@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Reforma Tributária | ACCOUNT Contabilidade</title>
+    <meta name="description" content="Simule IBS e CBS da Reforma Tributária para Simples Nacional, Lucro Presumido e Lucro Real.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg: #0A0A0A;
+            --surface: #161616;
+            --surface-2: #171a17;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #f5f5f5;
+            --muted: #a6a7aa;
+            --primary: #74C92C;
+            --primary-2: #91ea57;
+            --danger: #ff6961;
+            --radius: 8px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Inter, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.55;
+        }
+
+        a { color: inherit; text-decoration: none; }
+        .container { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(10, 10, 10, 0.88);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-row {
+            min-height: 76px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .brand { display: flex; align-items: center; gap: 0.75rem; font-weight: 800; letter-spacing: 0.04em; }
+        .brand-mark { width: 36px; height: 36px; border-radius: 8px; background: var(--primary); color: #071006; display: grid; place-items: center; }
+        nav ul { display: flex; align-items: center; gap: 1.25rem; list-style: none; font-size: 0.92rem; color: var(--muted); }
+        nav a:hover, nav a.active { color: var(--primary); }
+
+        .btn {
+            border: 0;
+            border-radius: var(--radius);
+            padding: 0.9rem 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+        }
+        .btn-primary { background: var(--primary); color: #071006; }
+        .btn-outline { border: 1px solid var(--border); color: var(--text); background: transparent; }
+
+        main { padding: 64px 0; }
+        .eyebrow { color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.82rem; }
+        h1 { font-size: clamp(2.2rem, 5vw, 4.8rem); line-height: 1; margin: 0.8rem 0 1rem; color: var(--primary); }
+        .lead { color: var(--muted); max-width: 780px; font-size: 1.08rem; }
+
+        .tabs { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 2rem 0; }
+        .tab { border: 1px solid var(--border); background: var(--surface); color: var(--muted); }
+        .tab.active { border-color: rgba(116, 201, 44, 0.5); background: rgba(116, 201, 44, 0.12); color: var(--primary-2); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        .panel h2 { font-size: 1.35rem; margin-bottom: 1rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .field { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 1rem; }
+        .field.full { grid-column: 1 / -1; }
+        label { color: var(--muted); font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+        input, select {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: #070807;
+            color: var(--text);
+            border-radius: var(--radius);
+            padding: 0.9rem 1rem;
+            font: inherit;
+            font-weight: 700;
+        }
+        .money-input {
+            position: relative;
+        }
+        .money-input span {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            font-weight: 800;
+            pointer-events: none;
+        }
+        .money-input input {
+            padding-left: 3.05rem;
+        }
+
+        .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .metric {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            min-height: 112px;
+        }
+        .metric.full { grid-column: 1 / -1; }
+        .metric span { color: var(--muted); display: block; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+        .metric strong { display: block; margin-top: 0.65rem; font-size: 1.85rem; }
+        .metric .green { color: var(--primary); }
+        .metric .danger { color: var(--danger); }
+        .breakdown {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.8rem;
+        }
+        .breakdown th,
+        .breakdown td {
+            border-bottom: 1px solid var(--border);
+            padding: 0.55rem 0;
+            text-align: right;
+            font-size: 0.9rem;
+        }
+        .breakdown th:first-child,
+        .breakdown td:first-child {
+            text-align: left;
+        }
+        .breakdown tr:last-child th,
+        .breakdown tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .note {
+            margin-top: 1rem;
+            color: var(--muted);
+            font-size: 0.88rem;
+            border-left: 3px solid var(--primary);
+            padding-left: 0.85rem;
+        }
+
+        .assumptions {
+            margin-top: 2rem;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .assumption {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+        .assumption strong { color: var(--text); display: block; margin-bottom: 0.4rem; }
+
+        footer { border-top: 1px solid var(--border); color: var(--muted); padding: 2rem 0; margin-top: 4rem; }
+
+        @media (max-width: 900px) {
+            nav ul { display: none; }
+            .grid, .assumptions { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 560px) {
+            main { padding-top: 40px; }
+            .form-grid, .result-grid { grid-template-columns: 1fr; }
+            .metric.full { grid-column: auto; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-row">
+            <a class="brand" href="/">
+                <span class="brand-mark"><i class="fa-solid fa-chart-line"></i></span>
+                <span>ACCOUNT</span>
+            </a>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="servicos">Serviços</a></li>
+                    <li><a href="sobre">Sobre Nós</a></li>
+                    <li><a href="orcamento">Orçamento</a></li>
+                    <li><a class="active" href="simples-nacional">Simples Nacional</a></li>
+                    <li><a href="contato">Contato</a></li>
+                </ul>
+            </nav>
+            <a class="btn btn-outline" href="simples-nacional"><i class="fa-solid fa-arrow-left"></i> Simples</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <span class="eyebrow">Subpágina do Simples Nacional</span>
+            <h1>Calculadora da Reforma Tributária</h1>
+            <p class="lead">Simule IBS e CBS por regime tributário, com créditos, reduções de alíquota e comparação com a carga atual. As alíquotas de referência são premissas editáveis: a LCP 214 prevê fixação por resolução do Senado Federal.</p>
+
+            <div class="tabs" role="tablist" aria-label="Regime tributário">
+                <button class="btn tab active" type="button" data-regime="simples">Simples Nacional</button>
+                <button class="btn tab" type="button" data-regime="simples-regular">Simples com regime regular</button>
+                <button class="btn tab" type="button" data-regime="presumido">Lucro Presumido</button>
+                <button class="btn tab" type="button" data-regime="real">Lucro Real</button>
+            </div>
+
+            <div class="grid">
+                <section class="panel">
+                    <h2>Dados da Simulação</h2>
+                    <form id="reformaForm">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="ano">Ano</label>
+                                <select id="ano">
+                                    <option value="2026">2026 - teste</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                    <option value="2029">2029</option>
+                                    <option value="2030">2030</option>
+                                    <option value="2031">2031</option>
+                                    <option value="2032">2032</option>
+                                    <option value="2033" selected>2033 em diante</option>
+                                </select>
+                            </div>
+
+                            <div class="field">
+                                <label for="reducao">Tratamento da operação</label>
+                                <select id="reducao">
+                                    <option value="0">Regra geral - sem redução</option>
+                                    <option value="0.30">Redução 30% - serviços profissionais listados</option>
+                                    <option value="0.60">Redução 60% - bens/serviços favorecidos</option>
+                                    <option value="1">Alíquota zero / redução 100%</option>
+                                </select>
+                            </div>
+
+                            <div class="field simples-detail">
+                                <label for="anexoSimples">Anexo do Simples</label>
+                                <select id="anexoSimples">
+                                    <option value="1">Anexo I - Comércio</option>
+                                    <option value="2">Anexo II - Indústria</option>
+                                    <option value="3" selected>Anexo III - Serviços</option>
+                                    <option value="4">Anexo IV - Serviços</option>
+                                    <option value="5">Anexo V - Serviços</option>
+                                </select>
+                            </div>
+
+                            <div class="field simples-detail">
+                                <label for="rbt12Simples">RBT12 do Simples</label>
+                                <div class="money-input">
+                                    <span>R$</span>
+                                    <input id="rbt12Simples" class="money-field" value="185.000,00" inputmode="decimal">
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="receita">Venda sem imposto IBS/CBS</label>
+                                <div class="money-input">
+                                    <span>R$</span>
+                                    <input id="receita" class="money-field" value="100.000,00" inputmode="decimal">
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="compras">Compras creditáveis</label>
+                                <div class="money-input">
+                                    <span>R$</span>
+                                    <input id="compras" class="money-field" value="40.000,00" inputmode="decimal">
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="cargaAtual">Tributos atuais sobre venda (%)</label>
+                                <input id="cargaAtual" value="11,20" inputmode="decimal">
+                            </div>
+
+                            <div class="field">
+                                <label for="ibsRef">IBS referência (%)</label>
+                                <input id="ibsRef" value="17,70" inputmode="decimal">
+                            </div>
+
+                            <div class="field">
+                                <label for="cbsRef">CBS referência (%)</label>
+                                <input id="cbsRef" value="8,80" inputmode="decimal">
+                            </div>
+
+                            <div class="field simples-only">
+                                <label for="simplesEfetivo">Simples efetivo atual (%)</label>
+                                <input id="simplesEfetivo" value="6,14" inputmode="decimal">
+                            </div>
+
+                            <div class="field simples-only">
+                                <label for="creditoSimples">IBS/CBS no DAS (%)</label>
+                                <input id="creditoSimples" value="0,00" inputmode="decimal">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" type="submit" style="width:100%; margin-top:0.5rem;">Calcular Reforma Tributária</button>
+                    </form>
+                    <p class="note" id="regimeNota">No Simples sem opção pelo regime regular, o simulador mantém o DAS informado e não apropria créditos de IBS/CBS para a própria empresa. O crédito ao comprador pode ser informado conforme a composição efetiva do DAS.</p>
+                </section>
+
+                <section class="panel">
+                    <h2>Resultado</h2>
+                    <div class="result-grid">
+                        <div class="metric">
+                            <span>Regime analisado</span>
+                            <strong id="outRegime">Simples Nacional</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Alíquota IBS/CBS aplicada</span>
+                            <strong id="outAliquota">0,00%</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Débito IBS</span>
+                            <strong id="outIbs">R$ 0,00</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Débito CBS</span>
+                            <strong id="outCbs">R$ 0,00</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Créditos aproveitados</span>
+                            <strong id="outCreditos">R$ 0,00</strong>
+                        </div>
+                        <div class="metric">
+                            <span>IBS/CBS a recolher</span>
+                            <strong class="green" id="outRecolher">R$ 0,00</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Total de tributos a recolher</span>
+                            <strong id="outPreco">R$ 0,00</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Comparativo vs. regra atual</span>
+                            <strong id="outDiferenca">R$ 0,00</strong>
+                        </div>
+                        <div class="metric full">
+                            <span>Leitura rápida</span>
+                            <strong id="outResumo">Preencha os dados e calcule.</strong>
+                        </div>
+                        <div class="metric full simples-breakdown">
+                            <span>Detalhamento da guia do Simples</span>
+                            <table class="breakdown">
+                                <tbody>
+                                    <tr><th>Faixa</th><td id="guiaFaixa">--</td></tr>
+                                    <tr><th>Total que pagaria no Simples</th><td id="guiaTotal">R$ 0,00</td></tr>
+                                    <tr><th>IRPJ</th><td id="guiaIrpj">R$ 0,00</td></tr>
+                                    <tr><th>CSLL</th><td id="guiaCsll">R$ 0,00</td></tr>
+                                    <tr><th>ISS</th><td id="guiaIss">R$ 0,00</td></tr>
+                                    <tr><th>ICMS</th><td id="guiaIcms">R$ 0,00</td></tr>
+                                    <tr><th>CPP</th><td id="guiaCpp">R$ 0,00</td></tr>
+                                    <tr><th>Demais tributos</th><td id="guiaOutros">R$ 0,00</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="note" id="outBaseLegal">Base: LCP 214, arts. 18, 41, 45, 47 e regras de transição; premissas iniciais espelhadas no simulador enviado.</p>
+                </section>
+            </div>
+
+            <section class="assumptions">
+                <div class="assumption"><strong>Simples Nacional</strong>Permanece no regime favorecido. Se não optar pelo regime regular, não apropria créditos próprios de IBS/CBS; o comprador no regime regular pode aproveitar o crédito correspondente ao tributo efetivamente pago.</div>
+                <div class="assumption"><strong>Lucro Presumido e Lucro Real</strong>Entram no regime regular de IBS/CBS: débito nas vendas menos créditos nas aquisições creditáveis, apurados separadamente.</div>
+                <div class="assumption"><strong>Reduções</strong>O campo de tratamento aplica redução de 30%, 60% ou 100% sobre IBS e CBS. Quando houver mais de um benefício, use o maior benefício aplicável ou alíquota zero quando cabível.</div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">© 2026 Account Contabilidade. Simulação para diagnóstico preliminar; não substitui revisão fiscal documental.</div>
+    </footer>
+
+    <script>
+        const tabelasSimples = {
+            "1": [
+                { limite: 180000, aliquota: 4.0, deducao: 0, irpj: 5.5, csll: 3.5, iss: 0, icms: 34.0, cpp: 41.5 },
+                { limite: 360000, aliquota: 7.3, deducao: 5940, irpj: 5.5, csll: 3.5, iss: 0, icms: 34.0, cpp: 41.5 },
+                { limite: 720000, aliquota: 9.5, deducao: 13860, irpj: 5.5, csll: 3.5, iss: 0, icms: 33.5, cpp: 42.0 },
+                { limite: 1800000, aliquota: 10.7, deducao: 22500, irpj: 5.5, csll: 3.5, iss: 0, icms: 33.5, cpp: 42.0 },
+                { limite: 3600000, aliquota: 14.3, deducao: 87300, irpj: 5.5, csll: 3.5, iss: 0, icms: 33.5, cpp: 42.0 },
+                { limite: 4800000, aliquota: 19.0, deducao: 378000, irpj: 13.5, csll: 10.0, iss: 0, icms: 0, cpp: 42.1 }
+            ],
+            "2": [
+                { limite: 180000, aliquota: 4.5, deducao: 0, irpj: 5.5, csll: 3.5, iss: 0, icms: 32.0, cpp: 37.5 },
+                { limite: 360000, aliquota: 7.8, deducao: 5940, irpj: 5.5, csll: 3.5, iss: 0, icms: 32.0, cpp: 37.5 },
+                { limite: 720000, aliquota: 10.0, deducao: 13860, irpj: 5.5, csll: 3.5, iss: 0, icms: 32.0, cpp: 37.5 },
+                { limite: 1800000, aliquota: 11.2, deducao: 22500, irpj: 5.5, csll: 3.5, iss: 0, icms: 32.0, cpp: 37.5 },
+                { limite: 3600000, aliquota: 14.7, deducao: 85500, irpj: 5.5, csll: 3.5, iss: 0, icms: 32.0, cpp: 37.5 },
+                { limite: 4800000, aliquota: 30.5, deducao: 720000, irpj: 8.5, csll: 7.5, iss: 0, icms: 0, cpp: 23.5 }
+            ],
+            "3": [
+                { limite: 180000, aliquota: 6.0, deducao: 0, irpj: 4.0, csll: 3.5, iss: 33.5, icms: 0, cpp: 43.4 },
+                { limite: 360000, aliquota: 11.2, deducao: 9360, irpj: 4.0, csll: 3.5, iss: 32.0, icms: 0, cpp: 43.4 },
+                { limite: 720000, aliquota: 13.5, deducao: 17640, irpj: 4.0, csll: 3.5, iss: 32.5, icms: 0, cpp: 43.4 },
+                { limite: 1800000, aliquota: 16.0, deducao: 35640, irpj: 4.0, csll: 3.5, iss: 32.5, icms: 0, cpp: 43.4 },
+                { limite: 3600000, aliquota: 21.0, deducao: 125640, irpj: 4.0, csll: 3.5, iss: 33.5, icms: 0, cpp: 43.4 },
+                { limite: 4800000, aliquota: 33.0, deducao: 648000, irpj: 35.0, csll: 15.0, iss: 0, icms: 0, cpp: 30.5 }
+            ],
+            "4": [
+                { limite: 180000, aliquota: 4.5, deducao: 0, irpj: 18.8, csll: 15.2, iss: 44.5, icms: 0, cpp: 0 },
+                { limite: 360000, aliquota: 9.0, deducao: 8100, irpj: 19.8, csll: 15.2, iss: 40.0, icms: 0, cpp: 0 },
+                { limite: 720000, aliquota: 10.2, deducao: 12420, irpj: 20.8, csll: 15.2, iss: 40.0, icms: 0, cpp: 0 },
+                { limite: 1800000, aliquota: 14.0, deducao: 39780, irpj: 17.8, csll: 19.2, iss: 40.0, icms: 0, cpp: 0 },
+                { limite: 3600000, aliquota: 22.0, deducao: 183780, irpj: 18.8, csll: 19.2, iss: 40.0, icms: 0, cpp: 0 },
+                { limite: 4800000, aliquota: 33.0, deducao: 828000, irpj: 53.5, csll: 21.5, iss: 0, icms: 0, cpp: 0 }
+            ],
+            "5": [
+                { limite: 180000, aliquota: 15.5, deducao: 0, irpj: 25.0, csll: 15.0, iss: 14.0, icms: 0, cpp: 28.85 },
+                { limite: 360000, aliquota: 18.0, deducao: 4500, irpj: 23.0, csll: 15.0, iss: 17.0, icms: 0, cpp: 27.85 },
+                { limite: 720000, aliquota: 19.5, deducao: 9900, irpj: 24.0, csll: 15.0, iss: 19.0, icms: 0, cpp: 23.85 },
+                { limite: 1800000, aliquota: 20.5, deducao: 17100, irpj: 21.0, csll: 15.0, iss: 21.0, icms: 0, cpp: 23.85 },
+                { limite: 3600000, aliquota: 23.0, deducao: 62100, irpj: 23.0, csll: 12.5, iss: 23.5, icms: 0, cpp: 23.85 },
+                { limite: 4800000, aliquota: 30.5, deducao: 540000, irpj: 35.0, csll: 15.5, iss: 0, icms: 0, cpp: 29.5 }
+            ]
+        };
+
+        const regimes = {
+            simples: {
+                label: 'Simples Nacional',
+                note: 'No Simples sem opção pelo regime regular, o IBS/CBS fica dentro do DAS. Informe o percentual de IBS/CBS no DAS para demonstrar a parcela desses tributos e o crédito possível ao comprador.'
+            },
+            'simples-regular': {
+                label: 'Simples com regime regular',
+                note: 'Optante do Simples que escolhe apurar IBS/CBS pelo regime regular: calcula débitos, créditos e saldo como os demais contribuintes, mantendo os demais tributos no Simples.'
+            },
+            presumido: {
+                label: 'Lucro Presumido',
+                note: 'Lucro Presumido no regime regular de IBS/CBS. Informe a carga atual de PIS/COFINS/ICMS/ISS para comparar com a transição.'
+            },
+            real: {
+                label: 'Lucro Real',
+                note: 'Lucro Real no regime regular de IBS/CBS. IRPJ e CSLL não entram no cálculo de IBS/CBS; use a carga atual apenas para comparação operacional.'
+            }
+        };
+
+        let regimeAtual = 'simples';
+
+        function parseNumber(value) {
+            if (!value) return 0;
+            return Number(String(value).replace(/\./g, '').replace(',', '.')) || 0;
+        }
+
+        function money(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function percent(value) {
+            return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+        }
+
+        function formatMoneyField(input) {
+            const value = parseNumber(input.value);
+            input.value = value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function transitionRates(year, ibsRef, cbsRef) {
+            const y = Number(year);
+            if (y === 2026) return { ibs: 0.1, cbs: 0.9 };
+            if (y === 2027 || y === 2028) return { ibs: 0, cbs: cbsRef };
+            if (y === 2029) return { ibs: ibsRef * 0.10, cbs: cbsRef };
+            if (y === 2030) return { ibs: ibsRef * 0.20, cbs: cbsRef };
+            if (y === 2031) return { ibs: ibsRef * 0.30, cbs: cbsRef };
+            if (y === 2032) return { ibs: ibsRef * 0.40, cbs: cbsRef };
+            return { ibs: ibsRef, cbs: cbsRef };
+        }
+
+        function calcularGuiaSimples(receita) {
+            const anexo = document.getElementById('anexoSimples').value;
+            const rbt12 = parseNumber(document.getElementById('rbt12Simples').value);
+            const tabela = tabelasSimples[anexo];
+            const baseBuscaFaixa = rbt12 === 0 ? 1 : rbt12;
+            const faixaIndex = tabela.findIndex(faixa => baseBuscaFaixa <= faixa.limite);
+
+            if (faixaIndex < 0 || rbt12 > 4800000) {
+                return null;
+            }
+
+            const faixa = tabela[faixaIndex];
+            const efetiva = rbt12 === 0 ? faixa.aliquota / 100 : Math.max(((rbt12 * (faixa.aliquota / 100)) - faixa.deducao) / rbt12, 0);
+            const total = receita * efetiva;
+            const issEfetivoSemLimite = efetiva * (faixa.iss / 100) * 100;
+            const issEfetivo = faixa.iss > 0 ? Math.min(Math.max(issEfetivoSemLimite, 2.01), 5) : 0;
+            const iss = receita * (issEfetivo / 100);
+            const irpj = total * (faixa.irpj / 100);
+            const csll = total * (faixa.csll / 100);
+            const icms = receita * efetiva * (faixa.icms / 100);
+            const cpp = total * (faixa.cpp / 100);
+            const outros = Math.max(total - irpj - csll - iss - icms - cpp, 0);
+
+            return { faixaIndex, faixa, efetiva, total, irpj, csll, iss, icms, cpp, outros };
+        }
+
+        function atualizarDetalheGuia(guia) {
+            const linhas = {
+                guiaFaixa: guia ? `${guia.faixaIndex + 1}ª faixa` : '--',
+                guiaTotal: guia ? money(guia.total) : 'R$ 0,00',
+                guiaIrpj: guia ? money(guia.irpj) : 'R$ 0,00',
+                guiaCsll: guia ? money(guia.csll) : 'R$ 0,00',
+                guiaIss: guia ? money(guia.iss) : 'R$ 0,00',
+                guiaIcms: guia ? money(guia.icms) : 'R$ 0,00',
+                guiaCpp: guia ? money(guia.cpp) : 'R$ 0,00',
+                guiaOutros: guia ? money(guia.outros) : 'R$ 0,00'
+            };
+
+            Object.entries(linhas).forEach(([id, value]) => {
+                document.getElementById(id).textContent = value;
+            });
+        }
+
+        function setRegime(regime) {
+            regimeAtual = regime;
+            document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.dataset.regime === regime));
+            document.querySelectorAll('.simples-detail').forEach(el => el.style.display = regime.startsWith('simples') ? 'flex' : 'none');
+            document.querySelectorAll('.simples-only').forEach(el => el.style.display = regime === 'simples' ? 'flex' : 'none');
+            document.querySelectorAll('.simples-breakdown').forEach(el => el.style.display = regime.startsWith('simples') ? 'block' : 'none');
+            document.getElementById('regimeNota').textContent = regimes[regime].note;
+            calcular();
+        }
+
+        function calcular() {
+            const receita = parseNumber(document.getElementById('receita').value);
+            const compras = parseNumber(document.getElementById('compras').value);
+            const cargaAtual = parseNumber(document.getElementById('cargaAtual').value) / 100;
+            const ibsRef = parseNumber(document.getElementById('ibsRef').value);
+            const cbsRef = parseNumber(document.getElementById('cbsRef').value);
+            const reducao = Number(document.getElementById('reducao').value);
+            const simplesEfetivo = parseNumber(document.getElementById('simplesEfetivo').value) / 100;
+            const creditoSimples = parseNumber(document.getElementById('creditoSimples').value) / 100;
+            const rates = transitionRates(document.getElementById('ano').value, ibsRef, cbsRef);
+            const fator = 1 - reducao;
+            const ibsAplicado = rates.ibs * fator / 100;
+            const cbsAplicado = rates.cbs * fator / 100;
+            const aliquotaAplicada = ibsAplicado + cbsAplicado;
+
+            let debitoIbs = receita * ibsAplicado;
+            let debitoCbs = receita * cbsAplicado;
+            let creditoIbs = compras * ibsAplicado;
+            let creditoCbs = compras * cbsAplicado;
+            let atual = receita * cargaAtual;
+            let ibsCbsRecolher;
+            let totalGeralPagar;
+            let resumo;
+            const guiaSimples = regimeAtual.startsWith('simples') ? calcularGuiaSimples(receita) : null;
+
+            if (regimeAtual === 'simples') {
+                debitoIbs = 0;
+                debitoCbs = 0;
+                creditoIbs = 0;
+                creditoCbs = 0;
+                ibsCbsRecolher = receita * creditoSimples;
+                totalGeralPagar = guiaSimples ? guiaSimples.total : receita * simplesEfetivo;
+                resumo = guiaSimples
+                    ? `Simples por dentro: empresa na ${guiaSimples.faixaIndex + 1}ª faixa, DAS estimado de ${money(guiaSimples.total)}. A parcela de IBS/CBS dentro do DAS é ${money(ibsCbsRecolher)}.`
+                    : 'RBT12 acima do limite do Simples Nacional.';
+            } else if (regimeAtual === 'simples-regular') {
+                const dasSemIbsCbs = guiaSimples ? guiaSimples.total : 0;
+                ibsCbsRecolher = Math.max(debitoIbs + debitoCbs - creditoIbs - creditoCbs, 0);
+                totalGeralPagar = dasSemIbsCbs + ibsCbsRecolher;
+                resumo = guiaSimples
+                    ? `Simples com IBS/CBS por fora: DAS estimado de ${money(dasSemIbsCbs)} mais IBS/CBS líquido de ${money(ibsCbsRecolher)}.`
+                    : 'RBT12 acima do limite do Simples Nacional.';
+            } else {
+                ibsCbsRecolher = Math.max(debitoIbs + debitoCbs - creditoIbs - creditoCbs, 0);
+                totalGeralPagar = ibsCbsRecolher;
+                resumo = `${regimes[regimeAtual].label}: IBS/CBS líquido pela não cumulatividade, com créditos sobre compras creditáveis.`;
+            }
+
+            const diferenca = totalGeralPagar - atual;
+
+            document.getElementById('outRegime').textContent = regimes[regimeAtual].label;
+            document.getElementById('outAliquota').textContent = percent(aliquotaAplicada * 100);
+            document.getElementById('outIbs').textContent = money(debitoIbs);
+            document.getElementById('outCbs').textContent = money(debitoCbs);
+            document.getElementById('outCreditos').textContent = money(creditoIbs + creditoCbs);
+            document.getElementById('outRecolher').textContent = money(ibsCbsRecolher);
+            document.getElementById('outPreco').textContent = money(totalGeralPagar);
+            document.getElementById('outDiferenca').textContent = money(diferenca);
+            document.getElementById('outDiferenca').className = diferenca > 0 ? 'danger' : 'green';
+            document.getElementById('outResumo').textContent = resumo;
+            atualizarDetalheGuia(guiaSimples);
+        }
+
+        document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => setRegime(btn.dataset.regime)));
+        document.getElementById('reformaForm').addEventListener('submit', event => {
+            event.preventDefault();
+            calcular();
+        });
+        document.querySelectorAll('input, select').forEach(el => el.addEventListener('change', calcular));
+        document.querySelectorAll('.money-field').forEach(input => {
+            input.addEventListener('blur', () => {
+                formatMoneyField(input);
+                calcular();
+            });
+        });
+        setRegime('simples');
+    </script>
+</body>
+</html>

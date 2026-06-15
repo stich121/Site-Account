@@ -1,0 +1,12 @@
+config_db.php
+google_drive_config.php
+.security/
+uploads/
+downloads/
+Planilhas/
+__pycache__/
+*.pyc
+IMPORTAR_*.sql
+importar_empresas_funcionarios.sql
+importar_funcionarios_acesso.sql
+atualizar_dados_folha_funcionarios.sql

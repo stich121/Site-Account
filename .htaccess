@@ -1,0 +1,43 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=302]
+
+    RewriteCond %{THE_REQUEST} \s/+index\.html[?\s] [NC]
+    RewriteRule ^index\.html$ / [L,R=302]
+
+    RewriteCond %{THE_REQUEST} \s/+painel-funcionarios\.php[?\s] [NC]
+    RewriteRule ^painel-funcionarios\.php$ /painel [L,R=302]
+
+    RewriteCond %{THE_REQUEST} \s/+entrada-funcionarios\.html[?\s] [NC]
+    RewriteRule ^entrada-funcionarios\.html$ /entrada-funcionarios [L,R=302]
+
+    RewriteCond %{THE_REQUEST} \s/+([A-Za-z0-9_-]+)\.php[?\s] [NC]
+    RewriteRule ^([A-Za-z0-9_-]+)\.php$ /$1 [L,R=302]
+
+    RewriteCond %{THE_REQUEST} \s/+([A-Za-z0-9_-]+)\.html[?\s] [NC]
+    RewriteRule ^([A-Za-z0-9_-]+)\.html$ /$1 [L,R=302]
+
+    RewriteRule ^painel/?$ painel-funcionarios.php [L,QSA]
+    RewriteRule ^entrada-funcionarios/?$ entrada-funcionarios.html [L]
+
+    RewriteRule ^(config_db|seguranca|google_drive_config|google_drive_service)/?$ - [F,L]
+    RewriteRule ^downloads/ - [F,L]
+
+    RewriteCond %{DOCUMENT_ROOT}/$1.php -f
+    RewriteRule ^([A-Za-z0-9_-]+)/?$ $1.php [L,QSA]
+
+    RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+    RewriteRule ^([A-Za-z0-9_-]+)/?$ $1.html [L]
+</IfModule>
+
+<FilesMatch "^(config_db|seguranca|google_drive_config|google_drive_service)\.php$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "\.(sql|xlsx|xls|csv)$">
+    Require all denied
+</FilesMatch>

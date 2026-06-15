@@ -1,0 +1,58 @@
+PASSO A PASSO PARA IMPORTAR NA HOSTINGER
+
+1. Suba estes arquivos para a pasta public_html da Hostinger:
+   - .htaccess
+   - index.html
+   - entrada-funcionarios.html
+   - login.php
+   - painel-funcionarios.php
+   - banco-horas.php
+   - afastamentos.php
+   - tipos-afastamentos.php
+   - gerenciar-funcionarios.php
+   - seguranca.php
+   - config_db.php
+   - imagens do site, como logo-branca.png, logo Preta.png e fachada.jpg
+   - demais paginas .html do site
+
+2. No hPanel da Hostinger, crie ou abra o banco MySQL.
+
+3. Abra o phpMyAdmin do banco escolhido.
+
+4. Importe o arquivo funcionarios.sql.
+   Ele cria:
+   - funcionarios
+   - registros_ponto
+   - afastamentos
+
+4.1. Se o banco ja existe e voce quer atualizar funcionarios, empresas, CNPJ e CPF:
+   importe o arquivo importar_empresas_funcionarios.sql.
+
+5. Edite config_db.php com os dados exatos do banco da Hostinger:
+   DB_HOST: host do MySQL informado pela Hostinger
+   DB_NAME: nome do banco
+   DB_USER: usuario do banco
+   DB_PASS: senha do banco
+
+6. Acesse a pagina:
+   https://SEU-DOMINIO.com.br/entrada-funcionarios
+
+7. Primeiro login de teste:
+   Usuario: admin
+   Senha: admin123
+
+8. Depois do primeiro acesso, troque a senha do admin ou crie funcionarios reais no phpMyAdmin.
+
+OBSERVACOES IMPORTANTES
+
+- Nao acesse /painel direto sem login.
+- O fluxo correto e /entrada-funcionarios -> /login -> /painel.
+- A tabela registros_ponto precisa existir antes de bater ponto.
+- Em hospedagem Linux, letras maiusculas e minusculas importam. O arquivo principal do site e index.html.
+- O sistema registra o horario do servidor no fuso America/Sao_Paulo.
+- A camera do navegador so funciona em HTTPS. Na Hostinger, use https:// no dominio.
+- Nao deixe arquivos .sql, .xlsx, .xls ou .csv na pasta publica depois de importar o banco.
+- Se o painel mostrar erro ao salvar a foto, execute atualizar_ponto_foto.sql no phpMyAdmin.
+- Se o painel mostrar erro ao cadastrar afastamento, execute atualizar_afastamentos.sql no phpMyAdmin.
+- Se a tela de tipos de afastamento não carregar as opções, execute atualizar_tipos_afastamentos.sql no phpMyAdmin.
+- Para separar Account e Bookkeep no painel, execute importar_empresas_funcionarios.sql no phpMyAdmin.
