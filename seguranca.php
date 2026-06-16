@@ -66,13 +66,17 @@ function iniciarSessaoSegura(bool $privado = true): void
 {
     forcarHttps();
 
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'secure' => requisicaoHttps(),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => requisicaoHttps(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        session_set_cookie_params(0, '/; samesite=Lax', '', requisicaoHttps(), true);
+    }
 
     if (session_status() !== PHP_SESSION_ACTIVE) {
         session_start();
