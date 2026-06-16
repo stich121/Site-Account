@@ -3,8 +3,6 @@ require_once __DIR__ . '/seguranca.php';
 iniciarSessaoSegura(true);
 header('Content-Type: application/json; charset=utf-8');
 
-require_once __DIR__ . '/config_db.php';
-
 function responderJson(array $dados): void
 {
     echo json_encode($dados);
@@ -204,6 +202,7 @@ if ((int) ($estadoLogin['tentativas'] ?? 0) >= 3) {
 }
 
 try {
+    require_once __DIR__ . '/config_db.php';
     $db = obterConexao();
     garantirCamposFuncionarios($db);
     garantirTabelaAfastamentos($db);
@@ -309,6 +308,7 @@ try {
         'permite_ponto' => (int) ($funcionario['permite_ponto'] ?? 1),
     ]);
 } catch (Throwable $e) {
+    error_log('[login.php] ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
     responderJson([
         'status' => 'error',
         'message' => 'Erro interno ao processar o login. Verifique a conexão com o banco de dados e tente novamente.',
