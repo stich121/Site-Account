@@ -1,27 +1,12 @@
 <?php
-ob_start();
-ini_set('display_errors', '0');
-
 require_once __DIR__ . '/seguranca.php';
 iniciarSessaoSegura(true);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/config_db.php';
 
-set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
-    if (!(error_reporting() & $severity)) {
-        return false;
-    }
-
-    throw new ErrorException($message, 0, $severity, $file, $line);
-});
-
 function responderJson(array $dados): void
 {
-    if (ob_get_length() !== false) {
-        ob_clean();
-    }
-
     echo json_encode($dados);
     exit;
 }
