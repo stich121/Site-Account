@@ -1,9 +1,30 @@
 <?php
+ob_start();
+ini_set('display_errors', '0');
+
 require_once __DIR__ . '/seguranca.php';
 iniciarSessaoSegura(true);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/config_db.php';
+
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+function responderJson(array $dados): void
+{
+    if (ob_get_length() !== false) {
+        ob_clean();
+    }
+
+    echo json_encode($dados);
+    exit;
+}
 
 function garantirCamposFuncionarios(PDO $db): void
 {
@@ -135,7 +156,7 @@ function limparFalhasLogin(string $chave): void
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['check'])) {
     if (isset($_SESSION['funcionario_id'])) {
-        echo json_encode([
+        responderJson([
             'status' => 'logged_in',
             'id' => $_SESSION['funcionario_id'],
             'usuario' => $_SESSION['funcionario_usuario'],
@@ -148,30 +169,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['check'])) {
             'permite_ponto' => $_SESSION['funcionario_permite_ponto'] ?? 1,
         ]);
     } else {
-        echo json_encode(['status' => 'logged_out']);
+        responderJson(['status' => 'logged_out']);
     }
-    exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['logout'])) {
     session_destroy();
-    echo json_encode(['status' => 'success', 'message' => 'Logout realizado com sucesso.']);
-    exit;
+    responderJson(['status' => 'success', 'message' => 'Logout realizado com sucesso.']);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Método não permitido.']);
-    exit;
+    responderJson(['status' => 'error', 'message' => 'Método não permitido.']);
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
+if (!is_array($input)) {
+    $input = [];
+}
 $usuario = trim($input['usuario'] ?? '');
 $senha = $input['senha'] ?? '';
 $respostaAntiBruteforce = trim((string) ($input['anti_bruteforce'] ?? ''));
 
 if ($usuario === '' || $senha === '') {
-    echo json_encode(['status' => 'error', 'message' => 'Informe usuário/e-mail e senha.']);
-    exit;
+    responderJson(['status' => 'error', 'message' => 'Informe usuário/e-mail e senha.']);
 }
 
 $chaveLogin = chaveTentativaLogin($usuario);
@@ -179,24 +199,22 @@ $estadoLogin = obterEstadoLogin($chaveLogin);
 $bloqueadoAte = (int) ($estadoLogin['bloqueado_ate'] ?? 0);
 if ($bloqueadoAte > time()) {
     $minutos = max(1, (int) ceil(($bloqueadoAte - time()) / 60));
-    echo json_encode([
+    responderJson([
         'status' => 'error',
         'message' => 'Muitas tentativas incorretas. Tente novamente em aproximadamente ' . $minutos . ' minuto(s).',
         'locked' => true,
     ]);
-    exit;
 }
 
 if ((int) ($estadoLogin['tentativas'] ?? 0) >= 3) {
     $desafio = desafioAtualLogin($chaveLogin);
     if (!respostaDesafioValida($chaveLogin, $respostaAntiBruteforce)) {
-        echo json_encode([
+        responderJson([
             'status' => 'error',
             'message' => 'Confirme o desafio de segurança para continuar: ' . $desafio['pergunta'],
             'requires_challenge' => true,
             'challenge_question' => $desafio['pergunta'],
         ]);
-        exit;
     }
 }
 
@@ -226,8 +244,7 @@ try {
             $resposta['challenge_question'] = $desafio['pergunta'];
             $resposta['message'] .= ' Desafio de segurança: ' . $desafio['pergunta'];
         }
-        echo json_encode($resposta);
-        exit;
+        responderJson($resposta);
     }
 
     $senhaArmazenada = $funcionario['senha'];
@@ -248,8 +265,7 @@ try {
             $resposta['challenge_question'] = $desafio['pergunta'];
             $resposta['message'] .= ' Desafio de segurança: ' . $desafio['pergunta'];
         }
-        echo json_encode($resposta);
-        exit;
+        responderJson($resposta);
     }
 
     $bloqueio = $db->prepare(
@@ -267,11 +283,10 @@ try {
     if ($afastamentoAtivo) {
         $inicio = (new DateTimeImmutable($afastamentoAtivo['data_inicio']))->format('d/m/Y');
         $fim = (new DateTimeImmutable($afastamentoAtivo['data_fim']))->format('d/m/Y');
-        echo json_encode([
+        responderJson([
             'status' => 'error',
             'message' => 'Usuário bloqueado por afastamento no período de ' . $inicio . ' a ' . $fim . '.',
         ]);
-        exit;
     }
 
     if ($senhaPrecisaAtualizar || password_needs_rehash($senhaArmazenada, PASSWORD_DEFAULT)) {
@@ -295,7 +310,7 @@ try {
     $_SESSION['funcionario_nivel_acesso'] = (int) ($funcionario['nivel_acesso'] ?? 1);
     $_SESSION['funcionario_permite_ponto'] = (int) ($funcionario['permite_ponto'] ?? 1);
 
-    echo json_encode([
+    responderJson([
         'status' => 'success',
         'message' => 'Login e senha corretos. Acesso liberado.',
         'redirect' => 'painel',
@@ -308,10 +323,10 @@ try {
         'nivel_acesso' => (int) ($funcionario['nivel_acesso'] ?? 1),
         'permite_ponto' => (int) ($funcionario['permite_ponto'] ?? 1),
     ]);
-} catch (PDOException $e) {
-    echo json_encode([
+} catch (Throwable $e) {
+    responderJson([
         'status' => 'error',
-        'message' => 'Erro ao conectar ao banco de dados: ' . $e->getMessage(),
+        'message' => 'Erro interno ao processar o login. Verifique a conexão com o banco de dados e tente novamente.',
     ]);
 }
 ?>

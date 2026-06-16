@@ -1349,12 +1349,12 @@
         
         // Verifica se a sessão do usuário está ativa assim que carrega o site
         function checarSessaoAtiva() {
-            fetch('login?check=1')
+            fetch('/login?check=1')
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'logged_in') {
                     if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
-                        fetch('login?logout=1', { keepalive: true })
+                        fetch('/login?logout=1', { keepalive: true })
                             .finally(() => {
                                 window.location.href = '/';
                             });
@@ -1389,7 +1389,7 @@
         }
 
         function executarLogout() {
-            fetch('login?logout=1')
+            fetch('/login?logout=1')
             .then(res => res.json())
             .then(() => {
                 sessionStorage.removeItem('accountFuncionarioSessao');
@@ -1502,12 +1502,25 @@
                         anti_bruteforce: antiBruteforceAnswer ? antiBruteforceAnswer.value : ''
                     };
 
-                    fetch('login', {
+                    fetch('/login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(loginData)
                     })
-                    .then(res => res.json())
+                    .then(async res => {
+                        const texto = await res.text();
+
+                        try {
+                            return JSON.parse(texto);
+                        } catch (err) {
+                            return {
+                                status: 'error',
+                                message: res.ok
+                                    ? 'Resposta inválida do servidor ao processar o login.'
+                                    : 'Não foi possível acessar o endpoint de login no servidor.'
+                            };
+                        }
+                    })
                     .then(data => {
                         if (data.status === 'success') {
                             sessionStorage.setItem('accountFuncionarioSessao', 'ativa');
@@ -1521,7 +1534,8 @@
                             loginFeedback.style.display = 'block';
                             
                             setTimeout(() => {
-                                window.location.href = data.redirect || 'painel';
+                                const destino = data.redirect || '/painel';
+                                window.location.href = destino.startsWith('/') ? destino : `/${destino}`;
                             }, 800);
                         } else {
                             if (data.requires_challenge && antiBruteforceGroup && antiBruteforceQuestion) {
