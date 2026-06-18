@@ -1,0 +1,59 @@
+================================================================================
+                    ACESSE ESTE LINK AGORA PARA DIAGNOSTICAR
+================================================================================
+
+O erro de login persiste. Para identificar EXATAMENTE o problema:
+
+1. ABRA NO NAVEGADOR:
+
+   http://seu-site.com/debug-login.php
+
+2. VEJA O RESULTADO:
+
+   - Se tudo estiver com ✓ verde = Sistema funcionando
+   - Se tiver ✗ vermelho = O erro está ali
+   - Se tiver ⚠️ laranja = Aviso
+
+3. ENVIE O RESULTADO PARA CORRIGIR
+
+Pode copiar a tela inteira e compartilhar.
+
+================================================================================
+POSSÍVEIS RESULTADOS
+================================================================================
+
+CENÁRIO 1: Erro 1045 (Acesso negado)
+→ Usuário ou senha errados em config_db.php
+
+CENÁRIO 2: Erro 1049 (Banco desconhecido)
+→ Banco de dados não existe ou nome errado
+
+CENÁRIO 3: Erro 2002/2003 (Conexão recusada)
+→ MySQL não está rodando ou host errado
+
+CENÁRIO 4: Tudo verde
+→ A conexão funciona, erro pode estar em seguranca.php ou outro lugar
+
+================================================================================
+O QUE FAZER DEPOIS
+================================================================================
+
+Se encontrar o problema:
+
+1. Abra o arquivo: config_db.php
+2. Atualize as credenciais
+3. Salve o arquivo
+4. Tente fazer login novamente
+
+Se não achar o problema:
+
+1. Envie a screenshot do debug-login.php
+2. Envie também o conteúdo de: config_db.php (sem a senha)
+3. Vamos resolver juntos
+
+================================================================================
+ATALHO (CTRL+C para copiar):
+
+http://seu-site.com/debug-login.php
+
+================================================================================

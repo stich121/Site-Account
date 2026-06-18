@@ -203,7 +203,9 @@ if ((int) ($estadoLogin['tentativas'] ?? 0) >= 3) {
 
 try {
     require_once __DIR__ . '/config_db.php';
+    error_log('[login.php] Tentando conectar ao banco: ' . DB_HOST . '/' . DB_NAME);
     $db = obterConexao();
+    error_log('[login.php] Conexao bem-sucedida');
     garantirCamposFuncionarios($db);
     garantirTabelaAfastamentos($db);
 
