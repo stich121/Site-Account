@@ -1,0 +1,186 @@
+================================================================================
+                    GUIA RÁPIDO DE INSTALAÇÃO
+                   Gerador de Folha de Ponto em PDF
+================================================================================
+
+TEMPO ESTIMADO: 5 minutos
+
+================================================================================
+PASSO 1: INSTALAR PYTHON (se não tiver)
+================================================================================
+
+Windows:
+  1. Acesse https://www.python.org/downloads/
+  2. Clique em "Download Python 3.x.x"
+  3. Execute o instalador
+  4. ✓ MARQUE "Add Python to PATH"
+  5. Clique "Install Now"
+
+Linux/macOS:
+  Provavelmente já tem. Verifique:
+  python3 --version
+
+================================================================================
+PASSO 2: INSTALAR DEPENDÊNCIAS
+================================================================================
+
+Abra terminal/prompt de comando e execute:
+
+  cd "H:\Meu Drive\00001 site\Site pelo CODEX"
+  pip install -r tools/requirements.txt
+
+Isso vai instalar:
+  - mysql-connector-python (conexão com MySQL)
+  - weasyprint (geração de PDF)
+
+Leva ~1-2 minutos...
+
+================================================================================
+PASSO 3: VALIDAR INSTALAÇÃO (RECOMENDADO)
+================================================================================
+
+Execute:
+  python tools/test_conexao.py
+
+Você deve ver:
+  ✓ Python 3.7+ (OK)
+  ✓ mysql-connector-python instalado (OK)
+  ✓ weasyprint instalado (OK)
+  ✓ Conexão com banco bem-sucedida (OK)
+
+Se tudo der ✓, está pronto!
+
+================================================================================
+PASSO 4: TESTAR NO PAINEL
+================================================================================
+
+1. Abra o painel: http://seu-site.com/painel
+2. Clique em "Meu PDF" no topo da página
+3. Aguarde ~2 segundos
+4. PDF deve fazer download automaticamente
+
+Se funcionou → ✅ TUDO PRONTO!
+
+Se não funcionou → Veja "TROUBLESHOOTING" abaixo
+
+================================================================================
+TROUBLESHOOTING RÁPIDO
+================================================================================
+
+Erro: "Python não encontrado"
+  → Reinstale Python seguindo PASSO 1
+  → Verifique se Python está no PATH: python --version
+
+Erro: "ModuleNotFoundError: mysql.connector"
+  → Execute novamente: pip install -r tools/requirements.txt
+  → Tente: pip install --upgrade mysql-connector-python
+
+Erro: "weasyprint não encontrado"
+  → Execute: pip install weasyprint
+  → Se falhar, continua funcionando (gera HTML em vez de PDF)
+
+Erro: "Cannot connect to MySQL"
+  → Verifique se MySQL está rodando
+  → Verifique credenciais em tools/gerar_folha_ponto_pdf.py
+
+PDF gerado está vazio ou quebrado
+  → Execute para testar diretamente:
+    python tools/gerar_folha_ponto_pdf.py 123 --mes 2026-05
+  → Verifique se funcionário 123 tem dados de ponto
+
+Para MAIS detalhes → Abra: tools/README_GERAR_FOLHA_PONTO.md
+
+================================================================================
+ARQUIVOS IMPORTANTES
+================================================================================
+
+📄 gerar-pdf-ponto.php
+   → Intermediário que conecta painel com Python (criado automaticamente)
+
+📁 tools/gerar_folha_ponto_pdf.py
+   → Script Python principal (criado automaticamente)
+
+📁 tools/requirements.txt
+   → Lista de dependências Python (criado automaticamente)
+
+📄 RESUMO_INTEGRACAO_PDF.md
+   → Explicação completa do que foi feito (criado automaticamente)
+
+📄 SETUP_PYTHON.md
+   → Detalhes de configuração avançada
+
+📁 tools/README_GERAR_FOLHA_PONTO.md
+   → Documentação técnica completa
+
+================================================================================
+PRÓXIMOS PASSOS
+================================================================================
+
+✓ Após instalar e validar:
+
+1. Teste clicando em "Meu PDF" no painel
+2. Teste clicando em "PDF do mês" na apuração de ponto
+3. Teste como admin (se tiver permissão)
+4. Teste para diferentes períodos
+
+Deve gerar PDFs automaticamente em ~2 segundos
+
+================================================================================
+SUPORTE
+================================================================================
+
+Se tiver problemas:
+
+1. Leia: tools/EXEMPLOS_USO.md (seção Troubleshooting)
+2. Execute: python tools/test_conexao.py (veja detalhes de erro)
+3. Verifique credenciais em: tools/gerar_folha_ponto_pdf.py
+4. Abra um terminal e teste:
+   python tools/gerar_folha_ponto_pdf.py 123
+
+================================================================================
+DICAS
+================================================================================
+
+💡 Para usar via linha de comando (opcional):
+
+  Windows:
+    gerar_folha_ponto.bat 123 --mes 2026-05
+
+  Linux/macOS:
+    ./tools/gerar_folha_ponto.sh 123 --mes 2026-05
+
+  Python direto:
+    python tools/gerar_folha_ponto_pdf.py 123 --mes 2026-05
+
+================================================================================
+RESUMO DO QUE ACONTECE AGORA
+================================================================================
+
+Antes:
+  1. Clica em "Meu PDF"
+  2. Abre HTML no navegador
+  3. Clica "Salvar como PDF"
+  4. Escolhe local e salva manualmente
+  5. ⏱️ Processo manual
+
+Depois:
+  1. Clica em "Meu PDF"
+  2. PDF é gerado por script Python
+  3. Download automático
+  4. ⏱️ Automático em ~2 segundos
+
+================================================================================
+PRONTO! 🎉
+================================================================================
+
+Sua integração está completa. Agora todos os PDFs de folha de ponto são
+gerados automaticamente com alta qualidade, mantendo exatamente o mesmo
+layout do painel web.
+
+Aproveite! 😊
+
+================================================================================
+Data: Junho 2026
+Versão: 1.0
+Status: Pronto para uso
+================================================================================

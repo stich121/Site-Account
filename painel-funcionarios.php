@@ -3522,7 +3522,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             </a>
             <div class="top-actions">
                 <a class="btn btn-outline" href="painel?export=csv"><i class="fa-solid fa-file-arrow-down"></i> Meu CSV</a>
-                <a class="btn btn-outline" href="painel?export=pdf" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Meu PDF</a>
+                <a class="btn btn-outline" href="gerar-pdf-ponto.php?export=pdf&mes=<?php echo h(date('Y-m')); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Meu PDF</a>
                 <?php if ($podeAdministrar): ?>
                     <a class="btn btn-outline" href="gerenciar-funcionarios"><i class="fa-solid fa-users-gear"></i> Funcionários</a>
                     <a class="btn btn-outline" href="painel?export=csv&scope=all"><i class="fa-solid fa-file-csv"></i> CSV geral</a>
@@ -3797,7 +3797,14 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                     'data_fim' => $dataFimFiltro,
                 ];
                 $csvAdminUrl = 'painel?export=csv&' . http_build_query($queryBase);
-                $pdfAdminUrl = 'painel?export=pdf&' . http_build_query($queryBase);
+                $pdfQueryBase = [
+                    'export' => 'pdf',
+                    'scope' => 'all',
+                    'funcionario_id' => $_GET['funcionario_id'] ?? '',
+                    'data_inicio' => $dataInicioFiltro,
+                    'data_fim' => $dataFimFiltro,
+                ];
+                $pdfAdminUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQueryBase);
             ?>
             <div class="admin-layout">
                 <aside class="panel admin-sidebar" id="adminSidebar" aria-label="Menu administrativo">

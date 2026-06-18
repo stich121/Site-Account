@@ -474,7 +474,7 @@ $pdfQuery = [
     'data_inicio' => $dataInicioFiltro,
     'data_fim' => $dataFimFiltro,
 ];
-$pdfTodosUrl = 'painel?' . http_build_query($pdfQuery);
+$pdfTodosUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQuery);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -1114,7 +1114,7 @@ $pdfTodosUrl = 'painel?' . http_build_query($pdfQuery);
                 <button class="btn" type="submit"><i class="fa-solid fa-filter"></i> Filtrar</button>
             </form>
 
-            <form class="admin-filters" method="get" action="painel" target="_blank" id="pdfMesForm">
+            <form class="admin-filters" method="get" action="gerar-pdf-ponto.php" target="_blank" id="pdfMesForm">
                 <input type="hidden" name="export" value="pdf">
                 <input type="hidden" name="scope" value="all">
                 <input type="hidden" name="data_inicio" id="pdf_data_inicio" value="<?php echo h($dataInicioFiltro); ?>">
