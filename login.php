@@ -309,9 +309,21 @@ try {
     ]);
 } catch (Throwable $e) {
     error_log('[login.php] ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+
+    // Debug: Mostrar erro mais específico se for erro de conexão
+    $mensagemErro = 'Erro interno ao processar o login. Verifique a conexão com o banco de dados e tente novamente.';
+    if (strpos($e->getMessage(), 'Connect') !== false || strpos($e->getMessage(), '2002') !== false || strpos($e->getMessage(), '2003') !== false) {
+        $mensagemErro = 'Erro de conexão com o banco de dados. O servidor MySQL pode estar desligado.';
+    } elseif (strpos($e->getMessage(), 'Access denied') !== false || strpos($e->getMessage(), '1045') !== false) {
+        $mensagemErro = 'Erro de autenticação no banco de dados. Verifique as credenciais em config_db.php.';
+    } elseif (strpos($e->getMessage(), 'Unknown database') !== false || strpos($e->getMessage(), '1049') !== false) {
+        $mensagemErro = 'Banco de dados não encontrado. Verifique o nome do banco em config_db.php.';
+    }
+
     responderJson([
         'status' => 'error',
-        'message' => 'Erro interno ao processar o login. Verifique a conexão com o banco de dados e tente novamente.',
+        'message' => $mensagemErro,
+        'debug_error' => $_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1' ? $e->getMessage() : null,
     ]);
 }
 ?>
