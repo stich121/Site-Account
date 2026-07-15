@@ -3509,11 +3509,18 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
     </style>
 </head>
 <body>
-    <?php if ($podeAdministrar): ?>
-        <button class="admin-menu-toggle" type="button" id="adminMenuToggle" aria-label="Abrir menu administrativo" aria-controls="adminSidebar" aria-expanded="false">
-            <i class="fa-solid fa-bars"></i>
-        </button>
-        <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop" aria-hidden="true"></div>
+    <button class="admin-menu-toggle" type="button" id="adminMenuToggle" aria-label="Abrir menu" aria-controls="adminSidebar" aria-expanded="false">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+    <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop" aria-hidden="true"></div>
+    <?php if (!$podeAdministrar): ?>
+        <aside class="panel admin-sidebar" id="adminSidebar" aria-label="Menu do funcionário">
+            <button class="admin-sidebar-close" type="button" id="adminSidebarClose" aria-label="Fechar menu">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="admin-sidebar-title">Programas internos</div>
+            <a class="admin-menu-link active" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
+        </aside>
     <?php endif; ?>
     <div class="shell">
         <header class="topbar">
