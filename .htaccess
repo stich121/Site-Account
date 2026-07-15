@@ -25,6 +25,7 @@ Options -Indexes
     RewriteRule ^entrada-funcionarios/?$ entrada-funcionarios.html [L]
 
     RewriteRule ^(config_db|seguranca|google_drive_config|google_drive_service)/?$ - [F,L]
+    RewriteRule ^downloads/programa-(fiscal-verificador-zip|contabil-ofx2excel)\.zip$ - [L]
     RewriteRule ^downloads/ - [F,L]
 
     RewriteCond %{DOCUMENT_ROOT}/$1.php -f
