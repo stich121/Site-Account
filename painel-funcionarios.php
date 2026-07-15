@@ -3339,63 +3339,6 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             font-size: 0.75rem;
             text-transform: uppercase;
         }
-        .programs-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .program-card {
-            display: grid;
-            gap: 0.9rem;
-            align-content: start;
-            padding: 1rem;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        .program-card h3 {
-            margin: 0;
-            font-family: var(--font-titles);
-            color: var(--text-white);
-            font-size: 1.05rem;
-        }
-
-        .program-card p {
-            margin: 0;
-        }
-
-        .program-card ul {
-            display: grid;
-            gap: 0.45rem;
-            margin: 0;
-            padding: 0;
-            list-style: none;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            line-height: 1.45;
-        }
-
-        .program-card li {
-            display: flex;
-            gap: 0.5rem;
-            align-items: flex-start;
-        }
-
-        .program-card li i {
-            margin-top: 0.2rem;
-            color: var(--primary);
-        }
-
-        .program-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.65rem;
-            align-items: center;
-            margin-top: 0.15rem;
-        }
 
         .inline-edit {
             display: grid;
@@ -3511,9 +3454,6 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             .camera-actions {
                 grid-template-columns: 1fr;
             }
-            .program-actions {
-                align-items: stretch;
-            }
             .admin-filters,
             .admin-form-grid,
             .inline-edit,
@@ -3581,7 +3521,6 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                 <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
             </a>
             <div class="top-actions">
-                <a class="btn btn-outline" href="#programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Programas</a>
                 <a class="btn btn-outline" href="painel?export=csv"><i class="fa-solid fa-file-arrow-down"></i> Meu CSV</a>
                 <a class="btn btn-outline" href="gerar-pdf-ponto.php?export=pdf&mes=<?php echo h(date('Y-m')); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Meu PDF</a>
                 <?php if ($podeAdministrar): ?>
@@ -3632,43 +3571,6 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             <div class="notice error"><?php echo h(mensagemBloqueioAfastamento($afastamentoBloqueioAtual)); ?></div>
         <?php endif; ?>
 
-        <section class="panel" id="programas-funcionarios">
-            <div class="section-title">
-                <h2>Programas dos funcionários</h2>
-                <span class="muted">Fiscal e Contábil</span>
-            </div>
-            <p class="muted">Baixe o pacote do setor, extraia a pasta no Windows e abra o arquivo <code>.pyw</code> com duplo clique.</p>
-
-            <div class="programs-grid">
-                <article class="program-card">
-                    <span class="badge"><i class="fa-solid fa-file-invoice-dollar"></i> Fiscal</span>
-                    <h3>Verificador Fiscal ZIP</h3>
-                    <p class="muted">Confere XMLs de notas fiscais dentro de um arquivo ZIP e gera uma planilha com impostos, status e alertas.</p>
-                    <ul>
-                        <li><i class="fa-solid fa-check"></i><span>Arquivo principal: VerificadorFiscalZIP.pyw</span></li>
-                        <li><i class="fa-solid fa-check"></i><span>Entrada: ZIP com XMLs de NF-e, NFC-e, CT-e ou NFS-e.</span></li>
-                        <li><i class="fa-solid fa-check"></i><span>Saída: Excel de conferência fiscal.</span></li>
-                    </ul>
-                    <div class="program-actions">
-                        <a class="btn" href="downloads/programa-fiscal-verificador-zip.zip" download><i class="fa-solid fa-download"></i> Baixar Fiscal</a>
-                    </div>
-                </article>
-
-                <article class="program-card">
-                    <span class="badge"><i class="fa-solid fa-building-columns"></i> Contábil</span>
-                    <h3>OFX para Excel e PDF</h3>
-                    <p class="muted">Converte extratos bancários OFX brasileiros para Excel e também permite gerar PDF pelo script incluído no pacote.</p>
-                    <ul>
-                        <li><i class="fa-solid fa-check"></i><span>Arquivo principal: OFX2Excel.pyw</span></li>
-                        <li><i class="fa-solid fa-check"></i><span>Entrada: extrato bancário em formato OFX.</span></li>
-                        <li><i class="fa-solid fa-check"></i><span>Saída: Excel no layout Data, d, c, Valor, Vazio e histórico.</span></li>
-                    </ul>
-                    <div class="program-actions">
-                        <a class="btn" href="downloads/programa-contabil-ofx2excel.zip" download><i class="fa-solid fa-download"></i> Baixar Contábil</a>
-                    </div>
-                </article>
-            </div>
-        </section>
 
         <?php if ($comprovante): ?>
             <section class="panel receipt">
@@ -3918,7 +3820,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                     <a class="admin-menu-link" href="afastamentos"><i class="fa-regular fa-calendar-xmark"></i> Afastamentos</a>
                     <a class="admin-menu-link" href="tipos-afastamentos"><i class="fa-solid fa-sliders"></i> Tipos de afastamento</a>
                     <div class="admin-sidebar-title">Programas internos</div>
-                    <a class="admin-menu-link" href="#programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
+                    <a class="admin-menu-link" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
                     <div class="admin-sidebar-title">Relatórios</div>
                     <a class="admin-menu-link" href="historico-espelho"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de espelho</a>
                     <a class="admin-menu-link" href="historico-download"><i class="fa-solid fa-download"></i> Histórico de download</a>
@@ -4572,4 +4474,3 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
 </script>
 </body>
 </html>
-
