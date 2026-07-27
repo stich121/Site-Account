@@ -139,6 +139,48 @@ function prepararTabelaEmpresasEmissorasNotas(PDO $db): void
     );
 }
 
+function semearEmpresasEmissorasNotas(PDO $db): void
+{
+    $stmt = $db->prepare(
+        'INSERT INTO empresas_emissoras (razao_social, ambiente_emissao, ativo)
+         VALUES (:razao_social, \'homologacao\', 1)
+         ON DUPLICATE KEY UPDATE razao_social = razao_social'
+    );
+
+    foreach (['Account', 'Art Designer', 'Consplatol', 'MC', 'MC2', 'Smarky', 'Tarsos Pizzaria'] as $nome) {
+        $stmt->execute(['razao_social' => $nome]);
+    }
+}
+
+function prepararTabelaNotasProdutosServicosNotas(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notas_produtos_servicos (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            empresa_emissora_id INT UNSIGNED NOT NULL,
+            tipo ENUM('produto','servico') NOT NULL,
+            descricao VARCHAR(255) NOT NULL,
+            codigo_interno VARCHAR(60) NULL,
+            ncm VARCHAR(10) NULL,
+            cfop VARCHAR(6) NULL,
+            cst_csosn VARCHAR(6) NULL,
+            codigo_servico_municipal VARCHAR(20) NULL,
+            unidade VARCHAR(10) NOT NULL DEFAULT 'UN',
+            valor_unitario_padrao DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            aliquota_icms DECIMAL(5,2) NULL,
+            aliquota_pis DECIMAL(5,2) NULL,
+            aliquota_cofins DECIMAL(5,2) NULL,
+            ativo TINYINT(1) NOT NULL DEFAULT 1,
+            criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_produtos_servicos_empresa (empresa_emissora_id, ativo),
+            CONSTRAINT fk_produtos_servicos_empresa_notas
+                FOREIGN KEY (empresa_emissora_id) REFERENCES empresas_emissoras(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
 function prepararTabelaNotasClientes(PDO $db): void
 {
     $db->exec(
@@ -273,6 +315,8 @@ try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
     prepararTabelaEmpresasEmissorasNotas($dbNotas);
+    semearEmpresasEmissorasNotas($dbNotas);
+    prepararTabelaNotasProdutosServicosNotas($dbNotas);
     prepararTabelaNotasClientes($dbNotas);
     prepararTabelaNotasFiscais($dbNotas);
     prepararTabelaNotasFiscaisItens($dbNotas);
