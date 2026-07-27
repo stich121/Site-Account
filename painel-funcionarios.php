@@ -2325,7 +2325,16 @@ try {
         $stmt->execute($bindAdmin);
         $registrosAdmin = $stmt->fetchAll();
 
-        $stmt = $db->query(
+        $porPaginaAjusteAdmin = 10;
+        $paginaAjusteAdmin = max(1, (int) ($_GET['pagina_ajuste'] ?? 1));
+        $totalAjusteAdmin = (int) $db->query('SELECT COUNT(*) FROM solicitacoes_ajuste_ponto')->fetchColumn();
+        $totalPaginasAjusteAdmin = max(1, (int) ceil($totalAjusteAdmin / $porPaginaAjusteAdmin));
+        if ($paginaAjusteAdmin > $totalPaginasAjusteAdmin) {
+            $paginaAjusteAdmin = $totalPaginasAjusteAdmin;
+        }
+        $offsetAjusteAdmin = ($paginaAjusteAdmin - 1) * $porPaginaAjusteAdmin;
+
+        $stmt = $db->prepare(
             'SELECT s.id, s.funcionario_id, s.tipo_solicitado, s.data_referencia, s.horario_solicitado,
                     s.justificativa, s.status, s.parecer_admin, s.criado_em, s.avaliado_em,
                     f.usuario, f.email, f.empresa_nome, f.empresa_cnpj, f.cpf, f.cargo,
@@ -2339,8 +2348,11 @@ try {
                 WHEN \'recusada\' THEN 3
                 ELSE 4
              END, s.criado_em DESC
-             LIMIT 200'
+             LIMIT :limite OFFSET :offset'
         );
+        $stmt->bindValue(':limite', $porPaginaAjusteAdmin, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offsetAjusteAdmin, PDO::PARAM_INT);
+        $stmt->execute();
         $solicitacoesAjusteAdmin = $stmt->fetchAll();
 
         $stmt = $db->query(
@@ -2388,6 +2400,9 @@ try {
     $saldosAdmin = [];
     $solicitacoesAjusteAdmin = [];
     $ajustesManuaisAdmin = [];
+    $porPaginaAjusteAdmin = 10;
+    $paginaAjusteAdmin = 1;
+    $totalPaginasAjusteAdmin = 1;
     $afastamentoBloqueioAtual = null;
     $proximoTipo = null;
     $tiposPontoPerfil = tiposPontoParaCargo($tiposPonto, $cargoRaw);
@@ -3325,6 +3340,38 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             font-size: 0.88rem;
         }
 
+        .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            align-items: center;
+            margin-top: 1rem;
+        }
+
+        .pagination a,
+        .pagination .pagination-atual {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2.2rem;
+            height: 2.2rem;
+            padding: 0 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            color: var(--text-white);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        .pagination a:hover {
+            border-color: var(--accent, #999);
+        }
+
+        .pagination .pagination-atual {
+            font-weight: 700;
+            background: var(--accent, #444);
+        }
+
         .admin-table th,
         .admin-table td {
             padding: 0.75rem;
@@ -3923,6 +3970,27 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <?php if ($totalPaginasAjusteAdmin > 1): ?>
+                        <?php
+                            $queryBaseAjuste = $_GET;
+                            unset($queryBaseAjuste['pagina_ajuste']);
+                        ?>
+                        <nav class="pagination" aria-label="Paginação de solicitações de ajuste">
+                            <?php if ($paginaAjusteAdmin > 1): ?>
+                                <a class="btn btn-outline" href="?<?php echo h(http_build_query(array_merge($queryBaseAjuste, ['pagina_ajuste' => $paginaAjusteAdmin - 1]))); ?>#solicitacoes-ajuste-admin">&laquo; Anterior</a>
+                            <?php endif; ?>
+                            <?php for ($paginaNumAjuste = 1; $paginaNumAjuste <= $totalPaginasAjusteAdmin; $paginaNumAjuste++): ?>
+                                <?php if ($paginaNumAjuste === $paginaAjusteAdmin): ?>
+                                    <span class="pagination-atual" aria-current="page"><?php echo (int) $paginaNumAjuste; ?></span>
+                                <?php else: ?>
+                                    <a href="?<?php echo h(http_build_query(array_merge($queryBaseAjuste, ['pagina_ajuste' => $paginaNumAjuste]))); ?>#solicitacoes-ajuste-admin"><?php echo (int) $paginaNumAjuste; ?></a>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+                            <?php if ($paginaAjusteAdmin < $totalPaginasAjusteAdmin): ?>
+                                <a class="btn btn-outline" href="?<?php echo h(http_build_query(array_merge($queryBaseAjuste, ['pagina_ajuste' => $paginaAjusteAdmin + 1]))); ?>#solicitacoes-ajuste-admin">Próxima &raquo;</a>
+                            <?php endif; ?>
+                        </nav>
+                    <?php endif; ?>
                 </div>
             </section>
 
