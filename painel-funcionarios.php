@@ -3519,7 +3519,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                 <i class="fa-solid fa-xmark"></i>
             </button>
             <div class="admin-sidebar-title">Notas Fiscais</div>
-            <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir notas</a>
+            <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
             <div class="admin-sidebar-title">Programas internos</div>
             <a class="admin-menu-link active" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
         </aside>
@@ -3829,9 +3829,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                     <a class="admin-menu-link" href="afastamentos"><i class="fa-regular fa-calendar-xmark"></i> Afastamentos</a>
                     <a class="admin-menu-link" href="tipos-afastamentos"><i class="fa-solid fa-sliders"></i> Tipos de afastamento</a>
                     <div class="admin-sidebar-title">Notas Fiscais</div>
-                    <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir notas</a>
-                    <a class="admin-menu-link" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
-                    <a class="admin-menu-link" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
+                    <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
                     <div class="admin-sidebar-title">Programas internos</div>
                     <a class="admin-menu-link" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
                     <div class="admin-sidebar-title">Relatórios</div>
