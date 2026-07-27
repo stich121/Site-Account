@@ -1,0 +1,530 @@
+<?php
+require_once __DIR__ . '/seguranca.php';
+iniciarSessaoSegura(true);
+date_default_timezone_set('America/Sao_Paulo');
+
+if (!isset($_SESSION['funcionario_id'])) {
+    header('Location: entrada-funcionarios');
+    exit;
+}
+
+require_once __DIR__ . '/config_db_notas.php';
+
+$funcionarioId = (int) $_SESSION['funcionario_id'];
+$nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
+
+if ($nivelAcesso < 3) {
+    header('Location: painel');
+    exit;
+}
+
+$erro = '';
+$sucesso = '';
+
+function h(string $valor): string
+{
+    return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
+}
+
+function prepararTabelaEmpresasEmissoras(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS empresas_emissoras (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            razao_social VARCHAR(180) NOT NULL,
+            nome_fantasia VARCHAR(180) NULL,
+            cnpj VARCHAR(20) NULL,
+            inscricao_estadual VARCHAR(30) NULL,
+            inscricao_municipal VARCHAR(30) NULL,
+            logradouro VARCHAR(180) NULL,
+            numero VARCHAR(20) NULL,
+            complemento VARCHAR(120) NULL,
+            bairro VARCHAR(120) NULL,
+            cep VARCHAR(12) NULL,
+            municipio VARCHAR(120) NULL,
+            codigo_ibge_municipio VARCHAR(10) NULL,
+            uf CHAR(2) NULL,
+            crt TINYINT UNSIGNED NULL,
+            ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+            ativo TINYINT(1) NOT NULL DEFAULT 1,
+            criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_empresas_emissoras_razao_social (razao_social)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
+function semearEmpresasEmissoras(PDO $db): void
+{
+    $stmt = $db->prepare(
+        'INSERT INTO empresas_emissoras (razao_social, ambiente_emissao, ativo)
+         VALUES (:razao_social, \'homologacao\', 1)
+         ON DUPLICATE KEY UPDATE razao_social = razao_social'
+    );
+
+    foreach (['Account', 'Art Designer', 'Consplatol', 'MC', 'MC2', 'Smarky', 'Tarsos Pizzaria'] as $nome) {
+        $stmt->execute(['razao_social' => $nome]);
+    }
+}
+
+try {
+    $db = obterConexaoNotas();
+    prepararTabelaEmpresasEmissoras($db);
+    semearEmpresasEmissoras($db);
+
+    if (empty($_SESSION['csrf_notas_empresas_emissoras'])) {
+        $_SESSION['csrf_notas_empresas_emissoras'] = bin2hex(random_bytes(32));
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $csrf = $_POST['csrf'] ?? '';
+        if (!hash_equals($_SESSION['csrf_notas_empresas_emissoras'], $csrf)) {
+            $erro = 'Sessão expirada. Atualize a página e tente novamente.';
+        } elseif (($_POST['acao'] ?? '') === 'adicionar') {
+            $razaoSocial = trim($_POST['razao_social'] ?? '');
+            $nomeFantasia = trim($_POST['nome_fantasia'] ?? '');
+            $cnpj = trim($_POST['cnpj'] ?? '');
+            $inscricaoEstadual = trim($_POST['inscricao_estadual'] ?? '');
+            $inscricaoMunicipal = trim($_POST['inscricao_municipal'] ?? '');
+            $logradouro = trim($_POST['logradouro'] ?? '');
+            $numero = trim($_POST['numero'] ?? '');
+            $complemento = trim($_POST['complemento'] ?? '');
+            $bairro = trim($_POST['bairro'] ?? '');
+            $cep = trim($_POST['cep'] ?? '');
+            $municipio = trim($_POST['municipio'] ?? '');
+            $codigoIbge = trim($_POST['codigo_ibge_municipio'] ?? '');
+            $uf = strtoupper(trim($_POST['uf'] ?? ''));
+            $crt = $_POST['crt'] !== '' ? (int) $_POST['crt'] : null;
+            $ambiente = ($_POST['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'producao' : 'homologacao';
+
+            if ($razaoSocial === '') {
+                $erro = 'Informe a razão social da empresa.';
+            } else {
+                $stmt = $db->prepare(
+                    'INSERT INTO empresas_emissoras (
+                        razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
+                        logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
+                        crt, ambiente_emissao, ativo
+                     ) VALUES (
+                        :razao_social, :nome_fantasia, :cnpj, :inscricao_estadual, :inscricao_municipal,
+                        :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :codigo_ibge_municipio, :uf,
+                        :crt, :ambiente_emissao, 1
+                     )
+                     ON DUPLICATE KEY UPDATE
+                        nome_fantasia = VALUES(nome_fantasia),
+                        cnpj = VALUES(cnpj),
+                        inscricao_estadual = VALUES(inscricao_estadual),
+                        inscricao_municipal = VALUES(inscricao_municipal),
+                        logradouro = VALUES(logradouro),
+                        numero = VALUES(numero),
+                        complemento = VALUES(complemento),
+                        bairro = VALUES(bairro),
+                        cep = VALUES(cep),
+                        municipio = VALUES(municipio),
+                        codigo_ibge_municipio = VALUES(codigo_ibge_municipio),
+                        uf = VALUES(uf),
+                        crt = VALUES(crt),
+                        ambiente_emissao = VALUES(ambiente_emissao),
+                        ativo = 1'
+                );
+                $stmt->execute([
+                    'razao_social' => $razaoSocial,
+                    'nome_fantasia' => $nomeFantasia !== '' ? $nomeFantasia : null,
+                    'cnpj' => $cnpj !== '' ? $cnpj : null,
+                    'inscricao_estadual' => $inscricaoEstadual !== '' ? $inscricaoEstadual : null,
+                    'inscricao_municipal' => $inscricaoMunicipal !== '' ? $inscricaoMunicipal : null,
+                    'logradouro' => $logradouro !== '' ? $logradouro : null,
+                    'numero' => $numero !== '' ? $numero : null,
+                    'complemento' => $complemento !== '' ? $complemento : null,
+                    'bairro' => $bairro !== '' ? $bairro : null,
+                    'cep' => $cep !== '' ? $cep : null,
+                    'municipio' => $municipio !== '' ? $municipio : null,
+                    'codigo_ibge_municipio' => $codigoIbge !== '' ? $codigoIbge : null,
+                    'uf' => $uf !== '' ? $uf : null,
+                    'crt' => $crt,
+                    'ambiente_emissao' => $ambiente,
+                ]);
+
+                $sucesso = 'Empresa emissora salva com sucesso.';
+            }
+        } elseif (($_POST['acao'] ?? '') === 'desativar') {
+            $id = (int) ($_POST['empresa_id'] ?? 0);
+            if ($id > 0) {
+                $stmt = $db->prepare('UPDATE empresas_emissoras SET ativo = 0 WHERE id = :id');
+                $stmt->execute(['id' => $id]);
+                $sucesso = 'Empresa desativada. Ela deixa de aparecer para escolha em novas notas.';
+            }
+        } elseif (($_POST['acao'] ?? '') === 'reativar') {
+            $id = (int) ($_POST['empresa_id'] ?? 0);
+            if ($id > 0) {
+                $stmt = $db->prepare('UPDATE empresas_emissoras SET ativo = 1 WHERE id = :id');
+                $stmt->execute(['id' => $id]);
+                $sucesso = 'Empresa reativada com sucesso.';
+            }
+        }
+    }
+
+    $stmt = $db->query(
+        'SELECT id, razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
+                logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
+                crt, ambiente_emissao, ativo
+         FROM empresas_emissoras
+         ORDER BY ativo DESC, razao_social ASC'
+    );
+    $empresas = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $erro = 'Erro ao carregar empresas emissoras: ' . $e->getMessage();
+    $empresas = [];
+}
+
+$csrf = h($_SESSION['csrf_notas_empresas_emissoras'] ?? '');
+
+function rotuloCrt(?int $crt): string
+{
+    return [
+        1 => '1 - Simples Nacional',
+        2 => '2 - Simples Nacional (excesso)',
+        3 => '3 - Regime Normal',
+    ][$crt] ?? '—';
+}
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empresas Emissoras | ACCOUNT Contabilidade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-main: #0A0A0A;
+            --bg-card: #161616;
+            --primary: #74C92C;
+            --primary-hover: #5EA522;
+            --danger: #FF453A;
+            --text-white: #FFFFFF;
+            --text-light: #F5F5F7;
+            --text-muted: #A1A1A6;
+            --border: rgba(255,255,255,0.1);
+            --font-titles: 'Montserrat', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            min-height: 100vh;
+            font-family: var(--font-body);
+            background: var(--bg-main);
+            color: var(--text-light);
+            padding: 2rem;
+        }
+
+        .shell { width: min(1180px, 100%); margin: 0 auto; }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .brand img { height: 34px; width: auto; display: block; }
+        a { color: inherit; text-decoration: none; }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h1, h2 {
+            font-family: var(--font-titles);
+            color: var(--text-white);
+            text-transform: uppercase;
+        }
+
+        h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 0.8rem; }
+        h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+        .muted { color: var(--text-muted); line-height: 1.6; }
+
+        .btn {
+            border: 0;
+            border-radius: 4px;
+            padding: 0.85rem 1rem;
+            color: var(--bg-main);
+            background: var(--primary);
+            font-family: var(--font-titles);
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+        }
+
+        .btn:hover { background: var(--primary-hover); }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-white);
+            border: 1px solid var(--border);
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: #FFD1CE;
+            border: 1px solid rgba(255, 69, 58, 0.35);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .field { display: grid; gap: 0.4rem; }
+        .field label { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
+
+        .field input,
+        .field select {
+            width: 100%;
+            padding: 0.85rem;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: #0A0A0A;
+            color: var(--text-white);
+            font-family: var(--font-body);
+        }
+
+        .notice {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(116, 201, 44, 0.3);
+            background: rgba(116, 201, 44, 0.08);
+        }
+
+        .notice.error {
+            border-color: rgba(255, 69, 58, 0.35);
+            background: rgba(255, 69, 58, 0.08);
+            color: #FFD1CE;
+        }
+
+        .notice.warning {
+            border-color: rgba(255, 191, 0, 0.35);
+            background: rgba(255, 191, 0, 0.08);
+            color: #FFE8A3;
+        }
+
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 0.8rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+        th { color: var(--text-white); font-family: var(--font-titles); font-size: 0.75rem; text-transform: uppercase; }
+        .status-active { color: var(--primary); font-weight: 700; }
+        .status-inactive { color: var(--danger); font-weight: 700; }
+        .row-actions { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+
+        @media (max-width: 820px) {
+            body { padding: 1rem; }
+            .topbar { flex-direction: column; align-items: flex-start; }
+            .form-grid { grid-template-columns: 1fr; }
+            .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <header class="topbar">
+            <a class="brand" href="painel" aria-label="Voltar para o painel">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+            </a>
+            <div class="top-actions">
+                <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
+                <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
+                <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
+                <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
+                <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
+            </div>
+        </header>
+
+        <section class="panel">
+            <h1>Empresas emissoras</h1>
+            <p class="muted">Cadastro das empresas do grupo que poderão emitir notas fiscais (NF-e/NFS-e). Confira CNPJ, Inscrição Estadual, Inscrição Municipal e endereço com o documento oficial de inscrição antes de usar em produção.</p>
+        </section>
+
+        <?php if ($erro !== ''): ?>
+            <div class="notice error"><?php echo h($erro); ?></div>
+        <?php endif; ?>
+
+        <?php if ($sucesso !== ''): ?>
+            <div class="notice"><?php echo h($sucesso); ?></div>
+        <?php endif; ?>
+
+        <div class="notice warning">
+            <strong>Fase 1:</strong> este cadastro ainda não emite notas de verdade. Certificado digital, transmissão para a SEFAZ (NF-e) e para o Portal Nacional da NFS-e ficam para a próxima etapa.
+        </div>
+
+        <section class="panel">
+            <h2>Adicionar / atualizar empresa</h2>
+            <form method="post">
+                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                <input type="hidden" name="acao" value="adicionar">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="razao_social">Razão social</label>
+                        <input id="razao_social" name="razao_social" type="text" required>
+                    </div>
+                    <div class="field">
+                        <label for="nome_fantasia">Nome fantasia</label>
+                        <input id="nome_fantasia" name="nome_fantasia" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="cnpj">CNPJ</label>
+                        <input id="cnpj" name="cnpj" type="text" placeholder="00.000.000/0000-00">
+                    </div>
+                    <div class="field">
+                        <label for="inscricao_estadual">Inscrição Estadual</label>
+                        <input id="inscricao_estadual" name="inscricao_estadual" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="inscricao_municipal">Inscrição Municipal</label>
+                        <input id="inscricao_municipal" name="inscricao_municipal" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="crt">Regime tributário (CRT)</label>
+                        <select id="crt" name="crt">
+                            <option value="">Selecione</option>
+                            <option value="1">1 - Simples Nacional</option>
+                            <option value="2">2 - Simples Nacional (excesso)</option>
+                            <option value="3">3 - Regime Normal</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="logradouro">Logradouro</label>
+                        <input id="logradouro" name="logradouro" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="numero">Número</label>
+                        <input id="numero" name="numero" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="complemento">Complemento</label>
+                        <input id="complemento" name="complemento" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="bairro">Bairro</label>
+                        <input id="bairro" name="bairro" type="text">
+                    </div>
+                    <div class="field">
+                        <label for="cep">CEP</label>
+                        <input id="cep" name="cep" type="text" placeholder="00000-000">
+                    </div>
+                    <div class="field">
+                        <label for="municipio">Município</label>
+                        <input id="municipio" name="municipio" type="text" value="Belo Horizonte">
+                    </div>
+                    <div class="field">
+                        <label for="codigo_ibge_municipio">Código IBGE do município</label>
+                        <input id="codigo_ibge_municipio" name="codigo_ibge_municipio" type="text" placeholder="3106200">
+                    </div>
+                    <div class="field">
+                        <label for="uf">UF</label>
+                        <input id="uf" name="uf" type="text" maxlength="2" value="MG">
+                    </div>
+                    <div class="field">
+                        <label for="ambiente_emissao">Ambiente de emissão</label>
+                        <select id="ambiente_emissao" name="ambiente_emissao">
+                            <option value="homologacao">Homologação (testes)</option>
+                            <option value="producao">Produção</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>&nbsp;</label>
+                        <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2>Empresas cadastradas</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Razão social</th>
+                            <th>CNPJ</th>
+                            <th>IE / IM</th>
+                            <th>Município/UF</th>
+                            <th>CRT</th>
+                            <th>Ambiente</th>
+                            <th>Status</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($empresas as $empresa): ?>
+                            <tr>
+                                <td><?php echo h($empresa['razao_social']); ?><?php if (($empresa['nome_fantasia'] ?? '') !== ''): ?><br><span class="muted"><?php echo h($empresa['nome_fantasia']); ?></span><?php endif; ?></td>
+                                <td><?php echo h($empresa['cnpj'] ?? '—'); ?></td>
+                                <td><?php echo h(($empresa['inscricao_estadual'] ?? '—') . ' / ' . ($empresa['inscricao_municipal'] ?? '—')); ?></td>
+                                <td><?php echo h(($empresa['municipio'] ?? '—') . '/' . ($empresa['uf'] ?? '')); ?></td>
+                                <td><?php echo h(rotuloCrt($empresa['crt'] !== null ? (int) $empresa['crt'] : null)); ?></td>
+                                <td><?php echo h($empresa['ambiente_emissao'] === 'producao' ? 'Produção' : 'Homologação'); ?></td>
+                                <td>
+                                    <?php if ((int) $empresa['ativo'] === 1): ?>
+                                        <span class="status-active">Ativa</span>
+                                    <?php else: ?>
+                                        <span class="status-inactive">Inativa</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <form method="post" class="row-actions">
+                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                        <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
+                                        <?php if ((int) $empresa['ativo'] === 1): ?>
+                                            <input type="hidden" name="acao" value="desativar">
+                                            <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
+                                        <?php else: ?>
+                                            <input type="hidden" name="acao" value="reativar">
+                                            <button class="btn btn-outline" type="submit"><i class="fa-solid fa-rotate-left"></i> Reativar</button>
+                                        <?php endif; ?>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
+            fetch('login?logout=1', { keepalive: true })
+                .finally(() => {
+                    window.location.href = '/';
+                });
+        }
+
+        function sair() {
+            sessionStorage.removeItem('accountFuncionarioSessao');
+            fetch('login?logout=1')
+                .then(() => {
+                    window.location.href = '/';
+                });
+        }
+    </script>
+</body>
+</html>

@@ -24,7 +24,7 @@ Options -Indexes
     RewriteRule ^painel/?$ painel-funcionarios.php [L,QSA]
     RewriteRule ^entrada-funcionarios/?$ entrada-funcionarios.html [L]
 
-    RewriteRule ^(config_db|seguranca|google_drive_config|google_drive_service)/?$ - [F,L]
+    RewriteRule ^(config_db|config_db_notas|seguranca|google_drive_config|google_drive_service)/?$ - [F,L]
     RewriteRule ^downloads/programa-(fiscal-verificador-zip|contabil-ofx2excel)\.zip$ - [L]
     RewriteRule ^downloads/ - [F,L]
 
@@ -35,7 +35,7 @@ Options -Indexes
     RewriteRule ^([A-Za-z0-9_-]+)/?$ $1.html [L]
 </IfModule>
 
-<FilesMatch "^(config_db|seguranca|google_drive_config|google_drive_service)\.php$">
+<FilesMatch "^(config_db|config_db_notas|seguranca|google_drive_config|google_drive_service)\.php$">
     Require all denied
 </FilesMatch>
 

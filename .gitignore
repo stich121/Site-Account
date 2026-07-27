@@ -1,4 +1,5 @@
 config_db.php
+config_db_notas.php
 google_drive_config.php
 .security/
 uploads/

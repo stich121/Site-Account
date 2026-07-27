@@ -62,6 +62,7 @@ function prepararCamposFuncionarios(PDO $db): void
         'centro_custo' => "ALTER TABLE funcionarios ADD COLUMN centro_custo VARCHAR(120) NULL AFTER numero_folha",
         'nivel_acesso' => "ALTER TABLE funcionarios ADD COLUMN nivel_acesso TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER cargo",
         'permite_ponto' => "ALTER TABLE funcionarios ADD COLUMN permite_ponto TINYINT(1) NOT NULL DEFAULT 1 AFTER nivel_acesso",
+        'permite_notas_fiscais' => "ALTER TABLE funcionarios ADD COLUMN permite_notas_fiscais TINYINT(1) NOT NULL DEFAULT 1 AFTER permite_ponto",
     ];
 
     foreach ($campos as $campo => $sql) {
@@ -107,6 +108,7 @@ try {
             $departamento = trim($_POST['departamento'] ?? '');
             $nivel = (int) ($_POST['nivel_acesso'] ?? 1);
             $permitePonto = isset($_POST['permite_ponto']) ? 1 : 0;
+            $permiteNotasFiscais = isset($_POST['permite_notas_fiscais']) ? 1 : 0;
 
             if (!isset($empresas[$empresaNome])) {
                 $erro = 'Selecione uma empresa válida.';
@@ -131,8 +133,8 @@ try {
                 }
 
                 $stmt = $db->prepare(
-                    'INSERT INTO funcionarios (usuario, empresa_nome, empresa_cnpj, cpf, email, senha, cargo, departamento, nivel_acesso, permite_ponto, ativo)
-                     VALUES (:usuario, :empresa_nome, :empresa_cnpj, :cpf, :email, :senha, :cargo, :departamento, :nivel_acesso, :permite_ponto, 1)'
+                    'INSERT INTO funcionarios (usuario, empresa_nome, empresa_cnpj, cpf, email, senha, cargo, departamento, nivel_acesso, permite_ponto, permite_notas_fiscais, ativo)
+                     VALUES (:usuario, :empresa_nome, :empresa_cnpj, :cpf, :email, :senha, :cargo, :departamento, :nivel_acesso, :permite_ponto, :permite_notas_fiscais, 1)'
                 );
                 $stmt->execute([
                     'usuario' => $usuario,
@@ -145,6 +147,7 @@ try {
                     'departamento' => $departamento,
                     'nivel_acesso' => $nivel,
                     'permite_ponto' => $permitePonto,
+                    'permite_notas_fiscais' => $permiteNotasFiscais,
                 ]);
 
                 $sucesso = 'Funcionário cadastrado com sucesso. Usuário gerado: ' . $usuario;
@@ -194,7 +197,7 @@ try {
     }
 
     $stmt = $db->query(
-        'SELECT id, usuario, empresa_nome, empresa_cnpj, cpf, email, cargo, departamento, nivel_acesso, permite_ponto, ativo
+        'SELECT id, usuario, empresa_nome, empresa_cnpj, cpf, email, cargo, departamento, nivel_acesso, permite_ponto, permite_notas_fiscais, ativo
          FROM funcionarios
          ORDER BY empresa_nome ASC, ativo DESC, usuario ASC'
     );
@@ -514,6 +517,10 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
                         <input type="checkbox" name="permite_ponto" checked>
                         Permite bater ponto
                     </label>
+                    <label class="check-row">
+                        <input type="checkbox" name="permite_notas_fiscais" checked>
+                        Permite emitir notas fiscais
+                    </label>
                     <div class="field">
                         <label>&nbsp;</label>
                         <button class="btn" type="submit"><i class="fa-solid fa-user-plus"></i> Adicionar</button>
@@ -536,6 +543,7 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
                             <th>Departamento</th>
                             <th>Nível</th>
                             <th>Ponto</th>
+                            <th>Notas fiscais</th>
                             <th>Status</th>
                             <th>Ação</th>
                         </tr>
@@ -551,6 +559,7 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
                                 <td><?php echo h($funcionario['departamento'] ?? ''); ?></td>
                                 <td><?php echo h((string) $funcionario['nivel_acesso']); ?></td>
                                 <td><?php echo (int) $funcionario['permite_ponto'] === 1 ? 'Sim' : 'Não'; ?></td>
+                                <td><?php echo (int) $funcionario['permite_notas_fiscais'] === 1 ? 'Sim' : 'Não'; ?></td>
                                 <td>
                                     <?php if ((int) $funcionario['ativo'] === 1): ?>
                                         <span class="status-active">Ativo</span>
