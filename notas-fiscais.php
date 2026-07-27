@@ -89,6 +89,27 @@ function gerarPdfSimples(array $linhas): string
     return $pdf;
 }
 
+function colunaExisteFuncionarios(PDO $db, string $coluna): bool
+{
+    $stmt = $db->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = \'funcionarios\'
+           AND COLUMN_NAME = :coluna'
+    );
+    $stmt->execute(['coluna' => $coluna]);
+
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function prepararColunaPermiteNotasFiscais(PDO $db): void
+{
+    if (!colunaExisteFuncionarios($db, 'permite_notas_fiscais')) {
+        $db->exec('ALTER TABLE funcionarios ADD COLUMN permite_notas_fiscais TINYINT(1) NOT NULL DEFAULT 1 AFTER permite_ponto');
+    }
+}
+
 function prepararTabelaEmpresasEmissorasNotas(PDO $db): void
 {
     $db->exec(
@@ -256,6 +277,8 @@ try {
     prepararTabelaNotasFiscais($dbNotas);
     prepararTabelaNotasFiscaisItens($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
+
+    prepararColunaPermiteNotasFiscais($db);
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);
