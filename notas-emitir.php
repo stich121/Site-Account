@@ -23,6 +23,7 @@ $sucesso = '';
 $notaEmEdicao = null;
 $nfseEmEdicao = null;
 $itensEmEdicao = [];
+$dadosRestaurar = null;
 
 function h(string $valor): string
 {
@@ -1115,6 +1116,24 @@ try {
                     if ($lockEdicaoAdquirido) liberarLockEdicaoNota($dbNotas, $notaEdicaoId);
                 }
             }
+
+            if ($erro !== '') {
+                // Preserva o que o usuário digitou para não perder a nota inteira quando a validação falha.
+                $dadosRestaurar = [
+                    'nota' => [
+                        'empresa_emissora_id' => $empresaId,
+                        'cliente_id' => $clienteId,
+                        'tipo_nota' => $tipoNota,
+                        'natureza_operacao' => $naturezaOperacao,
+                        'forma_pagamento' => $formaPagamento,
+                        'data_emissao' => $dataEmissao,
+                        'data_saida_entrada' => $dataSaidaEntrada,
+                        'informacoes_frete' => $informacoesFrete,
+                    ],
+                    'nfse' => $dadosNfse,
+                    'itens' => $itensValidos,
+                ];
+            }
         }
     }
 
@@ -1140,6 +1159,7 @@ $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
 $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
 $edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"itens":[]}';
+$restaurarJson = json_encode($dadosRestaurar, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
 $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
@@ -1721,6 +1741,7 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
 
     <script>
         const dadosEdicaoNota = <?php echo $edicaoJson; ?>;
+        const dadosRestaurar = <?php echo $restaurarJson; ?>;
         function aplicarDadosEdicao() {
             if (!dadosEdicaoNota || !dadosEdicaoNota.nota) return;
             const form = document.getElementById('formNota');
@@ -1801,6 +1822,47 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
         });
 
         aplicarDadosEdicao();
+
+        function restaurarCamposSimplesDoErro() {
+            if (!dadosRestaurar) return;
+            const form = document.getElementById('formNota');
+            const nota = dadosRestaurar.nota || {};
+            const nfse = dadosRestaurar.nfse || {};
+
+            Object.keys(nota).forEach(function (nome) {
+                const campo = form.elements.namedItem(nome);
+                if (campo) campo.value = nota[nome] == null ? '' : nota[nome];
+            });
+
+            const especiais = {
+                deducao_reducao_base_calculo: 'nfse_deducao_reducao_base',
+                exigibilidade_issqn_suspensa: 'nfse_exigibilidade_suspensa',
+                situacao_tributaria_pis_cofins: 'nfse_situacao_pis_cofins'
+            };
+            Object.keys(nfse).forEach(function (chave) {
+                const nome = especiais[chave] || ('nfse_' + chave);
+                const campo = form.elements.namedItem(nome);
+                if (!campo) return;
+                if (campo.type === 'checkbox') campo.checked = Number(nfse[chave]) === 1;
+                else campo.value = nfse[chave] == null ? '' : nfse[chave];
+            });
+            const informarDps = form.elements.namedItem('nfse_informar_dps');
+            if (informarDps) informarDps.checked = Boolean(nfse.serie_dps || nfse.numero_dps);
+
+            const cindopBusca = document.getElementById('nfse_ibscbs_codigo_indicador_operacao_busca');
+            if (cindopBusca && nfse.ibscbs_codigo_indicador_operacao) cindopBusca.value = nfse.ibscbs_codigo_indicador_operacao;
+            const cclassBusca = document.getElementById('nfse_ibscbs_classificacao_tributaria_busca');
+            if (cclassBusca && nfse.ibscbs_classificacao_tributaria) cclassBusca.value = nfse.ibscbs_classificacao_tributaria;
+
+            // O valor do serviço fica no item, não na tabela nfse — restaura separadamente.
+            const itensRestaurar = Array.isArray(dadosRestaurar.itens) ? dadosRestaurar.itens : [];
+            if (nota.tipo_nota === 'nfse' && itensRestaurar[0] && form.elements.namedItem('nfse_valor_servico')) {
+                form.elements.namedItem('nfse_valor_servico').value = itensRestaurar[0].valor_total;
+            }
+
+            CAMPOS_MOEDA_NFSE.forEach(function (id) { formatarCampoMoeda(document.getElementById(id)); });
+        }
+        restaurarCamposSimplesDoErro();
 
         function formatarCnpjOuCpf(valor, tipoPessoa) {
             const digitos = (valor || '').replace(/\D/g, '');
@@ -1997,7 +2059,11 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
         const selectCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal_opcoes');
         const campoNbs = document.getElementById('nfse_item_nbs');
         const statusNbs = document.getElementById('nfse_item_nbs_status');
-        const nbsSalvaEdicao = dadosEdicaoNota && dadosEdicaoNota.nfse ? String(dadosEdicaoNota.nfse.item_nbs || '').replace(/\D/g, '') : '';
+        const nbsSalvaEdicao = String(
+            (dadosEdicaoNota && dadosEdicaoNota.nfse && dadosEdicaoNota.nfse.item_nbs)
+            || (dadosRestaurar && dadosRestaurar.nfse && dadosRestaurar.nfse.item_nbs)
+            || ''
+        ).replace(/\D/g, '');
         function atualizarNbsPorServico() {
             if (!campoNbs || !campoCodigoTributacaoNacional) return;
             const partes = campoCodigoTributacaoNacional.value.trim().split('.');
@@ -2176,6 +2242,32 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
             adicionarLinhaItem();
         }
 
+        (function restaurarItensNfeDoErro() {
+            const nota = dadosRestaurar && dadosRestaurar.nota ? dadosRestaurar.nota : null;
+            const itens = dadosRestaurar && Array.isArray(dadosRestaurar.itens) ? dadosRestaurar.itens : [];
+            if (!nota || nota.tipo_nota !== 'nfe' || itens.length === 0 || !corpoItens) return;
+            corpoItens.innerHTML = '';
+            itens.forEach(function (item) {
+                adicionarLinhaItem();
+                const linha = corpoItens.lastElementChild;
+                if (!linha) return;
+                const mapa = {
+                    '.item-descricao': item.descricao,
+                    '.item-ncm': item.ncm,
+                    '.item-cfop': item.cfop,
+                    '.item-cst': item.cst_csosn,
+                    '.item-unidade': item.unidade,
+                    '.item-quantidade': item.quantidade,
+                    '.item-valor': item.valor_unitario
+                };
+                Object.keys(mapa).forEach(function (seletor) {
+                    const campoItem = linha.querySelector(seletor);
+                    if (campoItem && mapa[seletor] != null) campoItem.value = mapa[seletor];
+                });
+            });
+            recalcularTotal();
+        })();
+
         if (empresaSelect) {
             empresaSelect.addEventListener('change', function () {
                 corpoItens.querySelectorAll('.item-catalogo').forEach(function (select) {
@@ -2336,7 +2428,9 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                 .then(function (municipios) {
                     municipiosIbge = Array.isArray(municipios) ? municipios : [];
                     const opcaoEmpresa = empresaSelect ? empresaSelect.options[empresaSelect.selectedIndex] : null;
-                    const municipioSalvo = dadosEdicaoNota && dadosEdicaoNota.nfse ? dadosEdicaoNota.nfse.municipio_prestacao : '';
+                    const municipioSalvo = (dadosEdicaoNota && dadosEdicaoNota.nfse && dadosEdicaoNota.nfse.municipio_prestacao)
+                        || (dadosRestaurar && dadosRestaurar.nfse && dadosRestaurar.nfse.municipio_prestacao)
+                        || '';
                     if (municipioSalvo) {
                         selecionarMunicipioPorCodigo(municipioSalvo);
                     } else if (opcaoEmpresa && opcaoEmpresa.dataset.ibge) {
