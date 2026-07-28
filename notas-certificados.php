@@ -122,6 +122,77 @@ function salvarArquivoCertificado(array $arquivo): string
     return $nomeArquivo;
 }
 
+function ultimosErrosOpenssl(): string
+{
+    $erros = [];
+    while (($msg = openssl_error_string()) !== false) {
+        $erros[] = $msg;
+    }
+
+    return implode(' | ', $erros);
+}
+
+function erroIndicaCriptografiaLegada(string $detalhe): bool
+{
+    return $detalhe !== '' && (
+        stripos($detalhe, 'digital envelope') !== false
+        || stripos($detalhe, 'unsupported') !== false
+        || stripos($detalhe, 'algorithm') !== false
+    );
+}
+
+function executarOpenssl(array $argumentos, array $variaveisAmbiente): void
+{
+    $descritores = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $processo = @proc_open(array_merge(['openssl'], $argumentos), $descritores, $pipes, null, $variaveisAmbiente);
+
+    if (!is_resource($processo)) {
+        throw new RuntimeException('Não foi possível executar o openssl no servidor (proc_open indisponível).');
+    }
+
+    fclose($pipes[1]);
+    $erro = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $codigo = proc_close($processo);
+
+    if ($codigo !== 0) {
+        throw new RuntimeException(trim($erro) !== '' ? trim($erro) : "openssl retornou código {$codigo}.");
+    }
+}
+
+// Certificados ICP-Brasil antigos costumam usar RC2/3DES para cifrar o .pfx, algo que o
+// OpenSSL 3 (usado pelo PHP 8.3 do servidor) recusa por padrão, mesmo com a senha certa.
+// Em vez de obrigar a conversão manual pra cada certificado de cliente, tentamos converter
+// automaticamente aqui: extrai com "-legacy" (que ainda entende o formato antigo) e
+// reempacota num .pfx novo, reaproveitando a mesma senha, sem o funcionário precisar fazer nada.
+function converterCertificadoLegadoParaModerno(string $caminhoOriginal, string $senha): string
+{
+    if (!function_exists('proc_open')) {
+        throw new RuntimeException('A função proc_open está desabilitada neste servidor; não é possível converter automaticamente.');
+    }
+
+    $pemTemp = tempnam(sys_get_temp_dir(), 'cert_') . '.pem';
+    $pfxTemp = tempnam(sys_get_temp_dir(), 'cert_') . '.pfx';
+    // getenv() preserva o ambiente do processo (PATH, fontes de entropia do sistema etc.);
+    // se passássemos só a senha, o openssl perderia acesso a isso e falharia de formas estranhas.
+    $env = getenv() + ['CERT_SENHA' => $senha];
+
+    try {
+        executarOpenssl(['pkcs12', '-in', $caminhoOriginal, '-out', $pemTemp, '-nodes', '-legacy', '-passin', 'env:CERT_SENHA'], $env);
+        executarOpenssl(['pkcs12', '-export', '-in', $pemTemp, '-out', $pfxTemp, '-passout', 'env:CERT_SENHA'], $env);
+
+        $novoConteudo = file_get_contents($pfxTemp);
+        if ($novoConteudo === false) {
+            throw new RuntimeException('Não foi possível ler o certificado convertido.');
+        }
+
+        return $novoConteudo;
+    } finally {
+        @unlink($pemTemp);
+        @unlink($pfxTemp);
+    }
+}
+
 function validarCertificadoPfx(string $caminho, string $senha): string
 {
     $conteudo = file_get_contents($caminho);
@@ -131,24 +202,32 @@ function validarCertificadoPfx(string $caminho, string $senha): string
 
     $certs = [];
     if (!openssl_pkcs12_read($conteudo, $certs, $senha)) {
-        $errosOpenssl = [];
-        while (($msg = openssl_error_string()) !== false) {
-            $errosOpenssl[] = $msg;
-        }
-        $detalhe = implode(' | ', $errosOpenssl);
+        $detalhe = ultimosErrosOpenssl();
 
-        if ($detalhe !== '' && (stripos($detalhe, 'digital envelope') !== false || stripos($detalhe, 'unsupported') !== false || stripos($detalhe, 'algorithm') !== false)) {
+        if (erroIndicaCriptografiaLegada($detalhe)) {
+            try {
+                $conteudoConvertido = converterCertificadoLegadoParaModerno($caminho, $senha);
+            } catch (RuntimeException $e) {
+                throw new RuntimeException(
+                    'Este certificado usa uma criptografia antiga (RC2/3DES) que o servidor não abre diretamente, '
+                    . 'e a conversão automática falhou: ' . $e->getMessage()
+                );
+            }
+
+            if (file_put_contents($caminho, $conteudoConvertido) === false) {
+                throw new RuntimeException('Certificado convertido, mas não foi possível salvá-lo no servidor.');
+            }
+
+            $certs = [];
+            if (!openssl_pkcs12_read($conteudoConvertido, $certs, $senha)) {
+                throw new RuntimeException('Certificado convertido automaticamente, mas ainda não abriu. Detalhe: ' . ultimosErrosOpenssl());
+            }
+        } else {
             throw new RuntimeException(
-                'O servidor não conseguiu abrir este certificado porque ele usa uma criptografia antiga (RC2/3DES) '
-                . 'que o OpenSSL 3 do servidor desabilitou por padrão (isso não é sobre a senha estar errada). '
-                . 'Detalhe técnico: ' . $detalhe
+                'Certificado inválido ou senha incorreta. Confira o arquivo e a senha e tente novamente.'
+                . ($detalhe !== '' ? (' Detalhe técnico: ' . $detalhe) : '')
             );
         }
-
-        throw new RuntimeException(
-            'Certificado inválido ou senha incorreta. Confira o arquivo e a senha e tente novamente.'
-            . ($detalhe !== '' ? (' Detalhe técnico: ' . $detalhe) : '')
-        );
     }
 
     $infoCertificado = openssl_x509_parse($certs['cert'] ?? '');
