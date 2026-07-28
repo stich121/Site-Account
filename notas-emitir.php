@@ -603,77 +603,6 @@ try {
         $csrf = $_POST['csrf'] ?? '';
         if (!hash_equals($_SESSION['csrf_notas_emitir'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
-        } elseif (($_POST['acao'] ?? '') === 'cadastrar_cliente') {
-            $tipoPessoa = ($_POST['tipo_pessoa'] ?? 'PJ') === 'PF' ? 'PF' : 'PJ';
-            $nomeRazaoSocial = trim($_POST['nome_razao_social'] ?? '');
-            $cnpjCpf = trim($_POST['cnpj_cpf'] ?? '');
-            $inscricaoEstadual = trim($_POST['cliente_inscricao_estadual'] ?? '');
-            $email = trim($_POST['cliente_email'] ?? '');
-            $logradouro = trim($_POST['cliente_logradouro'] ?? '');
-            $numero = trim($_POST['cliente_numero'] ?? '');
-            $complemento = trim($_POST['cliente_complemento'] ?? '');
-            $bairro = trim($_POST['cliente_bairro'] ?? '');
-            $cep = trim($_POST['cliente_cep'] ?? '');
-            $municipio = trim($_POST['cliente_municipio'] ?? '');
-            $codigoIbgeCliente = trim($_POST['cliente_codigo_ibge_municipio'] ?? '');
-            $codigoPaisCliente = trim($_POST['cliente_codigo_pais'] ?? '1058');
-            $nifCliente = trim($_POST['cliente_nif'] ?? '');
-            $motivoNaoNifCliente = trim($_POST['cliente_motivo_nao_nif'] ?? '');
-            $uf = strtoupper(trim($_POST['cliente_uf'] ?? ''));
-            $consumidorFinal = isset($_POST['indicador_consumidor_final']) ? 1 : 0;
-
-            $documentoClienteCadastro = preg_replace('/\D+/', '', $cnpjCpf);
-            $tamanhoEsperado = $tipoPessoa === 'PF' ? 11 : 14;
-            $clienteExterior = $codigoPaisCliente !== '' && $codigoPaisCliente !== '1058';
-            if ($nomeRazaoSocial === '') {
-                $erro = 'Informe o nome/razão social do cliente.';
-            } elseif (!$clienteExterior && (strlen($documentoClienteCadastro) !== $tamanhoEsperado || !documentoNfseValido($documentoClienteCadastro))) {
-                $erro = $tipoPessoa === 'PF' ? 'Informe um CPF válido.' : 'Informe um CNPJ válido.';
-            } elseif ($clienteExterior && $nifCliente === '' && $motivoNaoNifCliente === '') {
-                $erro = 'Cliente exterior exige NIF ou motivo oficial da ausência de NIF.';
-            } elseif ($logradouro === '' || $numero === '' || $bairro === '' || $municipio === '') {
-                $erro = 'Preencha o endereço do cliente.';
-            } elseif (!$clienteExterior && (!preg_match('/^[A-Z]{2}$/', $uf) || !preg_match('/^\d{7}$/', $codigoIbgeCliente))) {
-                $erro = 'Cliente nacional exige UF válida e código IBGE do município com 7 dígitos.';
-            } elseif ($cep !== '' && strlen(preg_replace('/\D+/', '', $cep)) !== 8) {
-                $erro = 'Informe um CEP válido, com 8 dígitos.';
-            } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $erro = 'Informe um e-mail válido para o cliente ou deixe em branco.';
-            } else {
-                $stmt = $dbNotas->prepare(
-                    'INSERT INTO notas_clientes (
-                        tipo_pessoa, nome_razao_social, cnpj_cpf, inscricao_estadual, email,
-                        logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, codigo_pais, nif, motivo_nao_nif, uf,
-                        indicador_consumidor_final, criado_por
-                     ) VALUES (
-                        :tipo_pessoa, :nome_razao_social, :cnpj_cpf, :inscricao_estadual, :email,
-                        :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :codigo_ibge_municipio, :codigo_pais, :nif, :motivo_nao_nif, :uf,
-                        :indicador_consumidor_final, :criado_por
-                     )'
-                );
-                $stmt->execute([
-                    'tipo_pessoa' => $tipoPessoa,
-                    'nome_razao_social' => $nomeRazaoSocial,
-                    'cnpj_cpf' => $cnpjCpf !== '' ? $cnpjCpf : null,
-                    'inscricao_estadual' => $inscricaoEstadual !== '' ? $inscricaoEstadual : null,
-                    'email' => $email !== '' ? $email : null,
-                    'logradouro' => $logradouro !== '' ? $logradouro : null,
-                    'numero' => $numero !== '' ? $numero : null,
-                    'complemento' => $complemento !== '' ? $complemento : null,
-                    'bairro' => $bairro !== '' ? $bairro : null,
-                    'cep' => $cep !== '' ? $cep : null,
-                    'municipio' => $municipio !== '' ? $municipio : null,
-                    'codigo_ibge_municipio' => $codigoIbgeCliente !== '' ? $codigoIbgeCliente : null,
-                    'codigo_pais' => $codigoPaisCliente !== '' ? $codigoPaisCliente : null,
-                    'nif' => $nifCliente !== '' ? $nifCliente : null,
-                    'motivo_nao_nif' => $motivoNaoNifCliente !== '' ? $motivoNaoNifCliente : null,
-                    'uf' => $uf !== '' ? $uf : null,
-                    'indicador_consumidor_final' => $consumidorFinal,
-                    'criado_por' => $funcionarioId,
-                ]);
-
-                $sucesso = 'Cliente cadastrado. Já pode ser selecionado ao criar uma nota.';
-            }
         } elseif ($erro === '' && in_array(($_POST['acao'] ?? ''), ['criar_nota', 'salvar_edicao'], true)) {
             $salvandoEdicao = ($_POST['acao'] ?? '') === 'salvar_edicao';
             $empresaId = (int) ($_POST['empresa_emissora_id'] ?? 0);
@@ -1197,94 +1126,10 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
             <div class="notice error">Nenhuma empresa emissora ativa. <?php echo $podeAdministrar ? 'Cadastre uma em <a href="notas-empresas-emissoras" style="text-decoration:underline;">Empresas emissoras</a>.' : 'Peça para um administrador cadastrar em Empresas emissoras.'; ?></div>
         <?php else: ?>
 
-            <details class="panel" id="cadastroCliente">
-                <summary>Cadastrar novo cliente (destinatário)</summary>
-                <form method="post">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="cadastrar_cliente">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="tipo_pessoa">Tipo de pessoa</label>
-                            <select id="tipo_pessoa" name="tipo_pessoa">
-                                <option value="PJ">Pessoa jurídica</option>
-                                <option value="PF">Pessoa física</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="nome_razao_social">Nome / Razão social</label>
-                            <input id="nome_razao_social" name="nome_razao_social" type="text" required>
-                        </div>
-                        <div class="field">
-                            <label for="cnpj_cpf">CNPJ / CPF</label>
-                            <div class="row-actions">
-                                <input id="cnpj_cpf" name="cnpj_cpf" type="text" maxlength="18" style="flex: 1;">
-                                <button class="btn btn-outline btn-small" type="button" id="btnBuscarCnpjCliente"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
-                            </div>
-                            <span class="muted" id="statusBuscaCnpjCliente" style="font-size: 0.78rem;"></span>
-                        </div>
-                        <div class="field">
-                            <label for="cliente_inscricao_estadual">Inscrição Estadual (ou "ISENTO")</label>
-                            <input id="cliente_inscricao_estadual" name="cliente_inscricao_estadual" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_email">E-mail</label>
-                            <input id="cliente_email" name="cliente_email" type="email">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_logradouro">Logradouro</label>
-                            <input id="cliente_logradouro" name="cliente_logradouro" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_numero">Número</label>
-                            <input id="cliente_numero" name="cliente_numero" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_complemento">Complemento</label>
-                            <input id="cliente_complemento" name="cliente_complemento" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_bairro">Bairro</label>
-                            <input id="cliente_bairro" name="cliente_bairro" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_cep">CEP</label>
-                            <input id="cliente_cep" name="cliente_cep" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_municipio">Município</label>
-                            <input id="cliente_municipio" name="cliente_municipio" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_codigo_ibge_municipio">Código IBGE do município</label>
-                            <input id="cliente_codigo_ibge_municipio" name="cliente_codigo_ibge_municipio" type="text" inputmode="numeric" pattern="\d{7}" maxlength="7">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_codigo_pais">Código do país</label>
-                            <input id="cliente_codigo_pais" name="cliente_codigo_pais" type="text" inputmode="numeric" maxlength="4" value="1058">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_nif">NIF (destinatário exterior)</label>
-                            <input id="cliente_nif" name="cliente_nif" type="text" maxlength="40">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_motivo_nao_nif">Motivo da ausência de NIF</label>
-                            <input id="cliente_motivo_nao_nif" name="cliente_motivo_nao_nif" type="text" maxlength="2" placeholder="Código oficial">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_uf">UF</label>
-                            <input id="cliente_uf" name="cliente_uf" type="text" maxlength="2">
-                        </div>
-                        <label class="check-row">
-                            <input type="checkbox" name="indicador_consumidor_final" checked>
-                            Consumidor final
-                        </label>
-                        <div class="field">
-                            <label>&nbsp;</label>
-                            <button class="btn" type="submit"><i class="fa-solid fa-user-plus"></i> Cadastrar cliente</button>
-                        </div>
-                    </div>
-                </form>
-            </details>
+            <div class="notice">
+                <i class="fa-solid fa-circle-info"></i>
+                Não achou o cliente na lista? <a href="notas-clientes" style="text-decoration:underline;">Cadastre um novo cliente</a> na aba Clientes e volte para escolhê-lo aqui.
+            </div>
 
             <section class="panel">
                 <h2><?php echo $notaEmEdicao ? 'Corrigir NFS-e nº ' . h((string) $notaEmEdicao['numero_interno']) : 'Nova nota (rascunho)'; ?></h2>
@@ -1883,82 +1728,6 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
             return d;
         }
 
-        function formatarCepCliente(valor) {
-            const d = (valor || '').replace(/\D/g, '').slice(0, 8);
-            return d.length > 5 ? d.replace(/^(\d{5})(\d{0,3})$/, '$1-$2') : d;
-        }
-
-        const campoCnpjCpf = document.getElementById('cnpj_cpf');
-        const campoTipoPessoa = document.getElementById('tipo_pessoa');
-        const campoCepCliente = document.getElementById('cliente_cep');
-        const btnBuscarCnpjCliente = document.getElementById('btnBuscarCnpjCliente');
-
-        if (campoCnpjCpf && campoTipoPessoa) {
-            campoCnpjCpf.addEventListener('input', function () {
-                campoCnpjCpf.value = formatarCnpjOuCpf(campoCnpjCpf.value, campoTipoPessoa.value);
-            });
-            campoTipoPessoa.addEventListener('change', function () {
-                campoCnpjCpf.value = formatarCnpjOuCpf(campoCnpjCpf.value, campoTipoPessoa.value);
-                if (btnBuscarCnpjCliente) {
-                    btnBuscarCnpjCliente.style.display = campoTipoPessoa.value === 'PF' ? 'none' : '';
-                }
-            });
-        }
-
-        if (campoCepCliente) {
-            campoCepCliente.addEventListener('input', function () {
-                campoCepCliente.value = formatarCepCliente(campoCepCliente.value);
-            });
-        }
-
-        if (btnBuscarCnpjCliente) {
-            btnBuscarCnpjCliente.addEventListener('click', function () {
-                const statusEl = document.getElementById('statusBuscaCnpjCliente');
-                const digitos = (campoCnpjCpf.value || '').replace(/\D/g, '');
-
-                if (digitos.length !== 14) {
-                    statusEl.textContent = 'Informe um CNPJ com 14 dígitos antes de buscar.';
-                    statusEl.style.color = '#FFD1CE';
-                    return;
-                }
-
-                statusEl.textContent = 'Buscando...';
-                statusEl.style.color = '';
-                btnBuscarCnpjCliente.disabled = true;
-
-                fetch('buscar-cnpj?cnpj=' + digitos)
-                    .then(function (resposta) { return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; }); })
-                    .then(function (resultado) {
-                        if (!resultado.ok) {
-                            statusEl.textContent = resultado.dados.erro || 'Não foi possível buscar o CNPJ.';
-                            statusEl.style.color = '#FFD1CE';
-                            return;
-                        }
-
-                        const dados = resultado.dados;
-                        document.getElementById('nome_razao_social').value = dados.razao_social || '';
-                        document.getElementById('cliente_logradouro').value = dados.logradouro || '';
-                        document.getElementById('cliente_numero').value = dados.numero || '';
-                        document.getElementById('cliente_complemento').value = dados.complemento || '';
-                        document.getElementById('cliente_bairro').value = dados.bairro || '';
-                        document.getElementById('cliente_cep').value = formatarCepCliente(dados.cep || '');
-                        document.getElementById('cliente_municipio').value = dados.municipio || '';
-                        document.getElementById('cliente_codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
-                        document.getElementById('cliente_uf').value = dados.uf || '';
-
-                        statusEl.style.color = 'var(--primary)';
-                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de cadastrar.';
-                    })
-                    .catch(function () {
-                        statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
-                        statusEl.style.color = '#FFD1CE';
-                    })
-                    .finally(function () {
-                        btnBuscarCnpjCliente.disabled = false;
-                    });
-            });
-        }
-
         function formatarDocumentoBusca(valor) {
             const digitos = (valor || '').replace(/\D/g, '');
             return formatarCnpjOuCpf(digitos, digitos.length <= 11 ? 'PF' : 'PJ');
@@ -1995,7 +1764,7 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                 statusEl.textContent = 'Cliente encontrado e selecionado: ' + opcao.textContent;
             } else {
                 statusEl.style.color = '#FFD1CE';
-                statusEl.innerHTML = 'Nenhum cliente cadastrado com esse documento. <a href="notas-emitir#cadastroCliente" style="text-decoration:underline; color:#FFD1CE;">Cadastre um novo cliente</a>.';
+                statusEl.innerHTML = 'Nenhum cliente cadastrado com esse documento. <a href="notas-clientes" style="text-decoration:underline; color:#FFD1CE;">Cadastre um novo cliente</a>.';
             }
         }
 
@@ -2036,14 +1805,6 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                     btnMenuHamburguer.setAttribute('aria-expanded', 'false');
                 }
             });
-        }
-
-        if (window.location.hash === '#cadastroCliente') {
-            const detalhesCliente = document.getElementById('cadastroCliente');
-            if (detalhesCliente) {
-                detalhesCliente.open = true;
-                detalhesCliente.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
         }
 
         const catalogo = JSON.parse(<?php echo json_encode($catalogoJson); ?>);

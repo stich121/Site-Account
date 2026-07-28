@@ -3,7 +3,7 @@
  * Cabeçalho e navegação compartilhados das telas do emissor fiscal.
  *
  * A página que inclui este arquivo deve, antes do include, opcionalmente definir:
- * - $paginaAtivaNotas (string): 'notas' | 'emitir' | 'certificados' | 'empresas' | 'produtos'
+ * - $paginaAtivaNotas (string): 'notas' | 'emitir' | 'clientes' | 'certificados' | 'empresas' | 'produtos'
  * - $podeAdministrar (bool): controla a exibição dos itens administrativos
  *
  * Requer que exista, na página, a função JS sair() e o CSS de
@@ -26,7 +26,6 @@ $abaClasse = static function (string $chave) use ($paginaAtivaNotas): string {
             <i class="fa-solid fa-bars"></i> Menu
         </button>
         <div class="menu-dropdown" id="menuDropdown">
-            <a class="btn btn-outline" href="notas-emitir#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
             <?php if ($podeAdministrar): ?>
                 <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
             <?php endif; ?>
@@ -40,6 +39,7 @@ $abaClasse = static function (string $chave) use ($paginaAtivaNotas): string {
 <nav class="notas-nav" aria-label="Navegação da área fiscal">
     <a class="<?php echo $abaClasse('notas'); ?>" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
     <a class="<?php echo $abaClasse('emitir'); ?>" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota</a>
+    <a class="<?php echo $abaClasse('clientes'); ?>" href="notas-clientes"><i class="fa-solid fa-users"></i> Clientes</a>
     <a class="<?php echo $abaClasse('certificados'); ?>" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
     <?php if ($podeAdministrar): ?>
         <a class="<?php echo $abaClasse('empresas'); ?>" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
