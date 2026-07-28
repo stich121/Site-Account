@@ -243,6 +243,43 @@ try {
                 $stmt->execute(['id' => $id]);
                 $sucesso = 'Empresa reativada com sucesso.';
             }
+        } elseif (($_POST['acao'] ?? '') === 'excluir') {
+            $id = (int) ($_POST['empresa_id'] ?? 0);
+            $confirmado = ($_POST['confirmar_exclusao'] ?? '') === 'sim';
+
+            if ($id <= 0) {
+                $erro = 'Empresa inválida.';
+            } elseif (!$confirmado) {
+                $erro = 'Marque SIM para confirmar a exclusão definitiva.';
+            } else {
+                $stmt = $db->prepare('SELECT ativo, certificado_arquivo FROM empresas_emissoras WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $id]);
+                $empresaExcluir = $stmt->fetch();
+
+                if (!$empresaExcluir) {
+                    $erro = 'Empresa não encontrada.';
+                } elseif ((int) $empresaExcluir['ativo'] === 1) {
+                    $erro = 'Desative a empresa antes de excluir definitivamente.';
+                } else {
+                    try {
+                        $stmt = $db->prepare('DELETE FROM empresas_emissoras WHERE id = :id AND ativo = 0');
+                        $stmt->execute(['id' => $id]);
+
+                        if (!empty($empresaExcluir['certificado_arquivo'])) {
+                            $arquivoCertificado = __DIR__ . '/certificados-nfse/' . basename($empresaExcluir['certificado_arquivo']);
+                            if (is_file($arquivoCertificado)) {
+                                unlink($arquivoCertificado);
+                            }
+                        }
+
+                        $sucesso = 'Empresa excluída definitivamente.';
+                    } catch (PDOException $e) {
+                        $erro = str_contains($e->getMessage(), 'a foreign key constraint fails')
+                            ? 'Não é possível excluir: existem notas fiscais emitidas vinculadas a esta empresa. O histórico precisa ser mantido.'
+                            : ('Erro ao excluir empresa: ' . $e->getMessage());
+                    }
+                }
+            }
         }
     }
 
@@ -381,6 +418,31 @@ function rotuloCrt(?int $crt): string
         }
 
         .btn-small { padding: 0.55rem 0.75rem; font-size: 0.72rem; white-space: nowrap; }
+
+        .delete-confirm {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--danger);
+            font-family: var(--font-titles);
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            background: transparent;
+            white-space: nowrap;
+        }
+
+        .delete-question {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+
+        .delete-confirm input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--danger);
+        }
 
         .form-grid {
             display: grid;
@@ -599,17 +661,32 @@ function rotuloCrt(?int $crt): string
                                 <td>
                                     <div class="row-actions">
                                         <a class="btn btn-outline" href="notas-empresas-emissoras?editar=<?php echo h((string) $empresa['id']); ?>#razao_social"><i class="fa-solid fa-pen"></i> Editar</a>
-                                        <form method="post" class="row-actions">
-                                            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                            <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
-                                            <?php if ((int) $empresa['ativo'] === 1): ?>
+                                        <?php if ((int) $empresa['ativo'] === 1): ?>
+                                            <form method="post">
+                                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                                <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
                                                 <input type="hidden" name="acao" value="desativar">
                                                 <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
-                                            <?php else: ?>
+                                            </form>
+                                        <?php else: ?>
+                                            <form method="post">
+                                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                                <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
                                                 <input type="hidden" name="acao" value="reativar">
                                                 <button class="btn btn-outline" type="submit"><i class="fa-solid fa-rotate-left"></i> Reativar</button>
-                                            <?php endif; ?>
-                                        </form>
+                                            </form>
+                                            <form method="post" class="row-actions">
+                                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                                <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
+                                                <input type="hidden" name="acao" value="excluir">
+                                                <span class="delete-question">Excluir de vez?</span>
+                                                <label class="delete-confirm" title="Confirmar exclusão definitiva (o catálogo de produtos/serviços dessa empresa também é apagado; notas fiscais já emitidas impedem a exclusão)">
+                                                    <input type="checkbox" name="confirmar_exclusao" value="sim">
+                                                    SIM
+                                                </label>
+                                                <button class="btn btn-danger" type="submit"><i class="fa-solid fa-trash"></i> Excluir</button>
+                                            </form>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
