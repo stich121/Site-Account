@@ -1279,7 +1279,7 @@ $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
                             <div class="field">
                                 <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
                                 <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="text">
-                                <span class="muted" style="font-size: 0.78rem;">Depende do município. Para Belo Horizonte, consulte o <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">código de tributação municipal (BHISS)</a>.</span>
+                                <span class="muted" style="font-size: 0.78rem;">Preenchido automaticamente como "<código>.001" (padrão da maioria dos municípios, inclusive BH, quando não há especialização própria). Se o seu município tiver um código diferente, ajuste aqui — para Belo Horizonte, confira no <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">código de tributação municipal (BHISS)</a>.</span>
                             </div>
                             <div class="field">
                                 <label for="nfse_imune_exportacao">Imunidade, exportação ou não incidência do ISSQN?</label>
@@ -1673,11 +1673,28 @@ $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 
         const campoCodigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
         const campoDescricaoServico = document.getElementById('nfse_descricao_servico');
+        const campoCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal');
+        let ultimoCodigoComplementarAutomatico = '';
+
         if (campoCodigoTributacaoNacional && campoDescricaoServico) {
             campoCodigoTributacaoNacional.addEventListener('input', function () {
-                const descricaoPadrao = mapaCodigosTributacaoNacional[campoCodigoTributacaoNacional.value.trim()];
+                const codigo = campoCodigoTributacaoNacional.value.trim();
+                const descricaoPadrao = mapaCodigosTributacaoNacional[codigo];
+
                 if (descricaoPadrao && campoDescricaoServico.value.trim() === '') {
                     campoDescricaoServico.value = descricaoPadrao;
+                }
+
+                if (campoCodigoTributacaoMunicipal) {
+                    const valorAtual = campoCodigoTributacaoMunicipal.value.trim();
+                    const eraAutomatico = valorAtual === '' || valorAtual === ultimoCodigoComplementarAutomatico;
+                    if (descricaoPadrao && eraAutomatico) {
+                        ultimoCodigoComplementarAutomatico = codigo + '.001';
+                        campoCodigoTributacaoMunicipal.value = ultimoCodigoComplementarAutomatico;
+                    } else if (!descricaoPadrao && eraAutomatico) {
+                        ultimoCodigoComplementarAutomatico = '';
+                        campoCodigoTributacaoMunicipal.value = '';
+                    }
                 }
             });
         }
