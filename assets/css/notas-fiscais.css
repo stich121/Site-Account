@@ -260,6 +260,9 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
 
 .municipio-opcao,
 .catalogo-opcao {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
     width: 100%;
     padding: 0.65rem 0.75rem;
     border: 0;
@@ -274,6 +277,13 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
 .municipio-opcao:focus,
 .catalogo-opcao:hover,
 .catalogo-opcao:focus { background: rgba(116, 201, 44, 0.16); outline: none; }
+
+.catalogo-opcao-exemplo {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
 
 /* Seções recolhíveis de cadastro (ex.: cadastro rápido de cliente) */
 details.panel summary {

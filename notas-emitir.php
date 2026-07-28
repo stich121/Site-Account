@@ -2366,7 +2366,16 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                     botao.type = 'button';
                     botao.className = 'catalogo-opcao';
                     botao.setAttribute('role', 'option');
-                    botao.textContent = configuracao.rotulo(item);
+                    const linhaPrincipal = document.createElement('span');
+                    linhaPrincipal.textContent = configuracao.rotulo(item);
+                    botao.appendChild(linhaPrincipal);
+                    const exemplo = configuracao.exemplo ? configuracao.exemplo(item) : '';
+                    if (exemplo) {
+                        const linhaExemplo = document.createElement('span');
+                        linhaExemplo.className = 'catalogo-opcao-exemplo';
+                        linhaExemplo.textContent = exemplo;
+                        botao.appendChild(linhaExemplo);
+                    }
                     botao.addEventListener('click', function () { escolher(item); });
                     opcoes.appendChild(botao);
                 });
@@ -2413,7 +2422,8 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
             statusId: 'nfse_ibscbs_codigo_indicador_operacao_status',
             textoInicial: 'Selecione uma opção da tabela oficial.',
             rotulo: function (item) { return item.codigo + ' - ' + item.tipo_operacao + ' — ' + item.local_fornecimento; },
-            detalhe: function (item) { return 'cIndOp ' + item.codigo + ': ' + item.caracteristica; }
+            detalhe: function (item) { return 'cIndOp ' + item.codigo + ': ' + item.caracteristica; },
+            exemplo: function (item) { return item.exemplos || ''; }
         });
         const autocompleteCclass = criarAutocompleteCatalogo({
             buscaId: 'nfse_ibscbs_classificacao_tributaria_busca',
