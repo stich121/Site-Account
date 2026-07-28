@@ -380,6 +380,8 @@ function rotuloCrt(?int $crt): string
             border: 1px solid rgba(255, 69, 58, 0.35);
         }
 
+        .btn-small { padding: 0.55rem 0.75rem; font-size: 0.72rem; white-space: nowrap; }
+
         .form-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -486,7 +488,11 @@ function rotuloCrt(?int $crt): string
                     </div>
                     <div class="field">
                         <label for="cnpj">CNPJ</label>
-                        <input id="cnpj" name="cnpj" type="text" placeholder="00.000.000/0000-00" value="<?php echo h($empresaEmEdicao['cnpj'] ?? ''); ?>">
+                        <div class="row-actions">
+                            <input id="cnpj" name="cnpj" type="text" placeholder="00.000.000/0000-00" value="<?php echo h($empresaEmEdicao['cnpj'] ?? ''); ?>" style="flex: 1;">
+                            <button class="btn btn-outline btn-small" type="button" id="btnBuscarCnpj"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+                        </div>
+                        <span class="muted" id="statusBuscaCnpj" style="font-size: 0.78rem;"></span>
                     </div>
                     <div class="field">
                         <label for="inscricao_estadual">Inscrição Estadual</label>
@@ -615,6 +621,60 @@ function rotuloCrt(?int $crt): string
     </div>
 
     <script>
+        const btnBuscarCnpj = document.getElementById('btnBuscarCnpj');
+        if (btnBuscarCnpj) {
+            btnBuscarCnpj.addEventListener('click', function () {
+                const campoCnpj = document.getElementById('cnpj');
+                const statusEl = document.getElementById('statusBuscaCnpj');
+                const digitos = (campoCnpj.value || '').replace(/\D/g, '');
+
+                if (digitos.length !== 14) {
+                    statusEl.textContent = 'Informe um CNPJ com 14 dígitos antes de buscar.';
+                    statusEl.style.color = '#FFD1CE';
+                    return;
+                }
+
+                statusEl.textContent = 'Buscando...';
+                statusEl.style.color = '';
+                btnBuscarCnpj.disabled = true;
+
+                fetch('buscar-cnpj?cnpj=' + digitos)
+                    .then(function (resposta) { return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; }); })
+                    .then(function (resultado) {
+                        if (!resultado.ok) {
+                            statusEl.textContent = resultado.dados.erro || 'Não foi possível buscar o CNPJ.';
+                            statusEl.style.color = '#FFD1CE';
+                            return;
+                        }
+
+                        const dados = resultado.dados;
+                        document.getElementById('razao_social').value = dados.razao_social || '';
+                        document.getElementById('nome_fantasia').value = dados.nome_fantasia || '';
+                        document.getElementById('logradouro').value = dados.logradouro || '';
+                        document.getElementById('numero').value = dados.numero || '';
+                        document.getElementById('complemento').value = dados.complemento || '';
+                        document.getElementById('bairro').value = dados.bairro || '';
+                        document.getElementById('cep').value = dados.cep || '';
+                        document.getElementById('municipio').value = dados.municipio || '';
+                        document.getElementById('codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
+                        document.getElementById('uf').value = dados.uf || '';
+                        if (dados.crt_sugerido) {
+                            document.getElementById('crt').value = String(dados.crt_sugerido);
+                        }
+
+                        statusEl.style.color = 'var(--primary)';
+                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de salvar.';
+                    })
+                    .catch(function () {
+                        statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
+                        statusEl.style.color = '#FFD1CE';
+                    })
+                    .finally(function () {
+                        btnBuscarCnpj.disabled = false;
+                    });
+            });
+        }
+
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
                 .finally(() => {
