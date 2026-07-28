@@ -664,9 +664,12 @@ try {
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, 'pendente_envio', 'Marcada como pronta para processamento.');
                     $sucesso = 'Nota colocada na fila de envio.';
                 } elseif ($acao === 'descartar' && in_array($notaAtual['status'], ['rascunho', 'pendente_envio', 'rejeitada'], true)) {
-                    $dbNotas->prepare('UPDATE notas_fiscais SET status = \'cancelada\' WHERE id = :id AND status IN (\'rascunho\', \'pendente_envio\', \'rejeitada\')')->execute(['id' => $notaId]);
-                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'descartada', 'Documento local descartado antes da autorização; não é cancelamento fiscal.');
-                    $sucesso = 'Documento local descartado. Nenhum evento fiscal de cancelamento foi enviado.';
+                    $stmt = $dbNotas->prepare('DELETE FROM notas_fiscais WHERE id = :id AND status IN (\'rascunho\', \'pendente_envio\', \'rejeitada\')');
+                    $stmt->execute(['id' => $notaId]);
+                    if ($stmt->rowCount() !== 1) {
+                        throw new RuntimeException('A nota mudou de estado e não pôde ser descartada; recarregue a página.');
+                    }
+                    $sucesso = 'Documento local excluído. A numeração #' . $notaAtual['numero_interno'] . ' fica livre para a próxima nota. Nenhum evento fiscal de cancelamento foi enviado.';
                 } elseif ($acao === 'reprocessar' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'rejeitada') {
                     $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\', motivo_rejeicao = NULL WHERE id = :id AND status = \'rejeitada\'')->execute(['id' => $notaId]);
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, 'reprocessamento_solicitado', 'Nova tentativa solicitada; a fila reconciliará o ID da DPS antes de retransmitir.');
@@ -858,7 +861,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                                         <form method="post" onsubmit="return prepararCancelamentoFiscal(this);"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="cancelar_nfse"><input type="hidden" name="motivo_cancelamento" value=""><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar NFS-e</button></form>
                                                     <?php endif; ?>
                                                     <?php if (in_array($nota['status'], ['rascunho', 'pendente_envio', 'rejeitada'], true)): ?>
-                                                        <form method="post" onsubmit="return confirm('Descartar este documento local? Nenhum cancelamento fiscal será enviado.');"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="descartar"><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-trash"></i> Descartar</button></form>
+                                                        <form method="post" onsubmit="return confirm('Excluir esta nota do sistema? Ela nunca foi autorizada, então nenhum cancelamento fiscal será enviado — a numeração ficará livre para a próxima nota. Esta ação não pode ser desfeita.');"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="descartar"><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-trash"></i> Excluir</button></form>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
