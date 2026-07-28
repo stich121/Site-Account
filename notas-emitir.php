@@ -277,7 +277,7 @@ function prepararTabelaNotasFiscaisNfse(PDO $db): void
             serie_dps VARCHAR(5) NULL,
             numero_dps VARCHAR(15) NULL,
             tomador_local ENUM('nao_informado','brasil','exterior') NOT NULL DEFAULT 'nao_informado',
-            tomador_indicador_municipal VARCHAR(20) NULL,
+            tomador_inscricao_municipal VARCHAR(20) NULL,
             tomador_telefone VARCHAR(20) NULL,
             intermediario_incluido TINYINT(1) NOT NULL DEFAULT 0,
             intermediario_local ENUM('nao_informado','brasil') NOT NULL DEFAULT 'nao_informado',
@@ -287,6 +287,7 @@ function prepararTabelaNotasFiscaisNfse(PDO $db): void
             municipio_prestacao VARCHAR(120) NULL,
             codigo_tributacao_nacional VARCHAR(20) NULL,
             codigo_tributacao_municipal VARCHAR(20) NULL,
+            codigo_interno_contribuinte VARCHAR(60) NULL,
             imune_exportacao_nao_incidencia ENUM('nao','sim') NOT NULL DEFAULT 'nao',
             item_nbs VARCHAR(20) NULL,
             descricao_servico TEXT NULL,
@@ -322,6 +323,21 @@ function prepararTabelaNotasFiscaisNfse(PDO $db): void
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+}
+
+function prepararColunasFase3bNotasFiscaisNfse(PDO $db): void
+{
+    // Alinhamento com o Guia do Emissor Publico Nacional Web: o campo do
+    // tomador e "Inscricao Municipal" (nao "indicador municipal"), e o
+    // bloco Servico Prestado tem um "Codigo interno do contribuinte" obrigatorio.
+    if (colunaExisteNotas($db, 'notas_fiscais_nfse', 'tomador_indicador_municipal')
+        && !colunaExisteNotas($db, 'notas_fiscais_nfse', 'tomador_inscricao_municipal')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfse CHANGE COLUMN tomador_indicador_municipal tomador_inscricao_municipal VARCHAR(20) NULL');
+    }
+
+    if (!colunaExisteNotas($db, 'notas_fiscais_nfse', 'codigo_interno_contribuinte')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfse ADD COLUMN codigo_interno_contribuinte VARCHAR(60) NULL AFTER codigo_tributacao_municipal');
+    }
 }
 
 function prepararTabelaNotasFiscaisLog(PDO $db): void
@@ -366,6 +382,7 @@ try {
     prepararTabelaNotasFiscais($dbNotas);
     prepararTabelaNotasFiscaisItens($dbNotas);
     prepararTabelaNotasFiscaisNfse($dbNotas);
+    prepararColunasFase3bNotasFiscaisNfse($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);
@@ -465,7 +482,7 @@ try {
                 $serieDps = $informarDps ? trim($_POST['nfse_serie_dps'] ?? '') : '';
                 $numeroDps = $informarDps ? trim($_POST['nfse_numero_dps'] ?? '') : '';
                 $tomadorLocal = in_array($_POST['nfse_tomador_local'] ?? '', ['brasil', 'exterior'], true) ? $_POST['nfse_tomador_local'] : 'nao_informado';
-                $tomadorIndicadorMunicipal = trim($_POST['nfse_tomador_indicador_municipal'] ?? '');
+                $tomadorInscricaoMunicipal = trim($_POST['nfse_tomador_inscricao_municipal'] ?? '');
                 $tomadorTelefone = trim($_POST['nfse_tomador_telefone'] ?? '');
                 $intermediarioIncluido = isset($_POST['nfse_intermediario_incluido']);
                 $intermediarioLocal = $intermediarioIncluido && ($_POST['nfse_intermediario_local'] ?? '') === 'brasil' ? 'brasil' : 'nao_informado';
@@ -475,6 +492,7 @@ try {
                 $municipioPrestacao = trim($_POST['nfse_municipio_prestacao'] ?? '');
                 $codigoTributacaoNacional = trim($_POST['nfse_codigo_tributacao_nacional'] ?? '');
                 $codigoTributacaoMunicipal = trim($_POST['nfse_codigo_tributacao_municipal'] ?? '');
+                $codigoInternoContribuinte = trim($_POST['nfse_codigo_interno_contribuinte'] ?? '');
                 $imuneExportacao = ($_POST['nfse_imune_exportacao'] ?? '') === 'sim' ? 'sim' : 'nao';
                 $itemNbs = trim($_POST['nfse_item_nbs'] ?? '');
                 $descricaoServico = trim($_POST['nfse_descricao_servico'] ?? '');
@@ -531,7 +549,7 @@ try {
                     'serie_dps' => $serieDps !== '' ? $serieDps : null,
                     'numero_dps' => $numeroDps !== '' ? $numeroDps : null,
                     'tomador_local' => $tomadorLocal,
-                    'tomador_indicador_municipal' => $tomadorIndicadorMunicipal !== '' ? $tomadorIndicadorMunicipal : null,
+                    'tomador_inscricao_municipal' => $tomadorInscricaoMunicipal !== '' ? $tomadorInscricaoMunicipal : null,
                     'tomador_telefone' => $tomadorTelefone !== '' ? $tomadorTelefone : null,
                     'intermediario_incluido' => $intermediarioIncluido ? 1 : 0,
                     'intermediario_local' => $intermediarioLocal,
@@ -541,6 +559,7 @@ try {
                     'municipio_prestacao' => $municipioPrestacao !== '' ? $municipioPrestacao : null,
                     'codigo_tributacao_nacional' => $codigoTributacaoNacional !== '' ? $codigoTributacaoNacional : null,
                     'codigo_tributacao_municipal' => $codigoTributacaoMunicipal !== '' ? $codigoTributacaoMunicipal : null,
+                    'codigo_interno_contribuinte' => $codigoInternoContribuinte !== '' ? $codigoInternoContribuinte : null,
                     'imune_exportacao_nao_incidencia' => $imuneExportacao,
                     'item_nbs' => $itemNbs !== '' ? $itemNbs : null,
                     'descricao_servico' => $descricaoServico !== '' ? $descricaoServico : null,
@@ -614,8 +633,10 @@ try {
                 $erro = 'Selecione o cliente destinatário.';
             } elseif ($naturezaOperacao === '') {
                 $erro = 'Informe a natureza da operação.';
-            } elseif ($tipoNota === 'nfse' && ($dadosNfse === null || $dadosNfse['municipio_prestacao'] === null || $dadosNfse['codigo_tributacao_nacional'] === null)) {
-                $erro = 'Informe o município da prestação e o código de tributação nacional do serviço.';
+            } elseif ($tipoNota === 'nfse' && ($dadosNfse === null || $dadosNfse['municipio_prestacao'] === null || $dadosNfse['codigo_tributacao_nacional'] === null || $dadosNfse['codigo_interno_contribuinte'] === null)) {
+                $erro = 'Informe o município da prestação, o código de tributação nacional e o código interno do contribuinte do serviço.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['tomador_local'] === 'brasil' && $dadosNfse['tomador_inscricao_municipal'] === null) {
+                $erro = 'Informe a Inscrição Municipal do tomador (obrigatória quando o tomador é do Brasil).';
             } elseif (empty($itensValidos)) {
                 $erro = $tipoNota === 'nfse'
                     ? 'Informe a descrição do serviço e um valor do serviço maior que zero.'
@@ -684,9 +705,9 @@ try {
                     if ($tipoNota === 'nfse' && $dadosNfse !== null) {
                         $stmtNfse = $dbNotas->prepare(
                             'INSERT INTO notas_fiscais_nfse (
-                                nota_id, data_competencia, serie_dps, numero_dps, tomador_local, tomador_indicador_municipal, tomador_telefone,
+                                nota_id, data_competencia, serie_dps, numero_dps, tomador_local, tomador_inscricao_municipal, tomador_telefone,
                                 intermediario_incluido, intermediario_local, intermediario_cpf_cnpj, intermediario_nome,
-                                pais_prestacao, municipio_prestacao, codigo_tributacao_nacional, codigo_tributacao_municipal,
+                                pais_prestacao, municipio_prestacao, codigo_tributacao_nacional, codigo_tributacao_municipal, codigo_interno_contribuinte,
                                 imune_exportacao_nao_incidencia, item_nbs, descricao_servico, documento_responsabilidade_tecnica,
                                 documento_referencia, informacoes_complementares, numero_pedido_b2b, valor_recebido_intermediario,
                                 desconto_incondicionado, desconto_condicionado, tributacao_issqn, regime_especial_tributacao,
@@ -695,9 +716,9 @@ try {
                                 contribuicao_previdenciaria_retida, tributos_modo, tributos_federal_percentual, tributos_estadual_percentual,
                                 tributos_municipal_percentual, tributos_federal_valor, tributos_estadual_valor, tributos_municipal_valor
                              ) VALUES (
-                                :nota_id, :data_competencia, :serie_dps, :numero_dps, :tomador_local, :tomador_indicador_municipal, :tomador_telefone,
+                                :nota_id, :data_competencia, :serie_dps, :numero_dps, :tomador_local, :tomador_inscricao_municipal, :tomador_telefone,
                                 :intermediario_incluido, :intermediario_local, :intermediario_cpf_cnpj, :intermediario_nome,
-                                :pais_prestacao, :municipio_prestacao, :codigo_tributacao_nacional, :codigo_tributacao_municipal,
+                                :pais_prestacao, :municipio_prestacao, :codigo_tributacao_nacional, :codigo_tributacao_municipal, :codigo_interno_contribuinte,
                                 :imune_exportacao_nao_incidencia, :item_nbs, :descricao_servico, :documento_responsabilidade_tecnica,
                                 :documento_referencia, :informacoes_complementares, :numero_pedido_b2b, :valor_recebido_intermediario,
                                 :desconto_incondicionado, :desconto_condicionado, :tributacao_issqn, :regime_especial_tributacao,
@@ -1178,9 +1199,9 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                                     <option value="exterior">Exterior</option>
                                 </select>
                             </div>
-                            <div class="field">
-                                <label for="nfse_tomador_indicador_municipal">Indicador municipal (opcional)</label>
-                                <input id="nfse_tomador_indicador_municipal" name="nfse_tomador_indicador_municipal" type="text">
+                            <div class="field" id="campoTomadorInscricaoMunicipal">
+                                <label for="nfse_tomador_inscricao_municipal">Inscrição Municipal do tomador</label>
+                                <input id="nfse_tomador_inscricao_municipal" name="nfse_tomador_inscricao_municipal" type="text">
                             </div>
                             <div class="field">
                                 <label for="nfse_tomador_telefone">Telefone (opcional)</label>
@@ -1243,6 +1264,10 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                             <div class="field">
                                 <label for="nfse_item_nbs">Item da NBS correspondente (opcional)</label>
                                 <input id="nfse_item_nbs" name="nfse_item_nbs" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_codigo_interno_contribuinte">Código interno do contribuinte</label>
+                                <input id="nfse_codigo_interno_contribuinte" name="nfse_codigo_interno_contribuinte" type="text" placeholder="Seu código de controle interno para este serviço">
                             </div>
                             <div class="field" style="grid-column: 1 / -1;">
                                 <label for="nfse_descricao_servico">Descrição do serviço</label>
@@ -1695,6 +1720,14 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
         const secaoNfe = document.getElementById('secaoNfe');
         const secaoNfse = document.getElementById('secaoNfse');
 
+        const selectTomadorLocal = document.getElementById('nfse_tomador_local');
+        const campoTomadorInscricaoMunicipal = document.getElementById('nfse_tomador_inscricao_municipal');
+
+        function atualizarObrigatoriedadeTomador() {
+            if (!campoTomadorInscricaoMunicipal || !tipoNotaSelect || !selectTomadorLocal) return;
+            campoTomadorInscricaoMunicipal.required = tipoNotaSelect.value === 'nfse' && selectTomadorLocal.value === 'brasil';
+        }
+
         function alternarTipoNota() {
             if (!tipoNotaSelect) return;
             const ehNfse = tipoNotaSelect.value === 'nfse';
@@ -1710,14 +1743,21 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
             const valorServico = document.getElementById('nfse_valor_servico');
             const municipioPrestacao = document.getElementById('nfse_municipio_prestacao');
             const codigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
-            [descricaoServico, valorServico, municipioPrestacao, codigoTributacaoNacional].forEach(function (campo) {
+            const codigoInternoContribuinte = document.getElementById('nfse_codigo_interno_contribuinte');
+            [descricaoServico, valorServico, municipioPrestacao, codigoTributacaoNacional, codigoInternoContribuinte].forEach(function (campo) {
                 if (campo) campo.required = ehNfse;
             });
+
+            atualizarObrigatoriedadeTomador();
         }
 
         if (tipoNotaSelect) {
             tipoNotaSelect.addEventListener('change', alternarTipoNota);
             alternarTipoNota();
+        }
+
+        if (selectTomadorLocal) {
+            selectTomadorLocal.addEventListener('change', atualizarObrigatoriedadeTomador);
         }
 
         const checkboxInformarDps = document.getElementById('nfse_informar_dps');

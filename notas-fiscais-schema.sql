@@ -195,7 +195,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
     serie_dps VARCHAR(5) NULL,
     numero_dps VARCHAR(15) NULL,
     tomador_local ENUM('nao_informado','brasil','exterior') NOT NULL DEFAULT 'nao_informado',
-    tomador_indicador_municipal VARCHAR(20) NULL,
+    tomador_inscricao_municipal VARCHAR(20) NULL,
     tomador_telefone VARCHAR(20) NULL,
     intermediario_incluido TINYINT(1) NOT NULL DEFAULT 0,
     intermediario_local ENUM('nao_informado','brasil') NOT NULL DEFAULT 'nao_informado',
@@ -205,6 +205,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
     municipio_prestacao VARCHAR(120) NULL,
     codigo_tributacao_nacional VARCHAR(20) NULL,
     codigo_tributacao_municipal VARCHAR(20) NULL,
+    codigo_interno_contribuinte VARCHAR(60) NULL,
     imune_exportacao_nao_incidencia ENUM('nao','sim') NOT NULL DEFAULT 'nao',
     item_nbs VARCHAR(20) NULL,
     descricao_servico TEXT NULL,
@@ -239,3 +240,18 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
         FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- FASE 3b — alinhamento com o Guia do Emissor Publico Nacional Web:
+-- o campo do tomador e "Inscricao Municipal" (obrigatorio quando o
+-- tomador e do Brasil), nao "indicador municipal"; e o bloco "Servico
+-- Prestado" tem um "Codigo interno do contribuinte" obrigatorio.
+-- Rode isto só se a tabela notas_fiscais_nfse já existia antes desta fase
+-- (instalação nova já nasce correta com o CREATE TABLE acima).
+-- ============================================================
+
+ALTER TABLE notas_fiscais_nfse
+    CHANGE COLUMN tomador_indicador_municipal tomador_inscricao_municipal VARCHAR(20) NULL;
+
+ALTER TABLE notas_fiscais_nfse
+    ADD COLUMN IF NOT EXISTS codigo_interno_contribuinte VARCHAR(60) NULL AFTER codigo_tributacao_municipal;

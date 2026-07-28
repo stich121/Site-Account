@@ -151,6 +151,7 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
                 ],
                 'toma' => [
                     $chaveDocumentoTomador => $documentoTomador,
+                    'IM' => ($nfse['tomador_local'] ?? null) === 'brasil' ? ($nfse['tomador_inscricao_municipal'] ?? null) : null,
                     'xNome' => $cliente['nome_razao_social'],
                     'email' => $cliente['email'] ?? null,
                     'fone' => $nfse['tomador_telefone'] ?? null,
@@ -163,6 +164,7 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
                         'cTribNac' => $codigoServicoNacional,
                         'cTribMun' => $codigoServicoMunicipal,
                         'xDescServ' => $servicoDescricao,
+                        'cIntContrib' => $nfse['codigo_interno_contribuinte'] ?? null,
                     ],
                 ],
                 'valores' => [
