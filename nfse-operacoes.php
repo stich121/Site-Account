@@ -95,7 +95,7 @@ function cancelarNfseRemota(array $empresa, string $ambiente, string $chave, str
         'versao' => '1.01',
         'infPedReg' => [
             'tpAmb' => $ambiente === 'producao' ? 1 : 2,
-            'verAplic' => 'AccountContabilidade-1.0',
+            'verAplic' => 'AccountContab-1.0',
             'dhEvento' => (new DateTimeImmutable('now'))->format('c'),
             'chNFSe' => $chave,
             'CNPJAutor' => $documentoAutor,
