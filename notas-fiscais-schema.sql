@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS empresas_emissoras (
     uf CHAR(2) NULL,
     crt TINYINT UNSIGNED NULL,
     ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+    certificado_arquivo VARCHAR(255) NULL,
+    certificado_senha_cifrada VARCHAR(512) NULL,
+    certificado_atualizado_em TIMESTAMP NULL,
+    certificado_atualizado_por INT UNSIGNED NULL,
     ativo TINYINT(1) NOT NULL DEFAULT 1,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -167,3 +171,13 @@ ALTER TABLE notas_fiscais
 
 ALTER TABLE notas_fiscais_itens
     ADD COLUMN IF NOT EXISTS codigo_servico_municipal VARCHAR(20) NULL AFTER cst_csosn;
+
+-- ============================================================
+-- FASE 2b — certificado digital A1 por empresa emissora
+-- ============================================================
+
+ALTER TABLE empresas_emissoras
+    ADD COLUMN IF NOT EXISTS certificado_arquivo VARCHAR(255) NULL AFTER ambiente_emissao,
+    ADD COLUMN IF NOT EXISTS certificado_senha_cifrada VARCHAR(512) NULL AFTER certificado_arquivo,
+    ADD COLUMN IF NOT EXISTS certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada,
+    ADD COLUMN IF NOT EXISTS certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em;

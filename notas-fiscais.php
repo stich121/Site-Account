@@ -130,6 +130,10 @@ function prepararTabelaEmpresasEmissorasNotas(PDO $db): void
             uf CHAR(2) NULL,
             crt TINYINT UNSIGNED NULL,
             ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+            certificado_arquivo VARCHAR(255) NULL,
+            certificado_senha_cifrada VARCHAR(512) NULL,
+            certificado_atualizado_em TIMESTAMP NULL,
+            certificado_atualizado_por INT UNSIGNED NULL,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -295,6 +299,25 @@ function prepararColunasFase2Notas(PDO $db): void
     }
 }
 
+function prepararColunasCertificadoEmpresa(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_arquivo')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_arquivo VARCHAR(255) NULL AFTER ambiente_emissao');
+    }
+
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_senha_cifrada')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_senha_cifrada VARCHAR(512) NULL AFTER certificado_arquivo');
+    }
+
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_atualizado_em')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada');
+    }
+
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_atualizado_por')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em');
+    }
+}
+
 function prepararTabelaNotasFiscaisLog(PDO $db): void
 {
     $db->exec(
@@ -349,6 +372,7 @@ try {
     prepararTabelaNotasFiscaisItens($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
+    prepararColunasCertificadoEmpresa($dbNotas);
 
     prepararColunaPermiteNotasFiscais($db);
 
@@ -907,6 +931,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
             </a>
             <div class="top-actions">
+                <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                 <?php if ($podeAdministrar): ?>
                     <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
                     <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>

@@ -63,7 +63,7 @@ function processarNotaNfse(PDO $dbNotas, array $notaResumo, int $operadorId): ar
     }
 
     $dps = dpsAPartirDaNota($nota, $empresa, $cliente, $itens);
-    $resultado = enviarNfseNacional($dps, $nota['ambiente']);
+    $resultado = enviarNfseNacional($dps, $nota['ambiente'], $empresa);
 
     if ($resultado['status'] !== 'pendente_envio') {
         $stmt = $dbNotas->prepare(
@@ -323,6 +323,7 @@ $csrf = h($_SESSION['csrf_processar_fila_nfse'] ?? '');
             </a>
             <div class="top-actions">
                 <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
+                <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                 <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>

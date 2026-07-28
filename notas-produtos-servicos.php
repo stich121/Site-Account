@@ -46,6 +46,10 @@ function prepararTabelaEmpresasEmissorasCatalogo(PDO $db): void
             uf CHAR(2) NULL,
             crt TINYINT UNSIGNED NULL,
             ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+            certificado_arquivo VARCHAR(255) NULL,
+            certificado_senha_cifrada VARCHAR(512) NULL,
+            certificado_atualizado_em TIMESTAMP NULL,
+            certificado_atualizado_por INT UNSIGNED NULL,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -337,6 +341,7 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
             <div class="top-actions">
                 <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
                 <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
+                <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                 <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>

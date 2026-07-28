@@ -1,11 +1,13 @@
 config_db.php
 config_db_notas.php
-config_certificado_nfse.php
+config_app_key.php
 google_drive_config.php
 vendor/
 .security/
 uploads/
 downloads/
+certificados-nfse/*
+!certificados-nfse/.htaccess
 Planilhas/
 __pycache__/
 *.pyc

@@ -3,12 +3,14 @@
 // nfse-nacional/nfse-php (https://github.com/nfse-nacional/nfse-php).
 //
 // Este arquivo não gera HTML — só funções, para ser usado por notas-fiscais.php e
-// processar-fila-nfse.php. Ele funciona em dois modos:
+// processar-fila-nfse.php. O certificado A1 é por empresa emissora (cadastrado em
+// notas-certificados.php, colunas certificado_arquivo/certificado_senha_cifrada em
+// empresas_emissoras) — não existe mais um certificado único global.
 //
-// 1) Composer/certificado ainda não configurados neste servidor (situação padrão até
-//    alguém rodar `composer install` e criar config_certificado_nfse.php): as funções
-//    retornam um erro claro e recuperável, sem derrubar a página com fatal error.
-// 2) Depois de configurado: monta a DPS a partir das nossas tabelas, assina e transmite.
+// Duas checagens diferentes precisam passar antes de enviar de verdade:
+// 1) integracaoNfseDisponivel(): coisa de servidor (Composer instalado, lib presente).
+// 2) certificadoEmpresaDisponivel($empresa): a empresa específica tem certificado configurado.
+// Se qualquer uma falhar, as funções retornam um erro claro e recuperável, sem fatal error.
 //
 // O mapeamento de campos da DPS abaixo foi conferido contra o exemplo oficial da lib
 // (examples/contribuinte/emitir.php no repositório). Um ponto que PRECISA de revisão
@@ -26,19 +28,29 @@ function integracaoNfseDisponivel(): array
 
     require_once $autoload;
 
-    $configCertificado = __DIR__ . '/config_certificado_nfse.php';
-    if (!is_file($configCertificado)) {
-        return [false, 'Certificado digital ainda não configurado (falta config_certificado_nfse.php).'];
-    }
-
-    require_once $configCertificado;
-
-    if (!certificadoNfseConfigurado()) {
-        return [false, 'Certificado digital configurado, mas o arquivo .pfx não foi encontrado no caminho informado.'];
-    }
-
     if (!class_exists(\Nfse\Nfse::class)) {
         return [false, 'Biblioteca nfse-nacional/nfse-php não encontrada no vendor/ (confira o composer.json).'];
+    }
+
+    $configAppKey = __DIR__ . '/config_app_key.php';
+    if (!is_file($configAppKey)) {
+        return [false, 'Chave de criptografia da aplicação ainda não configurada (falta config_app_key.php).'];
+    }
+
+    require_once $configAppKey;
+
+    return [true, ''];
+}
+
+function certificadoEmpresaDisponivel(array $empresa): array
+{
+    if (empty($empresa['certificado_arquivo']) || empty($empresa['certificado_senha_cifrada'])) {
+        return [false, 'Empresa "' . ($empresa['razao_social'] ?? '') . '" ainda não tem certificado digital cadastrado (cadastre em Certificado digital).'];
+    }
+
+    $caminho = __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']);
+    if (!is_file($caminho)) {
+        return [false, 'Certificado cadastrado para "' . ($empresa['razao_social'] ?? '') . '" não foi encontrado no servidor (recadastre em Certificado digital).'];
     }
 
     return [true, ''];
@@ -156,7 +168,7 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
     ];
 }
 
-function enviarNfseNacional(array $dpsMontada, string $ambiente): array
+function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa): array
 {
     [$disponivel, $motivo] = integracaoNfseDisponivel();
     if (!$disponivel) {
@@ -170,11 +182,23 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente): array
         ];
     }
 
+    [$certificadoOk, $motivoCertificado] = certificadoEmpresaDisponivel($empresa);
+    if (!$certificadoOk) {
+        return [
+            'sucesso' => false,
+            'status' => 'pendente_envio',
+            'motivo_rejeicao' => $motivoCertificado,
+            'chave_acesso' => null,
+            'protocolo_autorizacao' => null,
+            'xml_gerado' => null,
+        ];
+    }
+
     try {
         $context = new \Nfse\Http\NfseContext(
             ambiente: $ambiente === 'producao' ? \Nfse\Enums\TipoAmbiente::Producao : \Nfse\Enums\TipoAmbiente::Homologacao,
-            certificatePath: CERTIFICADO_NFSE_CAMINHO,
-            certificatePassword: CERTIFICADO_NFSE_SENHA
+            certificatePath: __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']),
+            certificatePassword: descriptografarSegredo($empresa['certificado_senha_cifrada'])
         );
 
         $nfse = new \Nfse\Nfse($context);

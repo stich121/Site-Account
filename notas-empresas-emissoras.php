@@ -46,6 +46,10 @@ function prepararTabelaEmpresasEmissoras(PDO $db): void
             uf CHAR(2) NULL,
             crt TINYINT UNSIGNED NULL,
             ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+            certificado_arquivo VARCHAR(255) NULL,
+            certificado_senha_cifrada VARCHAR(512) NULL,
+            certificado_atualizado_em TIMESTAMP NULL,
+            certificado_atualizado_por INT UNSIGNED NULL,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -53,6 +57,36 @@ function prepararTabelaEmpresasEmissoras(PDO $db): void
             UNIQUE KEY uq_empresas_emissoras_razao_social (razao_social)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+}
+
+function colunaExisteEmpresasEmissoras(PDO $db, string $coluna): bool
+{
+    $stmt = $db->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = \'empresas_emissoras\'
+           AND COLUMN_NAME = :coluna'
+    );
+    $stmt->execute(['coluna' => $coluna]);
+
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function prepararColunasCertificadoEmpresaEmissoras(PDO $db): void
+{
+    $campos = [
+        'certificado_arquivo' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_arquivo VARCHAR(255) NULL AFTER ambiente_emissao",
+        'certificado_senha_cifrada' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_senha_cifrada VARCHAR(512) NULL AFTER certificado_arquivo",
+        'certificado_atualizado_em' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada",
+        'certificado_atualizado_por' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em",
+    ];
+
+    foreach ($campos as $coluna => $sql) {
+        if (!colunaExisteEmpresasEmissoras($db, $coluna)) {
+            $db->exec($sql);
+        }
+    }
 }
 
 function semearEmpresasEmissoras(PDO $db): void
@@ -71,6 +105,7 @@ function semearEmpresasEmissoras(PDO $db): void
 try {
     $db = obterConexaoNotas();
     prepararTabelaEmpresasEmissoras($db);
+    prepararColunasCertificadoEmpresaEmissoras($db);
     semearEmpresasEmissoras($db);
 
     if (empty($_SESSION['csrf_notas_empresas_emissoras'])) {
@@ -352,6 +387,7 @@ function rotuloCrt(?int $crt): string
             <div class="top-actions">
                 <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
                 <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
+                <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                 <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
