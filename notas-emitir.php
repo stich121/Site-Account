@@ -10,6 +10,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
+require_once __DIR__ . '/nfse-codigos-tributacao-nacional.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -783,6 +784,7 @@ try {
 $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
 $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
+$codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -1267,11 +1269,17 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116)</label>
-                                <input id="nfse_codigo_tributacao_nacional" name="nfse_codigo_tributacao_nacional" type="text" placeholder="Ex.: 17.19.01">
+                                <input id="nfse_codigo_tributacao_nacional" name="nfse_codigo_tributacao_nacional" type="text" placeholder="Digite para buscar. Ex.: 17.19.01" list="datalistCodigosNacionais" autocomplete="off">
+                                <datalist id="datalistCodigosNacionais">
+                                    <?php foreach ($codigosTributacaoNacionalNfse as $codigoNacional): ?>
+                                        <option value="<?php echo h($codigoNacional['codigo']); ?>"><?php echo h($codigoNacional['codigo'] . ' - ' . $codigoNacional['descricao']); ?></option>
+                                    <?php endforeach; ?>
+                                </datalist>
                             </div>
                             <div class="field">
                                 <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
                                 <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="text">
+                                <span class="muted" style="font-size: 0.78rem;">Depende do município. Para Belo Horizonte, consulte o <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">código de tributação municipal (BHISS)</a>.</span>
                             </div>
                             <div class="field">
                                 <label for="nfse_imune_exportacao">Imunidade, exportação ou não incidência do ISSQN?</label>
@@ -1657,6 +1665,23 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
         }
 
         const catalogo = JSON.parse(<?php echo json_encode($catalogoJson); ?>);
+        const codigosTributacaoNacional = <?php echo json_encode($codigosTributacaoNacionalNfse, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+        const mapaCodigosTributacaoNacional = {};
+        codigosTributacaoNacional.forEach(function (item) {
+            mapaCodigosTributacaoNacional[item.codigo] = item.descricao;
+        });
+
+        const campoCodigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
+        const campoDescricaoServico = document.getElementById('nfse_descricao_servico');
+        if (campoCodigoTributacaoNacional && campoDescricaoServico) {
+            campoCodigoTributacaoNacional.addEventListener('input', function () {
+                const descricaoPadrao = mapaCodigosTributacaoNacional[campoCodigoTributacaoNacional.value.trim()];
+                if (descricaoPadrao && campoDescricaoServico.value.trim() === '') {
+                    campoDescricaoServico.value = descricaoPadrao;
+                }
+            });
+        }
+
         const corpoItens = document.getElementById('corpoItens');
         const empresaSelect = document.getElementById('empresa_emissora_id');
         const totalNotaEl = document.getElementById('totalNota');
