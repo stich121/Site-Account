@@ -2443,7 +2443,7 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
             }
         });
 
-        fetch('nfse-ibs-catalogos.json', { cache: 'force-cache' })
+        fetch('nfse-ibs-catalogos.json?v=<?php echo (int) @filemtime(__DIR__ . '/nfse-ibs-catalogos.json'); ?>', { cache: 'force-cache' })
             .then(function (resposta) {
                 if (!resposta.ok) throw new Error('Catálogo fiscal indisponível.');
                 return resposta.json();
