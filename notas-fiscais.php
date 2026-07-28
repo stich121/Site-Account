@@ -1001,6 +1001,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                 <td>
                                     <div class="row-actions">
                                         <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Conferência</a>
+                                        <?php $podeEditarNota = $nota['tipo_nota'] === 'nfse' && ($nota['status'] === 'rascunho' || ($nota['status'] === 'rejeitada' && str_starts_with((string) ($nota['motivo_rejeicao'] ?? ''), 'DPS não transmitida:'))); ?>
+                                        <?php if ($podeEditarNota): ?>
+                                            <a class="btn btn-outline btn-small" href="notas-emitir?editar=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                                        <?php endif; ?>
                                         <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada'): ?>
                                             <a class="btn btn-outline btn-small" href="notas-fiscais?xml=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-code"></i> XML fiscal</a>
                                             <a class="btn btn-outline btn-small" href="notas-fiscais?danfse=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFSe</a>
@@ -1010,7 +1014,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                         <?php if ($nota['status'] === 'rascunho'): ?>
                                             <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="marcar_pendente"><button class="btn btn-small" type="submit"><i class="fa-solid fa-paper-plane"></i> Pronta p/ envio</button></form>
                                         <?php endif; ?>
-                                        <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada'): ?>
+                                        <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada' && !$podeEditarNota): ?>
                                             <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="reprocessar"><button class="btn btn-small" type="submit"><i class="fa-solid fa-rotate-right"></i> Reprocessar</button></form>
                                         <?php endif; ?>
                                         <?php if (in_array($nota['status'], ['rascunho', 'pendente_envio'], true)): ?>

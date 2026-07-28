@@ -20,6 +20,9 @@ $podeAdministrar = $nivelAcesso >= 3;
 
 $erro = '';
 $sucesso = '';
+$notaEmEdicao = null;
+$nfseEmEdicao = null;
+$itensEmEdicao = [];
 
 function h(string $valor): string
 {
@@ -498,6 +501,19 @@ function registrarLogNota(PDO $db, int $notaId, int $funcionarioId, string $acao
     ]);
 }
 
+function obterLockEdicaoNota(PDO $db, int $notaId): bool
+{
+    $stmt = $db->prepare('SELECT GET_LOCK(:nome, 0)');
+    $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
+    return (int) $stmt->fetchColumn() === 1;
+}
+
+function liberarLockEdicaoNota(PDO $db, int $notaId): void
+{
+    $stmt = $db->prepare('SELECT RELEASE_LOCK(:nome)');
+    $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
+}
+
 try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
@@ -528,6 +544,35 @@ try {
 
     if (empty($_SESSION['csrf_notas_emitir'])) {
         $_SESSION['csrf_notas_emitir'] = bin2hex(random_bytes(32));
+    }
+
+    $notaEdicaoId = $_SERVER['REQUEST_METHOD'] === 'POST'
+        ? (int) ($_POST['nota_id_edicao'] ?? 0)
+        : (int) ($_GET['editar'] ?? 0);
+    if ($notaEdicaoId > 0) {
+        $sqlEdicao = 'SELECT * FROM notas_fiscais WHERE id = :id';
+        $paramsEdicao = ['id' => $notaEdicaoId];
+        if (!$podeAdministrar) {
+            $sqlEdicao .= ' AND funcionario_id = :funcionario_id';
+            $paramsEdicao['funcionario_id'] = $funcionarioId;
+        }
+        $sqlEdicao .= ' LIMIT 1';
+        $stmtEdicao = $dbNotas->prepare($sqlEdicao);
+        $stmtEdicao->execute($paramsEdicao);
+        $candidataEdicao = $stmtEdicao->fetch() ?: null;
+        $rejeicaoLocal = $candidataEdicao && $candidataEdicao['status'] === 'rejeitada'
+            && str_starts_with((string) ($candidataEdicao['motivo_rejeicao'] ?? ''), 'DPS não transmitida:');
+        if (!$candidataEdicao || $candidataEdicao['tipo_nota'] !== 'nfse' || !($candidataEdicao['status'] === 'rascunho' || $rejeicaoLocal)) {
+            $erro = 'Esta nota não pode ser editada. Somente rascunhos e NFS-e rejeitadas antes da transmissão podem ser corrigidos.';
+        } else {
+            $notaEmEdicao = $candidataEdicao;
+            $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
+            $stmtEdicao->execute(['nota_id' => $notaEdicaoId]);
+            $nfseEmEdicao = $stmtEdicao->fetch() ?: [];
+            $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_itens WHERE nota_id = :nota_id ORDER BY id ASC');
+            $stmtEdicao->execute(['nota_id' => $notaEdicaoId]);
+            $itensEmEdicao = $stmtEdicao->fetchAll();
+        }
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -605,10 +650,15 @@ try {
 
                 $sucesso = 'Cliente cadastrado. Já pode ser selecionado ao criar uma nota.';
             }
-        } elseif (($_POST['acao'] ?? '') === 'criar_nota') {
+        } elseif ($erro === '' && in_array(($_POST['acao'] ?? ''), ['criar_nota', 'salvar_edicao'], true)) {
+            $salvandoEdicao = ($_POST['acao'] ?? '') === 'salvar_edicao';
             $empresaId = (int) ($_POST['empresa_emissora_id'] ?? 0);
             $clienteId = (int) ($_POST['cliente_id'] ?? 0);
             $tipoNota = ($_POST['tipo_nota'] ?? 'nfe') === 'nfse' ? 'nfse' : 'nfe';
+            if ($salvandoEdicao && $notaEmEdicao) {
+                $empresaId = (int) $notaEmEdicao['empresa_emissora_id'];
+                $tipoNota = (string) $notaEmEdicao['tipo_nota'];
+            }
             $naturezaOperacao = trim($_POST['natureza_operacao'] ?? '');
             $formaPagamento = trim($_POST['forma_pagamento'] ?? '');
             $dataEmissao = trim($_POST['data_emissao'] ?? '') !== '' ? trim($_POST['data_emissao']) : date('Y-m-d');
@@ -854,6 +904,14 @@ try {
                 $erro = 'Exigibilidade suspensa exige tipo e número do processo de suspensão.';
             } elseif ($tipoNota === 'nfse' && $dadosNfse['beneficio_municipal'] === 'sim' && $dadosNfse['codigo_beneficio_municipal'] === null) {
                 $erro = 'Benefício municipal exige o código oficial do benefício.';
+            } elseif ($tipoNota === 'nfse' && (($dadosNfse['serie_dps'] === null) !== ($dadosNfse['numero_dps'] === null))) {
+                $erro = 'Informe juntos a série e o número da DPS, ou deixe ambos em branco.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['serie_dps'] !== null && !preg_match('/^[0-9]{1,5}$/D', (string) $dadosNfse['serie_dps'])) {
+                $erro = 'A série da DPS deve conter de 1 a 5 dígitos.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['numero_dps'] !== null && !preg_match('/^[0-9]{1,15}$/D', (string) $dadosNfse['numero_dps'])) {
+                $erro = 'O número da DPS deve conter de 1 a 15 dígitos.';
+            } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && !preg_match('/^[0-9]{9}$/D', (string) ($dadosNfse['item_nbs'] ?? ''))) {
+                $erro = 'Com IBS/CBS, informe o código NBS completo com 9 dígitos.';
             } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && !$ibscbsCompleto) {
                 $erro = 'Preencha o conjunto completo IBS/CBS selecionando os códigos nas tabelas oficiais.';
             } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && $cindopOficial === null) {
@@ -867,8 +925,35 @@ try {
                     ? 'Informe a descrição do serviço e um valor do serviço maior que zero.'
                     : 'Adicione ao menos um item com descrição e quantidade maior que zero.';
             } else {
-                $dbNotas->beginTransaction();
+                $lockEdicaoAdquirido = false;
                 try {
+                    if ($salvandoEdicao) {
+                        $lockEdicaoAdquirido = obterLockEdicaoNota($dbNotas, $notaEdicaoId);
+                        if (!$lockEdicaoAdquirido) throw new RuntimeException('A nota está sendo processada. Aguarde e tente novamente.');
+                    }
+                    $dbNotas->beginTransaction();
+                    if ($salvandoEdicao) {
+                        $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais WHERE id = :id FOR UPDATE');
+                        $stmt->execute(['id' => $notaEdicaoId]);
+                        $notaBloqueada = $stmt->fetch();
+                        $rejeicaoLocalBloqueada = $notaBloqueada && $notaBloqueada['status'] === 'rejeitada'
+                            && str_starts_with((string) ($notaBloqueada['motivo_rejeicao'] ?? ''), 'DPS não transmitida:');
+                        if (!$notaBloqueada || !($notaBloqueada['status'] === 'rascunho' || $rejeicaoLocalBloqueada)) {
+                            throw new RuntimeException('A nota mudou de estado e não pode mais ser editada.');
+                        }
+                        if (!$podeAdministrar && (int) $notaBloqueada['funcionario_id'] !== $funcionarioId) {
+                            throw new RuntimeException('Você não tem permissão para editar esta nota.');
+                        }
+                        if (!hash_equals((string) $notaBloqueada['atualizado_em'], (string) ($_POST['nota_atualizada_em'] ?? ''))) {
+                            throw new RuntimeException('A nota foi alterada em outra tela. Reabra a edição para não sobrescrever dados.');
+                        }
+                        $notaId = $notaEdicaoId;
+                        $numeroInterno = (int) $notaBloqueada['numero_interno'];
+                        $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET cliente_id = :cliente_id, natureza_operacao = :natureza_operacao, status = \'rascunho\', forma_pagamento = :forma_pagamento, data_emissao = :data_emissao, data_saida_entrada = :data_saida_entrada, valor_total = :valor_total, informacoes_frete = :informacoes_frete, chave_acesso = NULL, protocolo_autorizacao = NULL, xml_gerado = NULL, motivo_rejeicao = NULL WHERE id = :id');
+                        $stmt->execute(['cliente_id' => $clienteId, 'natureza_operacao' => $naturezaOperacao, 'forma_pagamento' => $formaPagamento !== '' ? $formaPagamento : null, 'data_emissao' => $dataEmissao, 'data_saida_entrada' => $dataSaidaEntrada !== '' ? $dataSaidaEntrada : null, 'valor_total' => round($valorTotalNota, 2), 'informacoes_frete' => $informacoesFrete !== '' ? $informacoesFrete : null, 'id' => $notaId]);
+                        $dbNotas->prepare('DELETE FROM notas_fiscais_itens WHERE nota_id = :nota_id')->execute(['nota_id' => $notaId]);
+                        $dbNotas->prepare('DELETE FROM notas_fiscais_nfse WHERE nota_id = :nota_id')->execute(['nota_id' => $notaId]);
+                    } else {
                     $stmt = $dbNotas->prepare(
                         'SELECT COALESCE(MAX(numero_interno), 0) + 1 FROM notas_fiscais
                          WHERE empresa_emissora_id = :empresa_id AND tipo_nota = :tipo_nota FOR UPDATE'
@@ -902,6 +987,7 @@ try {
                         'informacoes_frete' => $informacoesFrete !== '' ? $informacoesFrete : null,
                     ]);
                     $notaId = (int) $dbNotas->lastInsertId();
+                    }
 
                     $stmtItem = $dbNotas->prepare(
                         'INSERT INTO notas_fiscais_itens (
@@ -969,13 +1055,22 @@ try {
                         }
                     }
 
-                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'criada', 'Rascunho criado com ' . count($itensValidos) . ' item(ns).');
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, $salvandoEdicao ? 'editada' : 'criada', ($salvandoEdicao ? 'Correção salva; nota retornou a rascunho com ' : 'Rascunho criado com ') . count($itensValidos) . ' item(ns).');
 
                     $dbNotas->commit();
-                    $sucesso = 'Nota salva como rascunho (nº interno ' . $numeroInterno . '). Veja em "Notas fiscais" para gerar o PDF ou marcar como pronta para envio.';
+                    if ($salvandoEdicao) {
+                        $sucesso = 'Correções salvas na nota nº ' . $numeroInterno . '. Ela voltou para rascunho e pode ser marcada como pronta para envio.';
+                        $notaEmEdicao = null;
+                        $nfseEmEdicao = null;
+                        $itensEmEdicao = [];
+                    } else {
+                        $sucesso = 'Nota salva como rascunho (nº interno ' . $numeroInterno . '). Veja em "Notas fiscais" para gerar o PDF ou marcar como pronta para envio.';
+                    }
                 } catch (Throwable $e) {
-                    $dbNotas->rollBack();
+                    if ($dbNotas->inTransaction()) $dbNotas->rollBack();
                     $erro = 'Não foi possível salvar a nota: ' . $e->getMessage();
+                } finally {
+                    if ($lockEdicaoAdquirido) liberarLockEdicaoNota($dbNotas, $notaEdicaoId);
                 }
             }
         }
@@ -1002,6 +1097,7 @@ try {
 $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
 $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
+$edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"itens":[]}';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
 ?>
@@ -1374,10 +1470,14 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             </details>
 
             <section class="panel">
-                <h2>Nova nota (rascunho)</h2>
+                <h2><?php echo $notaEmEdicao ? 'Corrigir NFS-e nº ' . h((string) $notaEmEdicao['numero_interno']) : 'Nova nota (rascunho)'; ?></h2>
                 <form method="post" id="formNota">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="criar_nota">
+                    <input type="hidden" name="acao" value="<?php echo $notaEmEdicao ? 'salvar_edicao' : 'criar_nota'; ?>">
+                    <?php if ($notaEmEdicao): ?>
+                        <input type="hidden" name="nota_id_edicao" value="<?php echo h((string) $notaEmEdicao['id']); ?>">
+                        <input type="hidden" name="nota_atualizada_em" value="<?php echo h((string) $notaEmEdicao['atualizado_em']); ?>">
+                    <?php endif; ?>
                     <div class="form-grid">
                         <div class="field">
                             <label for="empresa_emissora_id">Empresa emissora</label>
@@ -1751,7 +1851,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                     </div>
 
                     <div style="margin-top: 1.5rem;">
-                        <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar rascunho</button>
+                        <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> <?php echo $notaEmEdicao ? 'Salvar correções' : 'Salvar rascunho'; ?></button>
                     </div>
                 </form>
             </section>
@@ -1759,6 +1859,54 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
     </div>
 
     <script>
+        const dadosEdicaoNota = <?php echo $edicaoJson; ?>;
+        function aplicarDadosEdicao() {
+            if (!dadosEdicaoNota || !dadosEdicaoNota.nota) return;
+            const form = document.getElementById('formNota');
+            const nota = dadosEdicaoNota.nota;
+            const nfse = dadosEdicaoNota.nfse || {};
+            const itens = Array.isArray(dadosEdicaoNota.itens) ? dadosEdicaoNota.itens : [];
+            const notaCampos = {
+                empresa_emissora_id: nota.empresa_emissora_id,
+                cliente_id: nota.cliente_id,
+                tipo_nota: nota.tipo_nota,
+                natureza_operacao: nota.natureza_operacao,
+                forma_pagamento: nota.forma_pagamento,
+                data_emissao: nota.data_emissao,
+                data_saida_entrada: nota.data_saida_entrada,
+                informacoes_frete: nota.informacoes_frete
+            };
+            Object.keys(notaCampos).forEach(function (nome) {
+                const campo = form.elements.namedItem(nome);
+                if (campo) campo.value = notaCampos[nome] == null ? '' : notaCampos[nome];
+            });
+            const especiais = {
+                deducao_reducao_base_calculo: 'nfse_deducao_reducao_base',
+                exigibilidade_issqn_suspensa: 'nfse_exigibilidade_suspensa',
+                situacao_tributaria_pis_cofins: 'nfse_situacao_pis_cofins'
+            };
+            Object.keys(nfse).forEach(function (chave) {
+                const nome = especiais[chave] || ('nfse_' + chave);
+                const campo = form.elements.namedItem(nome);
+                if (!campo) return;
+                if (campo.type === 'checkbox') campo.checked = Number(nfse[chave]) === 1;
+                else campo.value = nfse[chave] == null ? '' : nfse[chave];
+            });
+            const informarDps = form.elements.namedItem('nfse_informar_dps');
+            if (informarDps) informarDps.checked = Boolean(nfse.serie_dps || nfse.numero_dps);
+            const itemServico = itens[0] || null;
+            if (itemServico && form.elements.namedItem('nfse_valor_servico')) form.elements.namedItem('nfse_valor_servico').value = itemServico.valor_total;
+            const empresa = form.elements.namedItem('empresa_emissora_id');
+            const tipo = form.elements.namedItem('tipo_nota');
+            if (empresa) { empresa.disabled = true; empresa.title = 'A empresa emissora não pode ser alterada nesta correção.'; }
+            if (tipo) { tipo.disabled = true; tipo.title = 'O tipo da nota não pode ser alterado nesta correção.'; }
+            const cindopBusca = document.getElementById('nfse_ibscbs_codigo_indicador_operacao_busca');
+            if (cindopBusca && nfse.ibscbs_codigo_indicador_operacao) cindopBusca.value = nfse.ibscbs_codigo_indicador_operacao;
+            const cclassBusca = document.getElementById('nfse_ibscbs_classificacao_tributaria_busca');
+            if (cclassBusca && nfse.ibscbs_classificacao_tributaria) cclassBusca.value = nfse.ibscbs_classificacao_tributaria;
+        }
+        aplicarDadosEdicao();
+
         function formatarCnpjOuCpf(valor, tipoPessoa) {
             const digitos = (valor || '').replace(/\D/g, '');
             if (tipoPessoa === 'PF') {
@@ -2238,7 +2386,12 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                 .then(function (municipios) {
                     municipiosIbge = Array.isArray(municipios) ? municipios : [];
                     const opcaoEmpresa = empresaSelect ? empresaSelect.options[empresaSelect.selectedIndex] : null;
-                    if (opcaoEmpresa && opcaoEmpresa.dataset.ibge) selecionarMunicipioPorCodigo(opcaoEmpresa.dataset.ibge);
+                    const municipioSalvo = dadosEdicaoNota && dadosEdicaoNota.nfse ? dadosEdicaoNota.nfse.municipio_prestacao : '';
+                    if (municipioSalvo) {
+                        selecionarMunicipioPorCodigo(municipioSalvo);
+                    } else if (opcaoEmpresa && opcaoEmpresa.dataset.ibge) {
+                        selecionarMunicipioPorCodigo(opcaoEmpresa.dataset.ibge);
+                    }
                 })
                 .catch(function () {
                     municipioStatus.textContent = 'Não foi possível carregar o catálogo de municípios.';
@@ -2402,6 +2555,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             checkboxInformarDps.addEventListener('change', function () {
                 camposDpsManual.style.display = checkboxInformarDps.checked ? '' : 'none';
             });
+            camposDpsManual.style.display = checkboxInformarDps.checked ? '' : 'none';
         }
 
         const checkboxIntermediario = document.getElementById('nfse_intermediario_incluido');
@@ -2410,6 +2564,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             checkboxIntermediario.addEventListener('change', function () {
                 camposIntermediario.style.display = checkboxIntermediario.checked ? '' : 'none';
             });
+            camposIntermediario.style.display = checkboxIntermediario.checked ? '' : 'none';
         }
 
         const selectIssqnRetido = document.getElementById('nfse_issqn_retido');
@@ -2418,6 +2573,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             selectIssqnRetido.addEventListener('change', function () {
                 campoIssqnRetidoPor.style.display = selectIssqnRetido.value === 'sim' ? '' : 'none';
             });
+            campoIssqnRetidoPor.style.display = selectIssqnRetido.value === 'sim' ? '' : 'none';
         }
 
         const selectTributosModo = document.getElementById('nfse_tributos_modo');
@@ -2429,6 +2585,9 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                 blocoTributosPercentuais.style.display = ehValores ? 'none' : '';
                 blocoTributosValores.style.display = ehValores ? '' : 'none';
             });
+            const ehValoresInicial = selectTributosModo.value === 'valores';
+            blocoTributosPercentuais.style.display = ehValoresInicial ? 'none' : '';
+            blocoTributosValores.style.display = ehValoresInicial ? '' : 'none';
         }
 
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
