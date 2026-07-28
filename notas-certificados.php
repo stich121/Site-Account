@@ -193,7 +193,26 @@ function converterCertificadoLegadoParaModerno(string $caminhoOriginal, string $
     }
 }
 
-function validarCertificadoPfx(string $caminho, string $senha): string
+function extrairCnpjDoCertificado(array $infoCertificado): ?string
+{
+    $cn = $infoCertificado['subject']['CN'] ?? '';
+    if (is_array($cn)) {
+        $cn = $cn[0] ?? '';
+    }
+
+    // Certificados e-CNPJ (ICP-Brasil) trazem o CNPJ dentro do Common Name, geralmente no
+    // formato "RAZAO SOCIAL:14DIGITOS". Procuramos qualquer sequência de 14 dígitos no CN.
+    if (preg_match('/(\d{14})/', (string) $cn, $m)) {
+        return $m[1];
+    }
+
+    return null;
+}
+
+/**
+ * @return array{validade: string, cnpj: ?string}
+ */
+function validarCertificadoPfx(string $caminho, string $senha): array
 {
     $conteudo = file_get_contents($caminho);
     if ($conteudo === false) {
@@ -235,7 +254,10 @@ function validarCertificadoPfx(string $caminho, string $senha): string
         throw new RuntimeException('Não foi possível ler a data de validade do certificado.');
     }
 
-    return (new DateTimeImmutable('@' . $infoCertificado['validTo_time_t']))->format('Y-m-d');
+    return [
+        'validade' => (new DateTimeImmutable('@' . $infoCertificado['validTo_time_t']))->format('Y-m-d'),
+        'cnpj' => extrairCnpjDoCertificado($infoCertificado),
+    ];
 }
 
 $erro = '';
@@ -265,7 +287,7 @@ try {
             $empresaId = (int) ($_POST['empresa_emissora_id'] ?? 0);
             $senha = (string) ($_POST['senha_certificado'] ?? '');
 
-            $stmt = $dbNotas->prepare('SELECT certificado_arquivo FROM empresas_emissoras WHERE id = :id LIMIT 1');
+            $stmt = $dbNotas->prepare('SELECT razao_social, cnpj, certificado_arquivo FROM empresas_emissoras WHERE id = :id LIMIT 1');
             $stmt->execute(['id' => $empresaId]);
             $empresaAtual = $stmt->fetch();
 
@@ -274,9 +296,20 @@ try {
             } elseif ($senha === '') {
                 $erro = 'Informe a senha do certificado.';
             } else {
+                $nomeArquivo = null;
+
                 try {
                     $nomeArquivo = salvarArquivoCertificado($_FILES['certificado'] ?? []);
-                    $validade = validarCertificadoPfx(pastaCertificados() . '/' . $nomeArquivo, $senha);
+                    $resultado = validarCertificadoPfx(pastaCertificados() . '/' . $nomeArquivo, $senha);
+
+                    $cnpjEmpresa = preg_replace('/\D/', '', (string) ($empresaAtual['cnpj'] ?? ''));
+                    if ($resultado['cnpj'] !== null && $cnpjEmpresa !== '' && $resultado['cnpj'] !== $cnpjEmpresa) {
+                        throw new RuntimeException(
+                            'Este certificado é de outro CNPJ (' . $resultado['cnpj'] . ') e não bate com o CNPJ cadastrado '
+                            . 'para "' . $empresaAtual['razao_social'] . '" (' . $cnpjEmpresa . '). '
+                            . 'Confira se selecionou a empresa certa ou se o CNPJ cadastrado da empresa está correto.'
+                        );
+                    }
 
                     $stmt = $dbNotas->prepare(
                         'UPDATE empresas_emissoras
@@ -291,7 +324,7 @@ try {
                         'certificado_arquivo' => $nomeArquivo,
                         'certificado_senha_cifrada' => criptografarSegredo($senha),
                         'funcionario_id' => $funcionarioId,
-                        'certificado_validade' => $validade,
+                        'certificado_validade' => $resultado['validade'],
                         'id' => $empresaId,
                     ]);
 
@@ -305,6 +338,13 @@ try {
                     $sucesso = 'Certificado cadastrado com sucesso para a empresa.';
                 } catch (RuntimeException $e) {
                     $erro = $e->getMessage();
+
+                    if ($nomeArquivo !== null) {
+                        $arquivoRecemSalvo = pastaCertificados() . '/' . $nomeArquivo;
+                        if (is_file($arquivoRecemSalvo)) {
+                            unlink($arquivoRecemSalvo);
+                        }
+                    }
                 }
             }
         } elseif (($_POST['acao'] ?? '') === 'remover') {
