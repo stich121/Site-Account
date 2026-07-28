@@ -281,6 +281,27 @@ $csrf = h($_SESSION['csrf_processar_fila_nfse'] ?? '');
             border: 1px solid var(--border);
         }
 
+        .menu-hamburguer { position: relative; }
+
+        .menu-dropdown {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            display: none;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-width: 240px;
+            padding: 0.6rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+            z-index: 60;
+        }
+
+        .menu-dropdown.aberto { display: flex; }
+        .menu-dropdown .btn { justify-content: flex-start; width: 100%; }
+
         .notice {
             margin-bottom: 1rem;
             padding: 1rem;
@@ -321,12 +342,21 @@ $csrf = h($_SESSION['csrf_processar_fila_nfse'] ?? '');
             <a class="brand" href="painel" aria-label="Voltar para o painel">
                 <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
             </a>
-            <div class="top-actions">
-                <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
-                <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-                <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-                <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
+            <div class="menu-hamburguer">
+                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
+                    <i class="fa-solid fa-bars"></i> Menu
+                </button>
+                <div class="menu-dropdown" id="menuDropdown">
+                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
+                    <a class="btn btn-outline" href="notas-fiscais#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
+                    <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
+                    <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
+                    <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
+                    <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
+                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
+                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
+                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
+                </div>
             </div>
         </header>
 
@@ -422,6 +452,22 @@ $csrf = h($_SESSION['csrf_processar_fila_nfse'] ?? '');
     </div>
 
     <script>
+        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
+        const menuDropdown = document.getElementById('menuDropdown');
+        if (btnMenuHamburguer && menuDropdown) {
+            btnMenuHamburguer.addEventListener('click', function (evento) {
+                evento.stopPropagation();
+                const aberto = menuDropdown.classList.toggle('aberto');
+                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+            });
+            document.addEventListener('click', function (evento) {
+                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
+                    menuDropdown.classList.remove('aberto');
+                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
                 .finally(() => {
