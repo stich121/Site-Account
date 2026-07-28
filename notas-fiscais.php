@@ -484,182 +484,6 @@ try {
         $csrf = $_POST['csrf'] ?? '';
         if (!hash_equals($_SESSION['csrf_notas_fiscais'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
-        } elseif (($_POST['acao'] ?? '') === 'cadastrar_cliente') {
-            $tipoPessoa = ($_POST['tipo_pessoa'] ?? 'PJ') === 'PF' ? 'PF' : 'PJ';
-            $nomeRazaoSocial = trim($_POST['nome_razao_social'] ?? '');
-            $cnpjCpf = trim($_POST['cnpj_cpf'] ?? '');
-            $inscricaoEstadual = trim($_POST['cliente_inscricao_estadual'] ?? '');
-            $email = trim($_POST['cliente_email'] ?? '');
-            $logradouro = trim($_POST['cliente_logradouro'] ?? '');
-            $numero = trim($_POST['cliente_numero'] ?? '');
-            $complemento = trim($_POST['cliente_complemento'] ?? '');
-            $bairro = trim($_POST['cliente_bairro'] ?? '');
-            $cep = trim($_POST['cliente_cep'] ?? '');
-            $municipio = trim($_POST['cliente_municipio'] ?? '');
-            $uf = strtoupper(trim($_POST['cliente_uf'] ?? ''));
-            $consumidorFinal = isset($_POST['indicador_consumidor_final']) ? 1 : 0;
-
-            if ($nomeRazaoSocial === '') {
-                $erro = 'Informe o nome/razão social do cliente.';
-            } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $erro = 'Informe um e-mail válido para o cliente ou deixe em branco.';
-            } else {
-                $stmt = $dbNotas->prepare(
-                    'INSERT INTO notas_clientes (
-                        tipo_pessoa, nome_razao_social, cnpj_cpf, inscricao_estadual, email,
-                        logradouro, numero, complemento, bairro, cep, municipio, uf,
-                        indicador_consumidor_final, criado_por
-                     ) VALUES (
-                        :tipo_pessoa, :nome_razao_social, :cnpj_cpf, :inscricao_estadual, :email,
-                        :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :uf,
-                        :indicador_consumidor_final, :criado_por
-                     )'
-                );
-                $stmt->execute([
-                    'tipo_pessoa' => $tipoPessoa,
-                    'nome_razao_social' => $nomeRazaoSocial,
-                    'cnpj_cpf' => $cnpjCpf !== '' ? $cnpjCpf : null,
-                    'inscricao_estadual' => $inscricaoEstadual !== '' ? $inscricaoEstadual : null,
-                    'email' => $email !== '' ? $email : null,
-                    'logradouro' => $logradouro !== '' ? $logradouro : null,
-                    'numero' => $numero !== '' ? $numero : null,
-                    'complemento' => $complemento !== '' ? $complemento : null,
-                    'bairro' => $bairro !== '' ? $bairro : null,
-                    'cep' => $cep !== '' ? $cep : null,
-                    'municipio' => $municipio !== '' ? $municipio : null,
-                    'uf' => $uf !== '' ? $uf : null,
-                    'indicador_consumidor_final' => $consumidorFinal,
-                    'criado_por' => $funcionarioId,
-                ]);
-
-                $sucesso = 'Cliente cadastrado. Já pode ser selecionado ao criar uma nota.';
-            }
-        } elseif (($_POST['acao'] ?? '') === 'criar_nota') {
-            $empresaId = (int) ($_POST['empresa_emissora_id'] ?? 0);
-            $clienteId = (int) ($_POST['cliente_id'] ?? 0);
-            $tipoNota = ($_POST['tipo_nota'] ?? 'nfe') === 'nfse' ? 'nfse' : 'nfe';
-            $naturezaOperacao = trim($_POST['natureza_operacao'] ?? '');
-            $formaPagamento = trim($_POST['forma_pagamento'] ?? '');
-            $dataEmissao = trim($_POST['data_emissao'] ?? '') !== '' ? trim($_POST['data_emissao']) : date('Y-m-d');
-            $dataSaidaEntrada = trim($_POST['data_saida_entrada'] ?? '');
-            $informacoesFrete = trim($_POST['informacoes_frete'] ?? '');
-
-            $descricoes = $_POST['item_descricao'] ?? [];
-            $ncms = $_POST['item_ncm'] ?? [];
-            $cfops = $_POST['item_cfop'] ?? [];
-            $csts = $_POST['item_cst'] ?? [];
-            $codigosServico = $_POST['item_codigo_servico'] ?? [];
-            $unidades = $_POST['item_unidade'] ?? [];
-            $quantidades = $_POST['item_quantidade'] ?? [];
-            $valoresUnitarios = $_POST['item_valor_unitario'] ?? [];
-            $produtoIds = $_POST['item_produto_id'] ?? [];
-
-            $itensValidos = [];
-            $valorTotalNota = 0.0;
-            foreach ($descricoes as $indice => $descricaoItem) {
-                $descricaoItem = trim((string) $descricaoItem);
-                $quantidade = (float) str_replace(',', '.', (string) ($quantidades[$indice] ?? '0'));
-                $valorUnitario = (float) str_replace(',', '.', (string) ($valoresUnitarios[$indice] ?? '0'));
-
-                if ($descricaoItem === '' || $quantidade <= 0) {
-                    continue;
-                }
-
-                $valorTotalItem = round($quantidade * $valorUnitario, 2);
-                $valorTotalNota += $valorTotalItem;
-
-                $itensValidos[] = [
-                    'produto_servico_id' => (int) ($produtoIds[$indice] ?? 0) > 0 ? (int) $produtoIds[$indice] : null,
-                    'descricao' => $descricaoItem,
-                    'ncm' => trim((string) ($ncms[$indice] ?? '')) ?: null,
-                    'cfop' => trim((string) ($cfops[$indice] ?? '')) ?: null,
-                    'cst_csosn' => trim((string) ($csts[$indice] ?? '')) ?: null,
-                    'codigo_servico_municipal' => trim((string) ($codigosServico[$indice] ?? '')) ?: null,
-                    'unidade' => trim((string) ($unidades[$indice] ?? '')) ?: 'UN',
-                    'quantidade' => $quantidade,
-                    'valor_unitario' => $valorUnitario,
-                    'valor_total' => $valorTotalItem,
-                ];
-            }
-
-            if ($empresaId <= 0) {
-                $erro = 'Selecione a empresa emissora.';
-            } elseif ($clienteId <= 0) {
-                $erro = 'Selecione o cliente destinatário.';
-            } elseif ($naturezaOperacao === '') {
-                $erro = 'Informe a natureza da operação.';
-            } elseif (empty($itensValidos)) {
-                $erro = 'Adicione ao menos um item com descrição e quantidade maior que zero.';
-            } else {
-                $dbNotas->beginTransaction();
-                try {
-                    $stmt = $dbNotas->prepare(
-                        'SELECT COALESCE(MAX(numero_interno), 0) + 1 FROM notas_fiscais
-                         WHERE empresa_emissora_id = :empresa_id AND tipo_nota = :tipo_nota FOR UPDATE'
-                    );
-                    $stmt->execute(['empresa_id' => $empresaId, 'tipo_nota' => $tipoNota]);
-                    $numeroInterno = (int) $stmt->fetchColumn();
-
-                    $stmt = $dbNotas->prepare(
-                        'INSERT INTO notas_fiscais (
-                            empresa_emissora_id, cliente_id, funcionario_id, tipo_nota, natureza_operacao,
-                            numero_interno, status, ambiente, forma_pagamento, data_emissao, data_saida_entrada,
-                            valor_total, informacoes_frete
-                         ) VALUES (
-                            :empresa_id, :cliente_id, :funcionario_id, :tipo_nota, :natureza_operacao,
-                            :numero_interno, \'rascunho\', \'homologacao\', :forma_pagamento, :data_emissao, :data_saida_entrada,
-                            :valor_total, :informacoes_frete
-                         )'
-                    );
-                    $stmt->execute([
-                        'empresa_id' => $empresaId,
-                        'cliente_id' => $clienteId,
-                        'funcionario_id' => $funcionarioId,
-                        'tipo_nota' => $tipoNota,
-                        'natureza_operacao' => $naturezaOperacao,
-                        'numero_interno' => $numeroInterno,
-                        'forma_pagamento' => $formaPagamento !== '' ? $formaPagamento : null,
-                        'data_emissao' => $dataEmissao,
-                        'data_saida_entrada' => $dataSaidaEntrada !== '' ? $dataSaidaEntrada : null,
-                        'valor_total' => round($valorTotalNota, 2),
-                        'informacoes_frete' => $informacoesFrete !== '' ? $informacoesFrete : null,
-                    ]);
-                    $notaId = (int) $dbNotas->lastInsertId();
-
-                    $stmtItem = $dbNotas->prepare(
-                        'INSERT INTO notas_fiscais_itens (
-                            nota_id, produto_servico_id, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade,
-                            quantidade, valor_unitario, valor_total
-                         ) VALUES (
-                            :nota_id, :produto_servico_id, :descricao, :ncm, :cfop, :cst_csosn, :codigo_servico_municipal, :unidade,
-                            :quantidade, :valor_unitario, :valor_total
-                         )'
-                    );
-                    foreach ($itensValidos as $item) {
-                        $stmtItem->execute([
-                            'nota_id' => $notaId,
-                            'produto_servico_id' => $item['produto_servico_id'],
-                            'descricao' => $item['descricao'],
-                            'ncm' => $item['ncm'],
-                            'cfop' => $item['cfop'],
-                            'cst_csosn' => $item['cst_csosn'],
-                            'codigo_servico_municipal' => $item['codigo_servico_municipal'],
-                            'unidade' => $item['unidade'],
-                            'quantidade' => $item['quantidade'],
-                            'valor_unitario' => $item['valor_unitario'],
-                            'valor_total' => $item['valor_total'],
-                        ]);
-                    }
-
-                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'criada', 'Rascunho criado com ' . count($itensValidos) . ' item(ns).');
-
-                    $dbNotas->commit();
-                    $sucesso = 'Nota salva como rascunho (nº interno ' . $numeroInterno . '). Gere o PDF de conferência ou marque como pronta para envio.';
-                } catch (Throwable $e) {
-                    $dbNotas->rollBack();
-                    $erro = 'Não foi possível salvar a nota: ' . $e->getMessage();
-                }
-            }
         } elseif (in_array($_POST['acao'] ?? '', ['marcar_pendente', 'cancelar'], true)) {
             $notaId = (int) ($_POST['nota_id'] ?? 0);
             $stmt = $dbNotas->prepare('SELECT funcionario_id, status FROM notas_fiscais WHERE id = :id LIMIT 1');
@@ -681,18 +505,6 @@ try {
             }
         }
     }
-
-    $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
-    $empresasAtivas = $stmt->fetchAll();
-
-    $stmt = $dbNotas->query('SELECT id, nome_razao_social, cnpj_cpf, municipio, uf FROM notas_clientes ORDER BY nome_razao_social ASC');
-    $clientes = $stmt->fetchAll();
-
-    $stmt = $dbNotas->query(
-        'SELECT id, empresa_emissora_id, tipo, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade, valor_unitario_padrao
-         FROM notas_produtos_servicos WHERE ativo = 1 ORDER BY descricao ASC'
-    );
-    $catalogo = $stmt->fetchAll();
 
     $filtroStatus = trim($_GET['status'] ?? '');
     $where = [];
@@ -735,15 +547,11 @@ try {
     }
 } catch (PDOException $e) {
     $erro = 'Erro ao carregar notas fiscais: ' . $e->getMessage();
-    $empresasAtivas = [];
-    $clientes = [];
-    $catalogo = [];
     $notas = [];
 }
 
 $csrf = h($_SESSION['csrf_notas_fiscais'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
-$catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -867,38 +675,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
 
         .btn-small { padding: 0.55rem 0.75rem; font-size: 0.72rem; }
 
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1rem;
-        }
-
-        .field { display: grid; gap: 0.4rem; }
-        .field label { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
-
-        .field input,
-        .field select,
-        .field textarea {
-            width: 100%;
-            padding: 0.85rem;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            background: #0A0A0A;
-            color: var(--text-white);
-            font-family: var(--font-body);
-        }
-
-        .field textarea { resize: vertical; min-height: 4.5rem; }
-
-        .check-row {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            margin-top: 1.9rem;
-            color: var(--text-muted);
-            font-weight: 700;
-        }
-
         .notice {
             margin-bottom: 1rem;
             padding: 1rem;
@@ -919,21 +695,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
             color: #FFE8A3;
         }
 
-        details.panel summary {
-            cursor: pointer;
-            font-family: var(--font-titles);
-            color: var(--text-white);
-            text-transform: uppercase;
-            font-size: 1.1rem;
-        }
-
-        details.panel[open] summary { margin-bottom: 1rem; }
-
-        .itens-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-        .itens-table th, .itens-table td { padding: 0.5rem; border-bottom: 1px solid var(--border); text-align: left; }
-        .itens-table th { color: var(--text-white); font-size: 0.72rem; text-transform: uppercase; font-family: var(--font-titles); }
-        .itens-table input, .itens-table select { width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border); background: #0A0A0A; color: var(--text-white); }
-
         .table-wrap { overflow-x: auto; }
         table.lista { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 0.9rem; }
         table.lista th, table.lista td { padding: 0.8rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
@@ -945,12 +706,10 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
         .status-rejeitada,
         .status-cancelada { background: rgba(255, 69, 58, 0.15); color: #FFD1CE; }
         .row-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .totais { text-align: right; font-family: var(--font-titles); font-size: 1.1rem; color: var(--text-white); }
 
         @media (max-width: 820px) {
             body { padding: 1rem; }
             .topbar { flex-direction: column; align-items: flex-start; }
-            .form-grid { grid-template-columns: 1fr; }
             .btn { width: 100%; }
         }
     </style>
@@ -967,7 +726,8 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 </button>
                 <div class="menu-dropdown" id="menuDropdown">
                     <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                    <a class="btn btn-outline" href="notas-fiscais#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
+                    <a class="btn btn-outline" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota fiscal</a>
+                    <a class="btn btn-outline" href="notas-emitir#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
                     <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                     <?php if ($podeAdministrar): ?>
                         <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
@@ -998,164 +758,9 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
             <strong>Fase 1 — sem envio automático:</strong> notas criadas aqui ficam em rascunho/pendente de envio. Não há transmissão para a SEFAZ (NF-e) nem para o Portal Nacional da NFS-e ainda. O PDF gerado é só para conferência interna.
         </div>
 
-        <?php if (empty($empresasAtivas)): ?>
-            <div class="notice error">Nenhuma empresa emissora ativa. <?php echo $podeAdministrar ? 'Cadastre uma em <a href="notas-empresas-emissoras" style="text-decoration:underline;">Empresas emissoras</a>.' : 'Peça para um administrador cadastrar em Empresas emissoras.'; ?></div>
-        <?php else: ?>
-
-            <details class="panel" id="cadastroCliente">
-                <summary>Cadastrar novo cliente (destinatário)</summary>
-                <form method="post">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="cadastrar_cliente">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="tipo_pessoa">Tipo de pessoa</label>
-                            <select id="tipo_pessoa" name="tipo_pessoa">
-                                <option value="PJ">Pessoa jurídica</option>
-                                <option value="PF">Pessoa física</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="nome_razao_social">Nome / Razão social</label>
-                            <input id="nome_razao_social" name="nome_razao_social" type="text" required>
-                        </div>
-                        <div class="field">
-                            <label for="cnpj_cpf">CNPJ / CPF</label>
-                            <div class="row-actions">
-                                <input id="cnpj_cpf" name="cnpj_cpf" type="text" style="flex: 1;">
-                                <button class="btn btn-outline btn-small" type="button" id="btnBuscarCnpjCliente"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
-                            </div>
-                            <span class="muted" id="statusBuscaCnpjCliente" style="font-size: 0.78rem;"></span>
-                        </div>
-                        <div class="field">
-                            <label for="cliente_inscricao_estadual">Inscrição Estadual (ou "ISENTO")</label>
-                            <input id="cliente_inscricao_estadual" name="cliente_inscricao_estadual" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_email">E-mail</label>
-                            <input id="cliente_email" name="cliente_email" type="email">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_logradouro">Logradouro</label>
-                            <input id="cliente_logradouro" name="cliente_logradouro" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_numero">Número</label>
-                            <input id="cliente_numero" name="cliente_numero" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_complemento">Complemento</label>
-                            <input id="cliente_complemento" name="cliente_complemento" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_bairro">Bairro</label>
-                            <input id="cliente_bairro" name="cliente_bairro" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_cep">CEP</label>
-                            <input id="cliente_cep" name="cliente_cep" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_municipio">Município</label>
-                            <input id="cliente_municipio" name="cliente_municipio" type="text">
-                        </div>
-                        <div class="field">
-                            <label for="cliente_uf">UF</label>
-                            <input id="cliente_uf" name="cliente_uf" type="text" maxlength="2">
-                        </div>
-                        <label class="check-row">
-                            <input type="checkbox" name="indicador_consumidor_final" checked>
-                            Consumidor final
-                        </label>
-                        <div class="field">
-                            <label>&nbsp;</label>
-                            <button class="btn" type="submit"><i class="fa-solid fa-user-plus"></i> Cadastrar cliente</button>
-                        </div>
-                    </div>
-                </form>
-            </details>
-
-            <section class="panel">
-                <h2>Nova nota (rascunho)</h2>
-                <form method="post" id="formNota">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="criar_nota">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="empresa_emissora_id">Empresa emissora</label>
-                            <select id="empresa_emissora_id" name="empresa_emissora_id" required>
-                                <option value="">Selecione</option>
-                                <?php foreach ($empresasAtivas as $empresa): ?>
-                                    <option value="<?php echo h((string) $empresa['id']); ?>"><?php echo h($empresa['razao_social']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="tipo_nota">Tipo de nota</label>
-                            <select id="tipo_nota" name="tipo_nota">
-                                <option value="nfe">NF-e (produto)</option>
-                                <option value="nfse">NFS-e (serviço)</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="cliente_id">Cliente destinatário</label>
-                            <select id="cliente_id" name="cliente_id" required>
-                                <option value="">Selecione</option>
-                                <?php foreach ($clientes as $cliente): ?>
-                                    <option value="<?php echo h((string) $cliente['id']); ?>"><?php echo h($cliente['nome_razao_social'] . (($cliente['cnpj_cpf'] ?? '') !== '' ? ' - ' . $cliente['cnpj_cpf'] : '')); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="natureza_operacao">Natureza da operação</label>
-                            <input id="natureza_operacao" name="natureza_operacao" type="text" placeholder="Ex.: Venda de mercadoria / Prestação de serviço" required>
-                        </div>
-                        <div class="field">
-                            <label for="forma_pagamento">Forma de pagamento</label>
-                            <input id="forma_pagamento" name="forma_pagamento" type="text" placeholder="Pix, boleto, cartão...">
-                        </div>
-                        <div class="field">
-                            <label for="data_emissao">Data de emissão</label>
-                            <input id="data_emissao" name="data_emissao" type="date" value="<?php echo h(date('Y-m-d')); ?>">
-                        </div>
-                        <div class="field">
-                            <label for="data_saida_entrada">Data de saída/entrada</label>
-                            <input id="data_saida_entrada" name="data_saida_entrada" type="date">
-                        </div>
-                        <div class="field" style="grid-column: 1 / -1;">
-                            <label for="informacoes_frete">Frete/transporte (opcional)</label>
-                            <textarea id="informacoes_frete" name="informacoes_frete" placeholder="Transportadora, placa, volume, peso..."></textarea>
-                        </div>
-                    </div>
-
-                    <h3 style="margin-top: 1.5rem;">Itens</h3>
-                    <table class="itens-table" id="tabelaItens">
-                        <thead>
-                            <tr>
-                                <th style="min-width: 220px;">Catálogo (opcional)</th>
-                                <th style="min-width: 200px;">Descrição</th>
-                                <th>NCM</th>
-                                <th>CFOP</th>
-                                <th>CST/CSOSN</th>
-                                <th>Cód. serviço (LC 116)</th>
-                                <th>Unid.</th>
-                                <th>Qtd.</th>
-                                <th>Valor unit.</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="corpoItens"></tbody>
-                    </table>
-                    <button class="btn btn-outline btn-small" type="button" id="btnAddItem"><i class="fa-solid fa-plus"></i> Adicionar item</button>
-
-                    <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
-
-                    <div style="margin-top: 1.5rem;">
-                        <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar rascunho</button>
-                    </div>
-                </form>
-            </section>
-        <?php endif; ?>
+        <section class="panel">
+            <a class="btn" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Nova nota (emitir)</a>
+        </section>
 
         <section class="panel">
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
@@ -1234,98 +839,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
     </div>
 
     <script>
-        function formatarCnpjOuCpf(valor, tipoPessoa) {
-            const digitos = (valor || '').replace(/\D/g, '');
-            if (tipoPessoa === 'PF') {
-                const d = digitos.slice(0, 11);
-                if (d.length > 9) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2})$/, '$1.$2.$3-$4').replace(/-$/, '');
-                if (d.length > 6) return d.replace(/^(\d{3})(\d{3})(\d{0,3})$/, '$1.$2.$3');
-                if (d.length > 3) return d.replace(/^(\d{3})(\d{0,3})$/, '$1.$2');
-                return d;
-            }
-            const d = digitos.slice(0, 14);
-            if (d.length > 12) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})$/, '$1.$2.$3/$4-$5').replace(/-$/, '');
-            if (d.length > 8) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4})$/, '$1.$2.$3/$4');
-            if (d.length > 5) return d.replace(/^(\d{2})(\d{3})(\d{0,3})$/, '$1.$2.$3');
-            if (d.length > 2) return d.replace(/^(\d{2})(\d{0,3})$/, '$1.$2');
-            return d;
-        }
-
-        function formatarCepCliente(valor) {
-            const d = (valor || '').replace(/\D/g, '').slice(0, 8);
-            return d.length > 5 ? d.replace(/^(\d{5})(\d{0,3})$/, '$1-$2') : d;
-        }
-
-        const campoCnpjCpf = document.getElementById('cnpj_cpf');
-        const campoTipoPessoa = document.getElementById('tipo_pessoa');
-        const campoCepCliente = document.getElementById('cliente_cep');
-        const btnBuscarCnpjCliente = document.getElementById('btnBuscarCnpjCliente');
-
-        if (campoCnpjCpf && campoTipoPessoa) {
-            campoCnpjCpf.addEventListener('input', function () {
-                campoCnpjCpf.value = formatarCnpjOuCpf(campoCnpjCpf.value, campoTipoPessoa.value);
-            });
-            campoTipoPessoa.addEventListener('change', function () {
-                campoCnpjCpf.value = formatarCnpjOuCpf(campoCnpjCpf.value, campoTipoPessoa.value);
-                if (btnBuscarCnpjCliente) {
-                    btnBuscarCnpjCliente.style.display = campoTipoPessoa.value === 'PF' ? 'none' : '';
-                }
-            });
-        }
-
-        if (campoCepCliente) {
-            campoCepCliente.addEventListener('input', function () {
-                campoCepCliente.value = formatarCepCliente(campoCepCliente.value);
-            });
-        }
-
-        if (btnBuscarCnpjCliente) {
-            btnBuscarCnpjCliente.addEventListener('click', function () {
-                const statusEl = document.getElementById('statusBuscaCnpjCliente');
-                const digitos = (campoCnpjCpf.value || '').replace(/\D/g, '');
-
-                if (digitos.length !== 14) {
-                    statusEl.textContent = 'Informe um CNPJ com 14 dígitos antes de buscar.';
-                    statusEl.style.color = '#FFD1CE';
-                    return;
-                }
-
-                statusEl.textContent = 'Buscando...';
-                statusEl.style.color = '';
-                btnBuscarCnpjCliente.disabled = true;
-
-                fetch('buscar-cnpj?cnpj=' + digitos)
-                    .then(function (resposta) { return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; }); })
-                    .then(function (resultado) {
-                        if (!resultado.ok) {
-                            statusEl.textContent = resultado.dados.erro || 'Não foi possível buscar o CNPJ.';
-                            statusEl.style.color = '#FFD1CE';
-                            return;
-                        }
-
-                        const dados = resultado.dados;
-                        document.getElementById('nome_razao_social').value = dados.razao_social || '';
-                        document.getElementById('cliente_logradouro').value = dados.logradouro || '';
-                        document.getElementById('cliente_numero').value = dados.numero || '';
-                        document.getElementById('cliente_complemento').value = dados.complemento || '';
-                        document.getElementById('cliente_bairro').value = dados.bairro || '';
-                        document.getElementById('cliente_cep').value = formatarCepCliente(dados.cep || '');
-                        document.getElementById('cliente_municipio').value = dados.municipio || '';
-                        document.getElementById('cliente_uf').value = dados.uf || '';
-
-                        statusEl.style.color = 'var(--primary)';
-                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de cadastrar.';
-                    })
-                    .catch(function () {
-                        statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
-                        statusEl.style.color = '#FFD1CE';
-                    })
-                    .finally(function () {
-                        btnBuscarCnpjCliente.disabled = false;
-                    });
-            });
-        }
-
         const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
         const menuDropdown = document.getElementById('menuDropdown');
         if (btnMenuHamburguer && menuDropdown) {
@@ -1339,105 +852,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                     menuDropdown.classList.remove('aberto');
                     btnMenuHamburguer.setAttribute('aria-expanded', 'false');
                 }
-            });
-        }
-
-        if (window.location.hash === '#cadastroCliente') {
-            const detalhesCliente = document.getElementById('cadastroCliente');
-            if (detalhesCliente) {
-                detalhesCliente.open = true;
-                detalhesCliente.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-
-        const catalogo = JSON.parse(<?php echo json_encode($catalogoJson); ?>);
-        const corpoItens = document.getElementById('corpoItens');
-        const empresaSelect = document.getElementById('empresa_emissora_id');
-        const totalNotaEl = document.getElementById('totalNota');
-
-        function formatarMoeda(valor) {
-            return 'Total estimado: R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        function recalcularTotal() {
-            let total = 0;
-            corpoItens.querySelectorAll('tr').forEach(function (linha) {
-                const qtd = parseFloat((linha.querySelector('.item-quantidade').value || '0').replace(',', '.')) || 0;
-                const valorUnit = parseFloat((linha.querySelector('.item-valor').value || '0').replace(',', '.')) || 0;
-                total += qtd * valorUnit;
-            });
-            totalNotaEl.textContent = formatarMoeda(total);
-        }
-
-        function montarOpcoesCatalogo(empresaId) {
-            let opcoes = '<option value="">Digitar manualmente</option>';
-            catalogo.filter(function (item) {
-                return String(item.empresa_emissora_id) === String(empresaId);
-            }).forEach(function (item) {
-                opcoes += '<option value="' + item.id + '">' + item.descricao + '</option>';
-            });
-            return opcoes;
-        }
-
-        function adicionarLinhaItem() {
-            const empresaId = empresaSelect ? empresaSelect.value : '';
-            const linha = document.createElement('tr');
-            linha.innerHTML =
-                '<td><select class="item-catalogo">' + montarOpcoesCatalogo(empresaId) + '</select></td>' +
-                '<td><input type="text" name="item_descricao[]" class="item-descricao" required></td>' +
-                '<td><input type="text" name="item_ncm[]" class="item-ncm"></td>' +
-                '<td><input type="text" name="item_cfop[]" class="item-cfop"></td>' +
-                '<td><input type="text" name="item_cst[]" class="item-cst"></td>' +
-                '<td><input type="text" name="item_codigo_servico[]" class="item-codigo-servico"></td>' +
-                '<td><input type="text" name="item_unidade[]" class="item-unidade" value="UN"></td>' +
-                '<td><input type="text" name="item_quantidade[]" class="item-quantidade" value="1"></td>' +
-                '<td><input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00"></td>' +
-                '<td><input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
-                '<button type="button" class="btn btn-danger btn-small btn-remover-item"><i class="fa-solid fa-trash"></i></button></td>';
-
-            corpoItens.appendChild(linha);
-
-            const selectCatalogo = linha.querySelector('.item-catalogo');
-            selectCatalogo.addEventListener('change', function () {
-                const item = catalogo.find(function (candidato) {
-                    return String(candidato.id) === selectCatalogo.value;
-                });
-                if (item) {
-                    linha.querySelector('.item-descricao').value = item.descricao || '';
-                    linha.querySelector('.item-ncm').value = item.ncm || '';
-                    linha.querySelector('.item-cfop').value = item.cfop || '';
-                    linha.querySelector('.item-cst').value = item.cst_csosn || '';
-                    linha.querySelector('.item-codigo-servico').value = item.codigo_servico_municipal || '';
-                    linha.querySelector('.item-unidade').value = item.unidade || 'UN';
-                    linha.querySelector('.item-valor').value = Number(item.valor_unitario_padrao || 0).toFixed(2).replace('.', ',');
-                    linha.querySelector('.item-produto-id').value = item.id;
-                } else {
-                    linha.querySelector('.item-produto-id').value = 0;
-                }
-                recalcularTotal();
-            });
-
-            linha.querySelector('.item-quantidade').addEventListener('input', recalcularTotal);
-            linha.querySelector('.item-valor').addEventListener('input', recalcularTotal);
-            linha.querySelector('.btn-remover-item').addEventListener('click', function () {
-                linha.remove();
-                recalcularTotal();
-            });
-
-            recalcularTotal();
-        }
-
-        const btnAddItem = document.getElementById('btnAddItem');
-        if (btnAddItem) {
-            btnAddItem.addEventListener('click', adicionarLinhaItem);
-            adicionarLinhaItem();
-        }
-
-        if (empresaSelect) {
-            empresaSelect.addEventListener('change', function () {
-                corpoItens.querySelectorAll('.item-catalogo').forEach(function (select) {
-                    select.innerHTML = montarOpcoesCatalogo(empresaSelect.value);
-                });
             });
         }
 

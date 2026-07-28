@@ -591,7 +591,8 @@ $csrf = h($_SESSION['csrf_notas_certificados'] ?? '');
                 </button>
                 <div class="menu-dropdown" id="menuDropdown">
                     <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                    <a class="btn btn-outline" href="notas-fiscais#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
+                    <a class="btn btn-outline" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota fiscal</a>
+                    <a class="btn btn-outline" href="notas-emitir#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
                     <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                     <?php if ($podeAdministrar): ?>
                         <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
