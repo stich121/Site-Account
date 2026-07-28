@@ -1083,12 +1083,20 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                                 <option value="nfse">NFS-e (serviço)</option>
                             </select>
                         </div>
+                        <div class="field" style="grid-column: 1 / -1;">
+                            <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF</label>
+                            <div class="row-actions">
+                                <input id="busca_cliente_documento" type="text" style="flex: 1;" placeholder="Digite o CNPJ ou CPF do cliente já cadastrado">
+                                <button class="btn btn-outline btn-small" type="button" id="btnBuscarClienteDocumento"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+                            </div>
+                            <span class="muted" id="statusBuscaClienteDocumento" style="font-size: 0.78rem;"></span>
+                        </div>
                         <div class="field">
                             <label for="cliente_id">Cliente destinatário</label>
                             <select id="cliente_id" name="cliente_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($clientes as $cliente): ?>
-                                    <option value="<?php echo h((string) $cliente['id']); ?>"><?php echo h($cliente['nome_razao_social'] . (($cliente['cnpj_cpf'] ?? '') !== '' ? ' - ' . $cliente['cnpj_cpf'] : '')); ?></option>
+                                    <option value="<?php echo h((string) $cliente['id']); ?>" data-documento="<?php echo h(preg_replace('/\D/', '', (string) ($cliente['cnpj_cpf'] ?? ''))); ?>"><?php echo h($cliente['nome_razao_social'] . (($cliente['cnpj_cpf'] ?? '') !== '' ? ' - ' . $cliente['cnpj_cpf'] : '')); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -1514,6 +1522,59 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                     .finally(function () {
                         btnBuscarCnpjCliente.disabled = false;
                     });
+            });
+        }
+
+        function formatarDocumentoBusca(valor) {
+            const digitos = (valor || '').replace(/\D/g, '');
+            return formatarCnpjOuCpf(digitos, digitos.length <= 11 ? 'PF' : 'PJ');
+        }
+
+        const campoBuscaClienteDocumento = document.getElementById('busca_cliente_documento');
+        const btnBuscarClienteDocumento = document.getElementById('btnBuscarClienteDocumento');
+        const selectClienteId = document.getElementById('cliente_id');
+
+        if (campoBuscaClienteDocumento) {
+            campoBuscaClienteDocumento.addEventListener('input', function () {
+                campoBuscaClienteDocumento.value = formatarDocumentoBusca(campoBuscaClienteDocumento.value);
+            });
+        }
+
+        function buscarClientePorDocumento() {
+            const statusEl = document.getElementById('statusBuscaClienteDocumento');
+            const digitos = (campoBuscaClienteDocumento.value || '').replace(/\D/g, '');
+
+            if (digitos.length < 11) {
+                statusEl.textContent = 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) para buscar.';
+                statusEl.style.color = '#FFD1CE';
+                return;
+            }
+
+            const opcao = Array.from(selectClienteId.options).find(function (candidata) {
+                return candidata.dataset.documento && candidata.dataset.documento === digitos;
+            });
+
+            if (opcao) {
+                selectClienteId.value = opcao.value;
+                selectClienteId.dispatchEvent(new Event('change'));
+                statusEl.style.color = 'var(--primary)';
+                statusEl.textContent = 'Cliente encontrado e selecionado: ' + opcao.textContent;
+            } else {
+                statusEl.style.color = '#FFD1CE';
+                statusEl.innerHTML = 'Nenhum cliente cadastrado com esse documento. <a href="notas-emitir#cadastroCliente" style="text-decoration:underline; color:#FFD1CE;">Cadastre um novo cliente</a>.';
+            }
+        }
+
+        if (btnBuscarClienteDocumento) {
+            btnBuscarClienteDocumento.addEventListener('click', buscarClientePorDocumento);
+        }
+
+        if (campoBuscaClienteDocumento) {
+            campoBuscaClienteDocumento.addEventListener('keydown', function (evento) {
+                if (evento.key === 'Enter') {
+                    evento.preventDefault();
+                    buscarClientePorDocumento();
+                }
             });
         }
 
