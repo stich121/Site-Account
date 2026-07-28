@@ -41,6 +41,29 @@ function codigoMunicipioIbgeValido(string $codigo): bool
     return isset($codigos[$codigo]);
 }
 
+function catalogoIbsCbsNfse(): array
+{
+    static $catalogo = null;
+    if ($catalogo === null) {
+        $arquivo = __DIR__ . '/nfse-ibs-catalogos.json';
+        $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
+        $catalogo = is_array($conteudo) ? $conteudo : [];
+    }
+
+    return $catalogo;
+}
+
+function itemCatalogoIbsCbs(string $grupo, string $codigo): ?array
+{
+    foreach (catalogoIbsCbsNfse()[$grupo] ?? [] as $item) {
+        if ((string) ($item['codigo'] ?? '') === $codigo) {
+            return $item;
+        }
+    }
+
+    return null;
+}
+
 function documentoNfseValido(string $documento): bool
 {
     $numero = preg_replace('/\D+/', '', $documento);
@@ -789,6 +812,8 @@ try {
             $algumIbsCbsInformado = count(array_filter($camposIbsCbs, static fn($valor) => $valor !== null && $valor !== '')) > 0;
             $ibscbsCompleto = $dadosNfse && in_array($dadosNfse['ibscbs_ind_final'], [0, 1], true) && $dadosNfse['ibscbs_codigo_indicador_operacao'] !== null && $dadosNfse['ibscbs_ind_destinatario'] !== null && $dadosNfse['ibscbs_cst'] !== null && $dadosNfse['ibscbs_classificacao_tributaria'] !== null;
             $ibscbsObrigatorio = $tipoNota === 'nfse' && (int) ($empresaSelecionada['nfse_opcao_simples_nacional'] ?? 0) === 1 && ($dadosNfse['data_competencia'] ?? '') >= '2026-08-03';
+            $cindopOficial = $dadosNfse && $dadosNfse['ibscbs_codigo_indicador_operacao'] !== null ? itemCatalogoIbsCbs('cindop', (string) $dadosNfse['ibscbs_codigo_indicador_operacao']) : null;
+            $cclassOficial = $dadosNfse && $dadosNfse['ibscbs_classificacao_tributaria'] !== null ? itemCatalogoIbsCbs('cclass', (string) $dadosNfse['ibscbs_classificacao_tributaria']) : null;
 
             if ($empresaId <= 0 || $empresaSelecionada === null) {
                 $erro = 'Selecione uma empresa emissora ativa.';
@@ -830,7 +855,13 @@ try {
             } elseif ($tipoNota === 'nfse' && $dadosNfse['beneficio_municipal'] === 'sim' && $dadosNfse['codigo_beneficio_municipal'] === null) {
                 $erro = 'Benefício municipal exige o código oficial do benefício.';
             } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && !$ibscbsCompleto) {
-                $erro = 'Preencha o conjunto completo IBS/CBS da NT 004; os códigos fiscais não são inferidos automaticamente.';
+                $erro = 'Preencha o conjunto completo IBS/CBS selecionando os códigos nas tabelas oficiais.';
+            } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && $cindopOficial === null) {
+                $erro = 'Selecione um código indicador da operação (cIndOp) válido na tabela oficial da NFS-e.';
+            } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && $cclassOficial === null) {
+                $erro = 'Selecione uma classificação tributária (cClassTrib) vigente e permitida para NFS-e.';
+            } elseif ($tipoNota === 'nfse' && $cclassOficial !== null && (string) $dadosNfse['ibscbs_cst'] !== (string) ($cclassOficial['cst'] ?? '')) {
+                $erro = 'O CST IBS/CBS não corresponde à classificação tributária selecionada.';
             } elseif (empty($itensValidos)) {
                 $erro = $tipoNota === 'nfse'
                     ? 'Informe a descrição do serviço e um valor do serviço maior que zero.'
@@ -1118,8 +1149,10 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
         }
 
         .field textarea { resize: vertical; min-height: 4.5rem; }
-        .municipio-autocomplete { position: relative; }
-        .municipio-sugestoes {
+        .municipio-autocomplete,
+        .catalogo-autocomplete { position: relative; }
+        .municipio-sugestoes,
+        .catalogo-sugestoes {
             position: absolute;
             z-index: 30;
             top: calc(100% - 1.2rem);
@@ -1134,8 +1167,10 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             background: #111;
             box-shadow: 0 16px 35px rgba(0, 0, 0, 0.38);
         }
-        .municipio-sugestoes.aberto { display: grid; }
-        .municipio-opcao {
+        .municipio-sugestoes.aberto,
+        .catalogo-sugestoes.aberto { display: grid; }
+        .municipio-opcao,
+        .catalogo-opcao {
             width: 100%;
             padding: 0.65rem 0.75rem;
             border: 0;
@@ -1146,7 +1181,9 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             cursor: pointer;
         }
         .municipio-opcao:hover,
-        .municipio-opcao:focus { background: rgba(201, 162, 39, 0.16); outline: none; }
+        .municipio-opcao:focus,
+        .catalogo-opcao:hover,
+        .catalogo-opcao:focus { background: rgba(201, 162, 39, 0.16); outline: none; }
 
         .check-row {
             display: flex;
@@ -1533,14 +1570,26 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                         </div>
 
                         <h3 style="margin-top: 1.5rem;">IBS/CBS — Reforma Tributária (NT 004)</h3>
-                        <p class="muted">Informe os códigos conforme o enquadramento fiscal da operação. O sistema não presume CST nem classificação tributária.</p>
+                        <p class="muted">Pesquise e selecione os códigos das tabelas oficiais. Ao escolher a classificação tributária, o CST correspondente é preenchido automaticamente.</p>
                         <div class="form-grid">
                             <div class="field"><label for="nfse_ibscbs_finalidade">Finalidade</label><select id="nfse_ibscbs_finalidade" name="nfse_ibscbs_finalidade"><option value="0" selected>0 - NFS-e regular</option><option value="1">1 - Crédito</option><option value="2">2 - Débito</option></select></div>
                             <div class="field"><label for="nfse_ibscbs_ind_final">Operação com consumidor final?</label><select id="nfse_ibscbs_ind_final" name="nfse_ibscbs_ind_final"><option value="">Selecione</option><option value="0">0 - Não</option><option value="1">1 - Sim</option></select></div>
-                            <div class="field"><label for="nfse_ibscbs_codigo_indicador_operacao">Código do indicador da operação</label><input id="nfse_ibscbs_codigo_indicador_operacao" name="nfse_ibscbs_codigo_indicador_operacao" type="text" maxlength="10" placeholder="Conforme tabela oficial"></div>
-                            <div class="field"><label for="nfse_ibscbs_ind_destinatario">Indicador do destinatário</label><input id="nfse_ibscbs_ind_destinatario" name="nfse_ibscbs_ind_destinatario" type="text" maxlength="2" placeholder="Conforme NT 004"></div>
-                            <div class="field"><label for="nfse_ibscbs_cst">CST IBS/CBS</label><input id="nfse_ibscbs_cst" name="nfse_ibscbs_cst" type="text" inputmode="numeric" pattern="\d{3}" maxlength="3" placeholder="000"></div>
-                            <div class="field"><label for="nfse_ibscbs_classificacao_tributaria">Classificação tributária</label><input id="nfse_ibscbs_classificacao_tributaria" name="nfse_ibscbs_classificacao_tributaria" type="text" inputmode="numeric" maxlength="10" placeholder="Código cClassTrib"></div>
+                            <div class="field catalogo-autocomplete">
+                                <label for="nfse_ibscbs_codigo_indicador_operacao_busca">Código do indicador da operação (cIndOp)</label>
+                                <input id="nfse_ibscbs_codigo_indicador_operacao_busca" type="search" placeholder="Pesquise pelo código ou descrição" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_ibscbs_codigo_indicador_operacao_opcoes" aria-expanded="false">
+                                <input id="nfse_ibscbs_codigo_indicador_operacao" name="nfse_ibscbs_codigo_indicador_operacao" type="hidden">
+                                <div id="nfse_ibscbs_codigo_indicador_operacao_opcoes" class="catalogo-sugestoes" role="listbox"></div>
+                                <span class="muted" id="nfse_ibscbs_codigo_indicador_operacao_status" style="font-size: 0.78rem;">Selecione uma opção da tabela oficial.</span>
+                            </div>
+                            <div class="field"><label for="nfse_ibscbs_ind_destinatario">Indicador do destinatário</label><select id="nfse_ibscbs_ind_destinatario" name="nfse_ibscbs_ind_destinatario"><option value="">Selecione</option><option value="0">0 - Destinatário é o tomador</option><option value="1">1 - Destinatário diferente do tomador</option></select></div>
+                            <div class="field"><label for="nfse_ibscbs_cst">CST IBS/CBS</label><input id="nfse_ibscbs_cst" name="nfse_ibscbs_cst" type="text" inputmode="numeric" pattern="\d{3}" maxlength="3" placeholder="Preenchido pelo cClassTrib" readonly aria-readonly="true"><span class="muted" id="nfse_ibscbs_cst_status" style="font-size: 0.78rem;">Será definido automaticamente.</span></div>
+                            <div class="field catalogo-autocomplete">
+                                <label for="nfse_ibscbs_classificacao_tributaria_busca">Classificação tributária (cClassTrib)</label>
+                                <input id="nfse_ibscbs_classificacao_tributaria_busca" type="search" placeholder="Pesquise pelo código ou descrição" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_ibscbs_classificacao_tributaria_opcoes" aria-expanded="false">
+                                <input id="nfse_ibscbs_classificacao_tributaria" name="nfse_ibscbs_classificacao_tributaria" type="hidden">
+                                <div id="nfse_ibscbs_classificacao_tributaria_opcoes" class="catalogo-sugestoes" role="listbox"></div>
+                                <span class="muted" id="nfse_ibscbs_classificacao_tributaria_status" style="font-size: 0.78rem;">Selecione uma opção vigente e permitida para NFS-e.</span>
+                            </div>
                         </div>
 
                         <h3 style="margin-top: 1.5rem;">Informações complementares</h3>
@@ -2213,6 +2262,140 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                 if (!evento.target.closest('.municipio-autocomplete')) fecharMunicipios();
             });
         }
+        function criarAutocompleteCatalogo(configuracao) {
+            const busca = document.getElementById(configuracao.buscaId);
+            const codigo = document.getElementById(configuracao.codigoId);
+            const opcoes = document.getElementById(configuracao.opcoesId);
+            const status = document.getElementById(configuracao.statusId);
+            let itens = [];
+
+            function fechar() {
+                if (!busca || !opcoes) return;
+                opcoes.classList.remove('aberto');
+                busca.setAttribute('aria-expanded', 'false');
+            }
+
+            function limpar() {
+                if (codigo) codigo.value = '';
+                if (status) status.textContent = configuracao.textoInicial;
+                if (configuracao.aoLimpar) configuracao.aoLimpar();
+            }
+
+            function escolher(item) {
+                if (!busca || !codigo || !status) return;
+                codigo.value = item.codigo;
+                busca.value = configuracao.rotulo(item);
+                status.textContent = configuracao.detalhe(item);
+                busca.setCustomValidity('');
+                if (configuracao.aoEscolher) configuracao.aoEscolher(item);
+                fechar();
+            }
+
+            function renderizar() {
+                if (!busca || !codigo || !opcoes || !status) return;
+                const termo = normalizarMunicipio(busca.value);
+                limpar();
+                busca.setCustomValidity(termo === '' ? '' : 'Selecione uma opção da lista oficial.');
+                opcoes.innerHTML = '';
+                const encontrados = itens.filter(function (item) {
+                    return termo === '' || normalizarMunicipio(configuracao.rotulo(item)).includes(termo);
+                }).slice(0, 40);
+
+                encontrados.forEach(function (item) {
+                    const botao = document.createElement('button');
+                    botao.type = 'button';
+                    botao.className = 'catalogo-opcao';
+                    botao.setAttribute('role', 'option');
+                    botao.textContent = configuracao.rotulo(item);
+                    botao.addEventListener('click', function () { escolher(item); });
+                    opcoes.appendChild(botao);
+                });
+
+                if (encontrados.length === 0) {
+                    const vazio = document.createElement('span');
+                    vazio.className = 'muted';
+                    vazio.style.padding = '0.65rem 0.75rem';
+                    vazio.textContent = 'Nenhum código encontrado.';
+                    opcoes.appendChild(vazio);
+                }
+                opcoes.classList.add('aberto');
+                busca.setAttribute('aria-expanded', 'true');
+            }
+
+            if (busca && codigo && opcoes) {
+                busca.addEventListener('input', renderizar);
+                busca.addEventListener('focus', renderizar);
+                busca.addEventListener('keydown', function (evento) {
+                    if (evento.key === 'Escape') fechar();
+                    if (evento.key === 'Enter') {
+                        const primeira = opcoes.querySelector('.catalogo-opcao');
+                        if (primeira) {
+                            evento.preventDefault();
+                            primeira.click();
+                        }
+                    }
+                });
+            }
+
+            return {
+                definirItens: function (novosItens) { itens = Array.isArray(novosItens) ? novosItens : []; },
+                fechar: fechar
+            };
+        }
+
+        const campoCstIbsCbs = document.getElementById('nfse_ibscbs_cst');
+        const statusCstIbsCbs = document.getElementById('nfse_ibscbs_cst_status');
+        let descricoesCstIbsCbs = {};
+        const autocompleteCindop = criarAutocompleteCatalogo({
+            buscaId: 'nfse_ibscbs_codigo_indicador_operacao_busca',
+            codigoId: 'nfse_ibscbs_codigo_indicador_operacao',
+            opcoesId: 'nfse_ibscbs_codigo_indicador_operacao_opcoes',
+            statusId: 'nfse_ibscbs_codigo_indicador_operacao_status',
+            textoInicial: 'Selecione uma opção da tabela oficial.',
+            rotulo: function (item) { return item.codigo + ' - ' + item.tipo_operacao + ' — ' + item.local_fornecimento; },
+            detalhe: function (item) { return 'cIndOp ' + item.codigo + ': ' + item.caracteristica; }
+        });
+        const autocompleteCclass = criarAutocompleteCatalogo({
+            buscaId: 'nfse_ibscbs_classificacao_tributaria_busca',
+            codigoId: 'nfse_ibscbs_classificacao_tributaria',
+            opcoesId: 'nfse_ibscbs_classificacao_tributaria_opcoes',
+            statusId: 'nfse_ibscbs_classificacao_tributaria_status',
+            textoInicial: 'Selecione uma opção vigente e permitida para NFS-e.',
+            rotulo: function (item) { return item.codigo + ' - ' + item.nome; },
+            detalhe: function (item) { return item.tipo_aliquota + (item.reducao_ibs || item.reducao_cbs ? ' • Redução IBS/CBS: ' + item.reducao_ibs + '%/' + item.reducao_cbs + '%' : ''); },
+            aoEscolher: function (item) {
+                if (campoCstIbsCbs) campoCstIbsCbs.value = item.cst;
+                if (statusCstIbsCbs) statusCstIbsCbs.textContent = item.cst + ' - ' + (descricoesCstIbsCbs[item.cst] || 'CST vinculado à classificação');
+            },
+            aoLimpar: function () {
+                if (campoCstIbsCbs) campoCstIbsCbs.value = '';
+                if (statusCstIbsCbs) statusCstIbsCbs.textContent = 'Será definido automaticamente.';
+            }
+        });
+
+        fetch('nfse-ibs-catalogos.json', { cache: 'force-cache' })
+            .then(function (resposta) {
+                if (!resposta.ok) throw new Error('Catálogo fiscal indisponível.');
+                return resposta.json();
+            })
+            .then(function (catalogoFiscal) {
+                (catalogoFiscal.cst || []).forEach(function (item) { descricoesCstIbsCbs[item.codigo] = item.descricao; });
+                autocompleteCindop.definirItens(catalogoFiscal.cindop || []);
+                autocompleteCclass.definirItens(catalogoFiscal.cclass || []);
+            })
+            .catch(function () {
+                const statusCindop = document.getElementById('nfse_ibscbs_codigo_indicador_operacao_status');
+                const statusCclass = document.getElementById('nfse_ibscbs_classificacao_tributaria_status');
+                if (statusCindop) statusCindop.textContent = 'Não foi possível carregar a tabela oficial de cIndOp.';
+                if (statusCclass) statusCclass.textContent = 'Não foi possível carregar a tabela oficial de cClassTrib.';
+            });
+
+        document.addEventListener('click', function (evento) {
+            if (!evento.target.closest('.catalogo-autocomplete')) {
+                autocompleteCindop.fechar();
+                autocompleteCclass.fechar();
+            }
+        });
         const checkboxInformarDps = document.getElementById('nfse_informar_dps');
         const camposDpsManual = document.getElementById('camposDpsManual');
         if (checkboxInformarDps && camposDpsManual) {

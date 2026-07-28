@@ -1,0 +1,993 @@
+{
+  "versao": "2026-06-23 / NFS-e produção v1.01",
+  "gerado_em": "2026-07-28",
+  "fontes": {
+    "cindop": "https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual/anexo_c-indop_ibscbs-snnfse-v1-01-20260122.xlsx/@@download/file",
+    "cclass_cst": "https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=D5b4Ov84WDg%3D"
+  },
+  "cindop": [
+    {
+      "codigo": "020101",
+      "tipo_operacao": "Operação com bem imóvel, bem imaterial, inclusive direito, relacionada a bem imóvel",
+      "caracteristica": "Execução de operações com bem imóvel, bem imaterial, inclusive direito, relacionado a bem imóvel",
+      "local_fornecimento": "Localidade do imóvel (1)"
+    },
+    {
+      "codigo": "020201",
+      "tipo_operacao": "Serviço prestado fisicamente sobre bem imóvel",
+      "caracteristica": "Execução de serviços sobre bem imóvel",
+      "local_fornecimento": "Localidade do imóvel (1)"
+    },
+    {
+      "codigo": "020301",
+      "tipo_operacao": "Serviço de administração e intermediação de bem imóvel",
+      "caracteristica": "Execução dos serviços de administração e intermediação de bens imóveis",
+      "local_fornecimento": "Localidade do imóvel (1)"
+    },
+    {
+      "codigo": "030101",
+      "tipo_operacao": "Serviço prestado fisicamente sobre a pessoa ou fruído presencialmente por pessoa física",
+      "caracteristica": "Execução de serviços diversos exclusivamente prestados fisicamente sobre a pessoa ou integralmente fruídos presencialmente por pessoa física (2)",
+      "local_fornecimento": "Estabelecimento do fornecedor"
+    },
+    {
+      "codigo": "030102",
+      "tipo_operacao": "Serviço prestado fisicamente sobre a pessoa ou fruído presencialmente por pessoa física",
+      "caracteristica": "Execução de serviços diversos exclusivamente prestados fisicamente sobre a pessoa ou integralmente fruídos presencialmente por pessoa física (2)",
+      "local_fornecimento": "Endereço do adquirente"
+    },
+    {
+      "codigo": "030103",
+      "tipo_operacao": "Serviço prestado fisicamente sobre a pessoa ou fruído presencialmente por pessoa física",
+      "caracteristica": "Execução de serviços diversos exclusivamente prestados fisicamente sobre a pessoa ou integralmente fruídos presencialmente por pessoa física (2)",
+      "local_fornecimento": "Endereço do destinatário"
+    },
+    {
+      "codigo": "030104",
+      "tipo_operacao": "Serviço prestado fisicamente sobre a pessoa ou fruído presencialmente por pessoa física",
+      "caracteristica": "Execução de serviços diversos exclusivamente prestados fisicamente sobre a pessoa ou integralmente fruídos presencialmente por pessoa física (2)",
+      "local_fornecimento": "Endereço diverso do fornecedor, adquirente ou destinatário"
+    },
+    {
+      "codigo": "040101",
+      "tipo_operacao": "Serviço de planejamento, organização e administração de feiras, exposições, congressos, espetáculos, exibições e congêneres",
+      "caracteristica": "Execução de serviços de planejamento, organização e administração de feiras, exposições, congressos, espetáculos, exibições e congêneres",
+      "local_fornecimento": "Local do Evento"
+    },
+    {
+      "codigo": "050101",
+      "tipo_operacao": "Serviço prestado fisicamente sobre bem móvel material",
+      "caracteristica": "Execução de serviços diversos fisicamente prestados sobre bem móvel material",
+      "local_fornecimento": "Estabelecimento do fornecedor"
+    },
+    {
+      "codigo": "050102",
+      "tipo_operacao": "Serviço prestado fisicamente sobre bem móvel material",
+      "caracteristica": "Execução de serviços diversos fisicamente prestados sobre bem móvel material",
+      "local_fornecimento": "Endereço do adquirente"
+    },
+    {
+      "codigo": "050103",
+      "tipo_operacao": "Serviço prestado fisicamente sobre bem móvel material",
+      "caracteristica": "Execução de serviços diversos fisicamente prestados sobre bem móvel material",
+      "local_fornecimento": "Endereço do destinatário"
+    },
+    {
+      "codigo": "050104",
+      "tipo_operacao": "Serviço prestado fisicamente sobre bem móvel material",
+      "caracteristica": "Execução de serviços diversos fisicamente prestados sobre bem móvel material",
+      "local_fornecimento": "Endereço diverso do fornecedor, adquirente ou destinatário"
+    },
+    {
+      "codigo": "050201",
+      "tipo_operacao": "Serviços portuários",
+      "caracteristica": "Execução de serviços portuários",
+      "local_fornecimento": "Local da prestação"
+    },
+    {
+      "codigo": "060101",
+      "tipo_operacao": "Serviço de transporte de passageiros",
+      "caracteristica": "Execução de serviços de transporte de passageiros",
+      "local_fornecimento": "Local de início do transporte"
+    },
+    {
+      "codigo": "070101",
+      "tipo_operacao": "Serviço de transporte de carga",
+      "caracteristica": "Execução de serviços de transporte de carga",
+      "local_fornecimento": "Endereço fornecido para entrega"
+    },
+    {
+      "codigo": "070102",
+      "tipo_operacao": "Serviço de transporte de carga",
+      "caracteristica": "Execução de serviços de transporte de carga",
+      "local_fornecimento": "Local da retirada"
+    },
+    {
+      "codigo": "100101",
+      "tipo_operacao": "Cessão de espaço para prestação de serviços publicitários, em operações onerosas (4)",
+      "caracteristica": "Execução de operações de cessão de espaço para prestação de serviços publicitários",
+      "local_fornecimento": "Local do domicílio principal do adquirente (3)"
+    },
+    {
+      "codigo": "100102",
+      "tipo_operacao": "Cessão de espaço para prestação de serviços publicitários, em operações onerosas (4)",
+      "caracteristica": "Execução de operações de cessão de espaço para prestação de serviços publicitários",
+      "local_fornecimento": "Local do domicílio do destinatário, nos casos de adquirente residente ou domiciliado no exterior (5)(6)"
+    },
+    {
+      "codigo": "100201",
+      "tipo_operacao": "Cessão de espaço para prestação de serviços publicitários, em operações não onerosas (4)",
+      "caracteristica": "Execução de operações de cessão de espaço para prestação de serviços publicitários",
+      "local_fornecimento": "Local do domicílio principal do destinatário (6)"
+    },
+    {
+      "codigo": "100301",
+      "tipo_operacao": "Demais serviços, em operações onerosas",
+      "caracteristica": "Execução dos demais serviços em operações não especificadas anteriormente ou, nos serviços de que trata o inc. III, estes sejam, ainda que parcialmente, prestados à distância (2)",
+      "local_fornecimento": "Local do domicílio principal do adquirente (3)"
+    },
+    {
+      "codigo": "100302",
+      "tipo_operacao": "Demais serviços, em operações onerosas",
+      "caracteristica": "Execução dos demais serviços em operações não especificadas anteriormente ou, nos serviços de que trata o inc. III, estes sejam, ainda que parcialmente, prestados à distância (2)",
+      "local_fornecimento": "Local do domicílio do destinatário, nos casos de adquirente residente ou domiciliado no exterior (5)(6)"
+    },
+    {
+      "codigo": "100401",
+      "tipo_operacao": "Demais serviços, em operações não onerosas",
+      "caracteristica": "Execução dos demais serviços em operações não especificadas anteriormente ou, nos serviços de que tratam o inc. III, estes sejam, ainda que parcialmente, prestados à distância",
+      "local_fornecimento": "Local do domicílio principal do destinatário (6)"
+    },
+    {
+      "codigo": "100501",
+      "tipo_operacao": "Demais bens móveis imateriais, inclusive direitos, em operações onerosas",
+      "caracteristica": "Execução de demais operações não especificadas anteriormente com bens móveis imateriais, inclusive direitos",
+      "local_fornecimento": "Local do domicílio principal do adquirente (3)"
+    },
+    {
+      "codigo": "100502",
+      "tipo_operacao": "Demais bens móveis imateriais, inclusive direitos, em operações onerosas",
+      "caracteristica": "Execução de demais operações não especificadas anteriormente com bens móveis imateriais, inclusive direitos",
+      "local_fornecimento": "Local do domicílio do destinatário, nos casos de adquirente residente ou domiciliado no exterior (5)(6)"
+    },
+    {
+      "codigo": "100601",
+      "tipo_operacao": "Demais bens móveis imateriais, inclusive direitos, em operações não onerosas",
+      "caracteristica": "Execução de demais operações não especificadas anteriormente com bens móveis imateriais, inclusive direitos",
+      "local_fornecimento": "Local do domicílio principal do destinatário (6)"
+    }
+  ],
+  "cst": [
+    {
+      "codigo": "000",
+      "descricao": "Tributação integral"
+    },
+    {
+      "codigo": "010",
+      "descricao": "Tributação com alíquotas uniformes"
+    },
+    {
+      "codigo": "011",
+      "descricao": "Tributação com alíquotas uniformes reduzidas"
+    },
+    {
+      "codigo": "200",
+      "descricao": "Alíquota reduzida"
+    },
+    {
+      "codigo": "221",
+      "descricao": "Alíquota fixa proporcional"
+    },
+    {
+      "codigo": "400",
+      "descricao": "Isenção"
+    },
+    {
+      "codigo": "410",
+      "descricao": "Imunidade e não incidência"
+    },
+    {
+      "codigo": "515",
+      "descricao": "Diferimento com redução de alíquota"
+    },
+    {
+      "codigo": "550",
+      "descricao": "Suspensão"
+    },
+    {
+      "codigo": "800",
+      "descricao": "Transferência de crédito"
+    },
+    {
+      "codigo": "811",
+      "descricao": "Ajustes"
+    },
+    {
+      "codigo": "820",
+      "descricao": "Tributação em documento específico"
+    }
+  ],
+  "cclass": [
+    {
+      "codigo": "000001",
+      "cst": "000",
+      "nome": "Situações tributadas integralmente pelo IBS e CBS.",
+      "descricao": "Situações tributadas integralmente pelo IBS e CBS.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "010001",
+      "cst": "010",
+      "nome": "Operações do FGTS não realizadas pela Caixa Econômica Federal",
+      "descricao": "Operações do FGTS não realizadas pela Caixa Econômica Federal, observado o art. 212 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Uniforme setorial",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "010002",
+      "cst": "010",
+      "nome": "Operações do serviço financeiro",
+      "descricao": "Operações do serviço financeiro",
+      "tipo_aliquota": "Uniforme setorial",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "011003",
+      "cst": "011",
+      "nome": "Intermediação de planos de assistência à saúde",
+      "descricao": "Intermediação de planos de assistência à saúde, observado o art. 240 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Uniforme nacional (referência)",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200001",
+      "cst": "200",
+      "nome": "Serviços de transporte de bens até as zonas de processamento de exportação e bens exportados a partir das zonas de processamento de exportação",
+      "descricao": "Serviços de transporte de bens até as zonas de processamento de exportação e bens exportados a partir das zonas de processamento de exportação, observado o art. 103 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200004",
+      "cst": "200",
+      "nome": "Fornecimento de dispositivos médicos (Anexo XII)",
+      "descricao": "Fornecimento de dispositivos médicos com a especificação das respectivas classificações da NCM/SH previstas no Anexo XII da Lei Complementar nº 214, de 2025, observado o art. 144 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200005",
+      "cst": "200",
+      "nome": "Fornecimento de dispositivos médicos para órgãos da administração pública e entidades de saúde imunes (Anexo IV)",
+      "descricao": "Fornecimento de dispositivos médicos com a especificação das respectivas classificações da NCM/SH previstas no Anexo IV da Lei Complementar nº 214, de 2025, quando adquiridos por órgãos da administração pública direta, autarquias, fundações públicas e entidades de saúde imunes, observado o art. 144 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200006",
+      "cst": "200",
+      "nome": "Situação de emergência de saúde pública reconhecida pelo Poder público",
+      "descricao": "Situação de emergência de saúde pública reconhecida pelo Poder Legislativo federal, estadual, distrital ou municipal competente, ato conjunto do Ministro da Fazenda e do Comitê Gestor do IBS poderá ser editado, a qualquer momento, para incluir dispositivos não listados no Anexo XII da Lei Complementar nº 214, de 2025, limitada a vigência do benefício ao período e à localidade da emergência de saúde pública, observado o art. 144 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200007",
+      "cst": "200",
+      "nome": "Fornecimento dos dispositivos de acessibilidade próprios para pessoas com deficiência (Anexo XIII)",
+      "descricao": "Fornecimento dos dispositivos de acessibilidade próprios para pessoas com deficiência relacionados no Anexo XIII da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NCM/SH, observado o art. 145 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200008",
+      "cst": "200",
+      "nome": "Fornecimento dos dispositivos de acessibilidade próprios para pessoas com deficiência adquiridos por órgãos da administração pública (Anexo V)",
+      "descricao": "Fornecimento dos dispositivos de acessibilidade próprios para pessoas com deficiência relacionados no Anexo V da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NCM/SH, quando adquiridos por órgãos da administração pública direta, autarquias, fundações públicas e entidades imunes, observado o art. 145 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200016",
+      "cst": "200",
+      "nome": "Prestação de serviços de pesquisa e desenvolvimento por Instituição Científica, Tecnológica e de Inovação (ICT)",
+      "descricao": "Prestação de serviços de pesquisa e desenvolvimento por Instituição Científica, Tecnológica e de Inovação (ICT) sem fins lucrativos para a administração pública direta, autarquias e fundações públicas ou para o contribuinte sujeito ao regime regular do IBS e da CBS, observado o disposto no art. 156 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200017",
+      "cst": "200",
+      "nome": "Operações relacionadas ao FGTS",
+      "descricao": "Operações relacionadas ao FGTS, considerando aquelas necessárias à aplicação da Lei nº 8.036, de 1990, realizadas pelo Conselho Curador ou Secretaria Executiva do FGTS, observado o art. 212 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200019",
+      "cst": "200",
+      "nome": "Importador dos serviços financeiros contribuinte",
+      "descricao": "Importador dos serviços financeiros que seja contribuinte e tenha direito de apropriação de créditos na aquisição do mesmo serviço financeiro no País, observado o art. 231 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200020",
+      "cst": "200",
+      "nome": "Operação praticada por sociedades cooperativas optantes por regime específico do IBS e CBS",
+      "descricao": "Operação praticada por sociedades cooperativas optantes por regime específico do IBS e CBS, quando o associado destinar bem ou serviço à cooperativa de que participa, e a cooperativa fornecer bem ou serviço ao associado sujeito ao regime regular do IBS e da CBS, observado o art. 271 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200021",
+      "cst": "200",
+      "nome": "Serviços de transporte público coletivo de passageiros ferroviário e hidroviário",
+      "descricao": "Serviços de transporte público coletivo de passageiros ferroviário e hidroviário urbanos, semiurbanos e metropolitanos, observado o art. 285 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200025",
+      "cst": "200",
+      "nome": "Fornecimento dos serviços de educação relacionados ao Programa Universidade para Todos (Prouni)",
+      "descricao": "Fornecimento dos serviços de educação relacionados ao Programa Universidade para Todos (Prouni), instituído pela Lei nº 11.096, de 13 de janeiro de 2005, observado o art. 308 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200026",
+      "cst": "200",
+      "nome": "Locação de imóveis localizados nas zonas reabilitadas",
+      "descricao": "Locação de imóveis localizados nas zonas reabilitadas, pelo prazo de 5 (cinco) anos, contado da data de expedição do habite-se, e relacionados a projetos de reabilitação urbana de zonas históricas e de áreas críticas de recuperação e reconversão urbanística dos Municípios ou do Distrito Federal, a serem delimitadas por lei municipal ou distrital, observado o art. 158 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 80,
+      "reducao_cbs": 80,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200027",
+      "cst": "200",
+      "nome": "Operações de locação, cessão onerosa e arrendamento de bens imóveis",
+      "descricao": "Operações de locação, cessão onerosa e arrendamento de bens imóveis, observado o art. 261 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 70,
+      "reducao_cbs": 70,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200028",
+      "cst": "200",
+      "nome": "Fornecimento dos serviços de educação (Anexo II)",
+      "descricao": "Fornecimento dos serviços de educação relacionados no Anexo II da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da Nomenclatura Brasileira de Serviços, Intangíveis e Outras Operações que Produzam Variações no Patrimônio (NBS), observado o art. 129 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200029",
+      "cst": "200",
+      "nome": "Fornecimento dos serviços de saúde humana (Anexo III)",
+      "descricao": "Fornecimento dos serviços de saúde humana relacionados no Anexo III da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NBS, observado o art. 130 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200030",
+      "cst": "200",
+      "nome": "Venda dos dispositivos médicos (Anexo IV)",
+      "descricao": "Venda dos dispositivos médicos relacionados no Anexo IV da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NCM/SH, observado o art. 131 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200031",
+      "cst": "200",
+      "nome": "Fornecimento dos dispositivos de acessibilidade próprios para pessoas com deficiência (Anexo V)",
+      "descricao": "Fornecimento dos dispositivos de acessibilidade próprios para pessoas com deficiência relacionados no Anexo V da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NCM/SH, observado o art. 132 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200037",
+      "cst": "200",
+      "nome": "Fornecimento de serviços ambientais de conservação ou recuperação da vegetação nativa",
+      "descricao": "Fornecimento de serviços ambientais de conservação ou recuperação da vegetação nativa, mesmo que fornecidos sob a forma de manejo sustentável de sistemas agrícolas, agroflorestais e agrossilvopastoris, em conformidade com as definições e requisitos da legislação específica, observado o art. 137 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200038",
+      "cst": "200",
+      "nome": "Fornecimento dos insumos agropecuários e aquícolas (Anexo IX)",
+      "descricao": "Fornecimento dos insumos agropecuários e aquícolas relacionados no Anexo IX da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NCM/SH e da NBS, observado o art. 138 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200039",
+      "cst": "200",
+      "nome": "Fornecimento dos bens e serviços relacionados com produções nacionais artísticas, culturais, de eventos, jornalísticas e audiovisuais (Anexo X)",
+      "descricao": "Fornecimento dos bens e serviços listados no Anexo X da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NCM/SH e NBS, nos casos relacionados com produções nacionais artísticas, culturais, de eventos, jornalísticas e audiovisuais, observado o art. 139 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200040",
+      "cst": "200",
+      "nome": "Fornecimento de serviços de comunicação institucional à administração pública",
+      "descricao": "Fornecimento dos seguintes serviços de comunicação institucional à administração pública direta, autarquias e fundações públicas: serviços direcionados ao planejamento, criação, programação e manutenção de páginas eletrônicas da administração pública, ao monitoramento e gestão de suas redes sociais e à otimização de páginas e canais digitais para mecanismos de buscas e produção de mensagens, infográficos, painéis interativos e conteúdo institucional, serviços de relações com a imprensa, que reúnem estratégias organizacionais para promover e reforçar a comunicação dos órgãos e das entidades contratantes com seus públicos de interesse, por meio da interação com profissionais da imprensa, e serviços de relações públicas, que compreendem o esforço de comunicação planejado, coeso e contínuo que tem por objetivo estabelecer adequada percepção da atuação e dos objetivos institucionais, a partir do estímulo à compreensão mútua e da manutenção de padrões de relacionamento e fluxos de informação entre os órgãos e as entidades contratantes e seus públicos de interesse, no País e no exterior, observado o art. 140 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200041",
+      "cst": "200",
+      "nome": "Fornecimento de serviço de educação desportiva (art. 141. I)",
+      "descricao": "Operações relacionadas às seguintes atividades desportivas: fornecimento de serviço de educação desportiva, classificado no código 1.2205.12.00 da NBS, observado o art. 141 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200042",
+      "cst": "200",
+      "nome": "Fornecimento de serviço de gestão e exploração do desporto (art. 141. II)",
+      "descricao": "Operações relacionadas às seguintes atividades desportivas: gestão e exploração do desporto por associações e clubes esportivos filiados ao órgão estadual ou federal responsável pela coordenação dos desportos, observado o art. 141 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200043",
+      "cst": "200",
+      "nome": "Fornecimento à administração pública dos serviços e dos bens relativos à soberania (Anexo XI)",
+      "descricao": "Fornecimento à administração pública direta, autarquias e fundações púbicas dos serviços e dos bens relativos à soberania e à segurança nacional, à segurança da informação e à segurança cibernética relacionados no Anexo XI da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NBS e da NCM/SH, observado o art. 142 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200044",
+      "cst": "200",
+      "nome": "Operações e prestações de serviços de segurança da informação e segurança cibernética desenvolvidos por sociedade que tenha sócio brasileiro (Anexo XI)",
+      "descricao": "Operações e prestações de serviços de segurança da informação e segurança cibernética desenvolvidos por sociedade que tenha sócio brasileiro com o mínimo de 20% (vinte por cento) do seu capital social, relacionados no Anexo XI da Lei Complementar nº 214, de 2025, com a especificação das respectivas classificações da NBS e da NCM/SH, observado o art. 142 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200045",
+      "cst": "200",
+      "nome": "Operações relacionadas a projetos de reabilitação urbana de zonas históricas e de áreas críticas de recuperação e reconversão urbanística",
+      "descricao": "Operações relacionadas a projetos de reabilitação urbana de zonas históricas e de áreas críticas de recuperação e reconversão urbanística dos Municípios ou do Distrito Federal, a serem delimitadas por lei municipal ou distrital, observado o art. 158 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200046",
+      "cst": "200",
+      "nome": "Operações com bens imóveis",
+      "descricao": "Operações com bens imóveis, observado o art. 261 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 50,
+      "reducao_cbs": 50,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200048",
+      "cst": "200",
+      "nome": "Hotelaria, Parques de Diversão e Parques Temáticos",
+      "descricao": "Hotelaria, Parques de Diversão e Parques Temáticos, observado o art. 281 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 40,
+      "reducao_cbs": 40,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200051",
+      "cst": "200",
+      "nome": "Agências de Turismo",
+      "descricao": "Agências de Turismo, observado o art. 289 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 40,
+      "reducao_cbs": 40,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200052",
+      "cst": "200",
+      "nome": "Prestação de serviços de profissões intelectuais",
+      "descricao": "Prestação de serviços das seguintes profissões intelectuais de natureza científica, literária ou artística, submetidas à fiscalização por conselho profissional: administradores, advogados, arquitetos e urbanistas, assistentes sociais, bibliotecários, biólogos, contabilistas, economistas, economistas domésticos, profissionais de educação física, engenheiros e agrônomos, estatísticos, médicos veterinários e zootecnistas, museólogos, químicos, profissionais de relações públicas, técnicos industriais e técnicos agrícolas, observado o art. 127 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 30,
+      "reducao_cbs": 30,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "200054",
+      "cst": "200",
+      "nome": "Fornecimento de bem material pela cooperativa de produção agropecuária a associado não sujeito ao regime regular do IBS e da CBS",
+      "descricao": "Fornecimento de bem material pela cooperativa de produção agropecuária a associado não sujeito ao regime regular do IBS e da CBS com anulação de créditos referentes ao bem fornecido, observado o art. 271 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 100,
+      "reducao_cbs": 100,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "221001",
+      "cst": "221",
+      "nome": "Locação, cessão onerosa ou arrendamento de bem imóvel com alíquota sobre a receita bruta",
+      "descricao": "Locação, cessão onerosa ou arrendamento de bem imóvel com alíquota sobre a receita bruta, observado o art. 487 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Fixa",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "400001",
+      "cst": "400",
+      "nome": "Fornecimento de serviços de transporte público coletivo de passageiros rodoviário e metroviário",
+      "descricao": "Fornecimento de serviços de transporte público coletivo de passageiros rodoviário e metroviário de caráter urbano, semiurbano e metropolitano, sob regime de autorização, permissão ou concessão pública, observado o art. 157 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410001",
+      "cst": "410",
+      "nome": "Fornecimento de bonificações quando constem no documento fiscal e que não dependam de evento posterior",
+      "descricao": "Fornecimento de bonificações quando constem do respectivo documento fiscal e que não dependam de evento posterior, observado o art. 5º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410003",
+      "cst": "410",
+      "nome": "Doações sem contraprestação em benefício do doador",
+      "descricao": "Doações que não tenham por objeto bens ou serviços que tenham permitido a apropriação de créditos pelo doador, observado o art. 6º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410004",
+      "cst": "410",
+      "nome": "Exportações de bens e serviços",
+      "descricao": "Exportações de bens e serviços, observado o art. 8º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410005",
+      "cst": "410",
+      "nome": "Fornecimentos realizados pela União, pelos Estados, pelo Distrito Federal e pelos Municípios",
+      "descricao": "Fornecimentos realizados pela União, pelos Estados, pelo Distrito Federal e pelos Municípios, observado o art. 9º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410006",
+      "cst": "410",
+      "nome": "Fornecimentos realizados por entidades religiosas e templos de qualquer culto",
+      "descricao": "Fornecimentos realizados por entidades religiosas e templos de qualquer culto, inclusive suas organizações assistenciais e beneficentes, observado o art. 9º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410007",
+      "cst": "410",
+      "nome": "Fornecimentos realizados por partidos políticos, entidades sindicais e instituições de educação e de assistência social",
+      "descricao": "Fornecimentos realizados por partidos políticos, inclusive suas fundações, entidades sindicais dos trabalhadores e instituições de educação e de assistência social, sem fins lucrativos, observado o art. 9º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410008",
+      "cst": "410",
+      "nome": "Fornecimentos de livros, jornais, periódicos e do papel destinado a sua impressão",
+      "descricao": "Fornecimentos de livros, jornais, periódicos e do papel destinado a sua impressão, observado o art. 9º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410009",
+      "cst": "410",
+      "nome": "Fornecimentos de fonogramas e videofonogramas musicais produzidos no Brasil",
+      "descricao": "Fornecimentos de fonogramas e videofonogramas musicais produzidos no Brasil contendo obras musicais ou literomusicais de autores brasileiros e/ou obras em geral interpretadas por artistas brasileiros, bem como os suportes materiais ou arquivos digitais que os contenham, salvo na etapa de replicação industrial de mídias ópticas de leitura a laser, observado o art. 9º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410010",
+      "cst": "410",
+      "nome": "Fornecimentos de serviço de comunicação nas modalidades de radiodifusão sonora e de sons e imagens de recepção livre e gratuita",
+      "descricao": "Fornecimentos de serviço de comunicação nas modalidades de radiodifusão sonora e de sons e imagens de recepção livre e gratuita, observado o art. 9º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410012",
+      "cst": "410",
+      "nome": "Fornecimento de condomínio edilício não optante pelo regime regular",
+      "descricao": "Fornecimento de condomínio edilício não optante pelo regime regular, observado o art. 26 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410014",
+      "cst": "410",
+      "nome": "Fornecimento de produtor rural não contribuinte",
+      "descricao": "Fornecimento de produtor rural não contribuinte, observado o art. 164 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410015",
+      "cst": "410",
+      "nome": "Fornecimento por transportador autônomo não contribuinte",
+      "descricao": "Fornecimento por transportador autônomo não contribuinte, observado o art. 169 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410026",
+      "cst": "410",
+      "nome": "Doação com anulação de crédito",
+      "descricao": "Doações sem contraprestação em benefício do doador, com anulação de crédito apropriados pelo doador referente ao fornecimento doado, observado o art. 6º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410027",
+      "cst": "410",
+      "nome": "Exportação de serviço ou de bem imaterial",
+      "descricao": "Fornecimento de bens e serviços, desde que vinculados direta e exclusivamente à exportação de bens materiais ou associados à entrega no exterior de bens materiais, observado o art. 6º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410028",
+      "cst": "410",
+      "nome": "Operações com bens imóveis realizadas por pessoas físicas não consideradas contribuintes",
+      "descricao": "Operações com bens imóveis realizadas por pessoas físicas não consideradas contribuintes do regime regular do IBS e da CBS, observado o art. 251 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410033",
+      "cst": "410",
+      "nome": "Operações de Fundos de Investimento Imobiliário (FII) e Fundos de Investimento nas Cadeias Produtivas do Agronegócio (Fiagro)",
+      "descricao": "Operações com bens imóveis, inclusive operações com direitos reais sobre bens imóveis, realizadas por Fundos de Investimento Imobiliário (FII) e Fundos de Investimento nas Cadeias Produtivas do Agronegócio (Fiagro), observado o art. 26 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410035",
+      "cst": "410",
+      "nome": "Fornecimento realizado por nanoempreendedor",
+      "descricao": "Fornecimento realizado por nanoempreendedor, observado o art. 26 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "410999",
+      "cst": "410",
+      "nome": "Operações não onerosas sem previsão de tributação, não especificadas anteriormente",
+      "descricao": "Operações não onerosas sem previsão de tributação, não especificadas anteriormente, observado o art. 4º da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "515001",
+      "cst": "515",
+      "nome": "Operações, sujeitas a diferimento, com insumos agropecuários e aquícolas (Anexo IX)",
+      "descricao": "Operações, sujeitas a diferimento, com insumos agropecuários e aquícolas, observado o art. 138 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Padrão",
+      "reducao_ibs": 60,
+      "reducao_cbs": 60,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "550016",
+      "cst": "550",
+      "nome": "Regime Especial de Incentivos para o Desenvolvimento da Infraestrutura",
+      "descricao": "Regime Especial de Incentivos para o Desenvolvimento da Infraestrutura - Reidi, observado o art. 106 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "550022",
+      "cst": "550",
+      "nome": "Regime Especial de Incentivos para a Produção de Hidrogênio de Baixa Emissão de Carbono (Rehidro)",
+      "descricao": "Regime Especial de Incentivos para a Produção de Hidrogênio de Baixa Emissão de Carbono (Rehidro), observado o art. 106 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "800001",
+      "cst": "800",
+      "nome": "Fusão, cisão ou incorporação",
+      "descricao": "Fusão, cisão ou incorporação, observado o art. 55 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "800002",
+      "cst": "800",
+      "nome": "Transferência de crédito do associado, inclusive as cooperativas singulares",
+      "descricao": "Transferência de crédito do associado, inclusive as cooperativas singulares, para cooperativa de que participa das operações antecedentes às operações em que fornece bens e serviços e os créditos presumidos, observado o art. 272 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "811001",
+      "cst": "811",
+      "nome": "Anulação de Crédito por Saídas Imunes/Isentas",
+      "descricao": "Anulação de crédito proporcional ao valor das operações imunes e isentas, observado o art. 51 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "811002",
+      "cst": "811",
+      "nome": "Débitos de notas fiscais não processadas na apuração",
+      "descricao": "Débitos de notas fiscais não processadas na apuração, observado o art. 45 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "811003",
+      "cst": "811",
+      "nome": "Desenquadramento do Simples Nacional",
+      "descricao": "Débitos apurados após o desenquadramento do regime Simples Nacional, observado o art. 41 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820001",
+      "cst": "820",
+      "nome": "Documento com informações de fornecimento de serviços de planos de assistência à saúde elencados no art. 234 da Lei Complementar nº214, de 2025",
+      "descricao": "Documento com informações de fornecimento de serviços de planos de assistência à saúde elencados no art. 234 da Lei Complementar nº 214, de 2025, mas com tributação realizada por outro meio",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820002",
+      "cst": "820",
+      "nome": "Documento com informações de fornecimento de serviços de planos de assistência funerária",
+      "descricao": "Documento com informações de fornecimento de serviços de planos de assinstência funerária, mas com tributação realizada por outro meio, observado o art. 236 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820003",
+      "cst": "820",
+      "nome": "Documento com informações de fornecimento de serviços de planos de assistência à saúde de animais domésticos",
+      "descricao": "Documento com informações de fornecimento de serviços de planos de assinstência à saúde de animais domésticos, mas com tributação realizada por outro meio, observado o art. 243 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820004",
+      "cst": "820",
+      "nome": "Documento com informações de prestação de serviços de consursos de prognósticos",
+      "descricao": "Documento com informações de prestação de serviços de consursos de prognósticos, mas com tributação realizada por outro meio, observado o art. 248 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820006",
+      "cst": "820",
+      "nome": "Documento com informações de fornecimento de serviços de exploração de via",
+      "descricao": "Documento com informações de fornecimento de serviços de exploração de via, mas com tributação realizada por outro meio, observado o art. 11 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820007",
+      "cst": "820",
+      "nome": "Documento com informações de fornecimento de serviços financeiros",
+      "descricao": "Documento com informações de fornecimento de serviços financeiros, mas com tributação realizada por outro meio, observado o art. 181 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    },
+    {
+      "codigo": "820009",
+      "cst": "820",
+      "nome": "Cobrança relativa a fornecimentos declarados em outro documento",
+      "descricao": "Cobrança relativa a fornecimentos declarados em outro documento, observado o art. 60 da Lei Complementar nº 214, de 2025.",
+      "tipo_aliquota": "Sem alíquota",
+      "reducao_ibs": 0,
+      "reducao_cbs": 0,
+      "inicio_vigencia": "2026-01-01",
+      "fim_vigencia": null
+    }
+  ]
+}
