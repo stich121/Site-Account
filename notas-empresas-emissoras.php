@@ -117,6 +117,7 @@ try {
         if (!hash_equals($_SESSION['csrf_notas_empresas_emissoras'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
         } elseif (($_POST['acao'] ?? '') === 'adicionar') {
+            $empresaIdEdicao = (int) ($_POST['empresa_id'] ?? 0);
             $razaoSocial = trim($_POST['razao_social'] ?? '');
             $nomeFantasia = trim($_POST['nome_fantasia'] ?? '');
             $cnpj = trim($_POST['cnpj'] ?? '');
@@ -135,6 +136,51 @@ try {
 
             if ($razaoSocial === '') {
                 $erro = 'Informe a razão social da empresa.';
+            } elseif ($empresaIdEdicao > 0) {
+                $stmt = $db->prepare(
+                    'UPDATE empresas_emissoras SET
+                        razao_social = :razao_social,
+                        nome_fantasia = :nome_fantasia,
+                        cnpj = :cnpj,
+                        inscricao_estadual = :inscricao_estadual,
+                        inscricao_municipal = :inscricao_municipal,
+                        logradouro = :logradouro,
+                        numero = :numero,
+                        complemento = :complemento,
+                        bairro = :bairro,
+                        cep = :cep,
+                        municipio = :municipio,
+                        codigo_ibge_municipio = :codigo_ibge_municipio,
+                        uf = :uf,
+                        crt = :crt,
+                        ambiente_emissao = :ambiente_emissao
+                     WHERE id = :id'
+                );
+                try {
+                    $stmt->execute([
+                        'razao_social' => $razaoSocial,
+                        'nome_fantasia' => $nomeFantasia !== '' ? $nomeFantasia : null,
+                        'cnpj' => $cnpj !== '' ? $cnpj : null,
+                        'inscricao_estadual' => $inscricaoEstadual !== '' ? $inscricaoEstadual : null,
+                        'inscricao_municipal' => $inscricaoMunicipal !== '' ? $inscricaoMunicipal : null,
+                        'logradouro' => $logradouro !== '' ? $logradouro : null,
+                        'numero' => $numero !== '' ? $numero : null,
+                        'complemento' => $complemento !== '' ? $complemento : null,
+                        'bairro' => $bairro !== '' ? $bairro : null,
+                        'cep' => $cep !== '' ? $cep : null,
+                        'municipio' => $municipio !== '' ? $municipio : null,
+                        'codigo_ibge_municipio' => $codigoIbge !== '' ? $codigoIbge : null,
+                        'uf' => $uf !== '' ? $uf : null,
+                        'crt' => $crt,
+                        'ambiente_emissao' => $ambiente,
+                        'id' => $empresaIdEdicao,
+                    ]);
+                    $sucesso = 'Empresa emissora atualizada com sucesso.';
+                } catch (PDOException $e) {
+                    $erro = str_contains($e->getMessage(), 'uq_empresas_emissoras_razao_social')
+                        ? 'Já existe outra empresa cadastrada com essa razão social.'
+                        : ('Erro ao atualizar empresa: ' . $e->getMessage());
+                }
             } else {
                 $stmt = $db->prepare(
                     'INSERT INTO empresas_emissoras (
@@ -208,9 +254,21 @@ try {
          ORDER BY ativo DESC, razao_social ASC'
     );
     $empresas = $stmt->fetchAll();
+
+    $empresaEmEdicao = null;
+    $idEdicao = (int) ($_GET['editar'] ?? 0);
+    if ($idEdicao > 0) {
+        foreach ($empresas as $empresaLista) {
+            if ((int) $empresaLista['id'] === $idEdicao) {
+                $empresaEmEdicao = $empresaLista;
+                break;
+            }
+        }
+    }
 } catch (PDOException $e) {
     $erro = 'Erro ao carregar empresas emissoras: ' . $e->getMessage();
     $empresas = [];
+    $empresaEmEdicao = null;
 }
 
 $csrf = h($_SESSION['csrf_notas_empresas_emissoras'] ?? '');
@@ -412,82 +470,89 @@ function rotuloCrt(?int $crt): string
         </div>
 
         <section class="panel">
-            <h2>Adicionar / atualizar empresa</h2>
+            <h2><?php echo $empresaEmEdicao ? 'Editando: ' . h($empresaEmEdicao['razao_social']) : 'Adicionar empresa'; ?></h2>
             <form method="post">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                 <input type="hidden" name="acao" value="adicionar">
+                <input type="hidden" name="empresa_id" value="<?php echo h((string) ($empresaEmEdicao['id'] ?? 0)); ?>">
                 <div class="form-grid">
                     <div class="field">
                         <label for="razao_social">Razão social</label>
-                        <input id="razao_social" name="razao_social" type="text" required>
+                        <input id="razao_social" name="razao_social" type="text" value="<?php echo h($empresaEmEdicao['razao_social'] ?? ''); ?>" required>
                     </div>
                     <div class="field">
                         <label for="nome_fantasia">Nome fantasia</label>
-                        <input id="nome_fantasia" name="nome_fantasia" type="text">
+                        <input id="nome_fantasia" name="nome_fantasia" type="text" value="<?php echo h($empresaEmEdicao['nome_fantasia'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="cnpj">CNPJ</label>
-                        <input id="cnpj" name="cnpj" type="text" placeholder="00.000.000/0000-00">
+                        <input id="cnpj" name="cnpj" type="text" placeholder="00.000.000/0000-00" value="<?php echo h($empresaEmEdicao['cnpj'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="inscricao_estadual">Inscrição Estadual</label>
-                        <input id="inscricao_estadual" name="inscricao_estadual" type="text">
+                        <input id="inscricao_estadual" name="inscricao_estadual" type="text" value="<?php echo h($empresaEmEdicao['inscricao_estadual'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="inscricao_municipal">Inscrição Municipal</label>
-                        <input id="inscricao_municipal" name="inscricao_municipal" type="text">
+                        <input id="inscricao_municipal" name="inscricao_municipal" type="text" value="<?php echo h($empresaEmEdicao['inscricao_municipal'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="crt">Regime tributário (CRT)</label>
                         <select id="crt" name="crt">
                             <option value="">Selecione</option>
-                            <option value="1">1 - Simples Nacional</option>
-                            <option value="2">2 - Simples Nacional (excesso)</option>
-                            <option value="3">3 - Regime Normal</option>
+                            <?php $crtAtual = $empresaEmEdicao !== null && $empresaEmEdicao['crt'] !== null ? (int) $empresaEmEdicao['crt'] : null; ?>
+                            <option value="1" <?php echo $crtAtual === 1 ? 'selected' : ''; ?>>1 - Simples Nacional</option>
+                            <option value="2" <?php echo $crtAtual === 2 ? 'selected' : ''; ?>>2 - Simples Nacional (excesso)</option>
+                            <option value="3" <?php echo $crtAtual === 3 ? 'selected' : ''; ?>>3 - Regime Normal</option>
                         </select>
                     </div>
                     <div class="field">
                         <label for="logradouro">Logradouro</label>
-                        <input id="logradouro" name="logradouro" type="text">
+                        <input id="logradouro" name="logradouro" type="text" value="<?php echo h($empresaEmEdicao['logradouro'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="numero">Número</label>
-                        <input id="numero" name="numero" type="text">
+                        <input id="numero" name="numero" type="text" value="<?php echo h($empresaEmEdicao['numero'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="complemento">Complemento</label>
-                        <input id="complemento" name="complemento" type="text">
+                        <input id="complemento" name="complemento" type="text" value="<?php echo h($empresaEmEdicao['complemento'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="bairro">Bairro</label>
-                        <input id="bairro" name="bairro" type="text">
+                        <input id="bairro" name="bairro" type="text" value="<?php echo h($empresaEmEdicao['bairro'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="cep">CEP</label>
-                        <input id="cep" name="cep" type="text" placeholder="00000-000">
+                        <input id="cep" name="cep" type="text" placeholder="00000-000" value="<?php echo h($empresaEmEdicao['cep'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="municipio">Município</label>
-                        <input id="municipio" name="municipio" type="text" value="Belo Horizonte">
+                        <input id="municipio" name="municipio" type="text" value="<?php echo h($empresaEmEdicao['municipio'] ?? 'Belo Horizonte'); ?>">
                     </div>
                     <div class="field">
                         <label for="codigo_ibge_municipio">Código IBGE do município</label>
-                        <input id="codigo_ibge_municipio" name="codigo_ibge_municipio" type="text" placeholder="3106200">
+                        <input id="codigo_ibge_municipio" name="codigo_ibge_municipio" type="text" placeholder="3106200" value="<?php echo h($empresaEmEdicao['codigo_ibge_municipio'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="uf">UF</label>
-                        <input id="uf" name="uf" type="text" maxlength="2" value="MG">
+                        <input id="uf" name="uf" type="text" maxlength="2" value="<?php echo h($empresaEmEdicao['uf'] ?? 'MG'); ?>">
                     </div>
                     <div class="field">
                         <label for="ambiente_emissao">Ambiente de emissão</label>
                         <select id="ambiente_emissao" name="ambiente_emissao">
-                            <option value="homologacao">Homologação (testes)</option>
-                            <option value="producao">Produção</option>
+                            <option value="homologacao" <?php echo ($empresaEmEdicao['ambiente_emissao'] ?? 'homologacao') === 'homologacao' ? 'selected' : ''; ?>>Homologação (testes)</option>
+                            <option value="producao" <?php echo ($empresaEmEdicao['ambiente_emissao'] ?? '') === 'producao' ? 'selected' : ''; ?>>Produção</option>
                         </select>
                     </div>
                     <div class="field">
                         <label>&nbsp;</label>
-                        <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                        <div class="row-actions">
+                            <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                            <?php if ($empresaEmEdicao): ?>
+                                <a class="btn btn-outline" href="notas-empresas-emissoras">Cancelar edição</a>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -526,17 +591,20 @@ function rotuloCrt(?int $crt): string
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <form method="post" class="row-actions">
-                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                        <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
-                                        <?php if ((int) $empresa['ativo'] === 1): ?>
-                                            <input type="hidden" name="acao" value="desativar">
-                                            <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
-                                        <?php else: ?>
-                                            <input type="hidden" name="acao" value="reativar">
-                                            <button class="btn btn-outline" type="submit"><i class="fa-solid fa-rotate-left"></i> Reativar</button>
-                                        <?php endif; ?>
-                                    </form>
+                                    <div class="row-actions">
+                                        <a class="btn btn-outline" href="notas-empresas-emissoras?editar=<?php echo h((string) $empresa['id']); ?>#razao_social"><i class="fa-solid fa-pen"></i> Editar</a>
+                                        <form method="post" class="row-actions">
+                                            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                            <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
+                                            <?php if ((int) $empresa['ativo'] === 1): ?>
+                                                <input type="hidden" name="acao" value="desativar">
+                                                <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
+                                            <?php else: ?>
+                                                <input type="hidden" name="acao" value="reativar">
+                                                <button class="btn btn-outline" type="submit"><i class="fa-solid fa-rotate-left"></i> Reativar</button>
+                                            <?php endif; ?>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
