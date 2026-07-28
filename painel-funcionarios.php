@@ -669,6 +669,34 @@ function prepararFotoPonto(PDO $db): void
     }
 }
 
+function indiceExiste(PDO $db, string $tabela, string $indice): bool
+{
+    $stmt = $db->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = :tabela
+           AND INDEX_NAME = :indice'
+    );
+    $stmt->execute([
+        'tabela' => $tabela,
+        'indice' => $indice,
+    ]);
+
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function prepararIndicesPerformance(PDO $db): void
+{
+    if (!indiceExiste($db, 'registros_ponto', 'idx_registros_ponto_marcado_em')) {
+        $db->exec('ALTER TABLE registros_ponto ADD INDEX idx_registros_ponto_marcado_em (marcado_em)');
+    }
+
+    if (!indiceExiste($db, 'solicitacoes_ajuste_ponto', 'idx_solicitacoes_ajuste_status_criado')) {
+        $db->exec('ALTER TABLE solicitacoes_ajuste_ponto ADD INDEX idx_solicitacoes_ajuste_status_criado (status, criado_em)');
+    }
+}
+
 function prepararCamposFuncionarios(PDO $db): void
 {
     $campos = [
@@ -1218,6 +1246,7 @@ try {
     prepararTabelaSolicitacoesAjuste($db);
     prepararTabelaAjustesManuaisPonto($db);
     prepararTabelaHistoricoDownloads($db);
+    prepararIndicesPerformance($db);
     if (function_exists('prepararTabelaSaldosIniciaisBancoHoras')) {
         prepararTabelaSaldosIniciaisBancoHoras($db);
     }

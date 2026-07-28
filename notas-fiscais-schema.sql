@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais (
     data_saida_entrada DATE NULL,
     valor_total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     informacoes_frete TEXT NULL,
+    chave_acesso VARCHAR(60) NULL,
     protocolo_autorizacao VARCHAR(80) NULL,
     xml_gerado LONGTEXT NULL,
     motivo_rejeicao TEXT NULL,
@@ -129,6 +130,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_itens (
     ncm VARCHAR(10) NULL,
     cfop VARCHAR(6) NULL,
     cst_csosn VARCHAR(6) NULL,
+    codigo_servico_municipal VARCHAR(20) NULL,
     unidade VARCHAR(10) NOT NULL DEFAULT 'UN',
     quantidade DECIMAL(12,3) NOT NULL,
     valor_unitario DECIMAL(12,2) NOT NULL,
@@ -153,3 +155,15 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_log (
         FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- FASE 2 — só rode se você já tinha aplicado o schema da Fase 1
+-- antes (se está criando tudo do zero, os CREATE TABLE acima já
+-- incluem essas colunas e estes ALTER abaixo não fazem nada de novo).
+-- ============================================================
+
+ALTER TABLE notas_fiscais
+    ADD COLUMN IF NOT EXISTS chave_acesso VARCHAR(60) NULL AFTER informacoes_frete;
+
+ALTER TABLE notas_fiscais_itens
+    ADD COLUMN IF NOT EXISTS codigo_servico_municipal VARCHAR(20) NULL AFTER cst_csosn;

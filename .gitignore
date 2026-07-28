@@ -1,6 +1,8 @@
 config_db.php
 config_db_notas.php
+config_certificado_nfse.php
 google_drive_config.php
+vendor/
 .security/
 uploads/
 downloads/

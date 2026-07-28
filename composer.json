@@ -1,0 +1,12 @@
+{
+    "name": "account-contabilidade/site",
+    "description": "Dependencias PHP do site - integracao com o Portal Nacional da NFS-e (SEFIN Nacional / ADN).",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "nfse-nacional/nfse-php": "^1.0"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

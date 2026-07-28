@@ -227,6 +227,7 @@ function prepararTabelaNotasFiscais(PDO $db): void
             data_saida_entrada DATE NULL,
             valor_total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             informacoes_frete TEXT NULL,
+            chave_acesso VARCHAR(60) NULL,
             protocolo_autorizacao VARCHAR(80) NULL,
             xml_gerado LONGTEXT NULL,
             motivo_rejeicao TEXT NULL,
@@ -255,6 +256,7 @@ function prepararTabelaNotasFiscaisItens(PDO $db): void
             ncm VARCHAR(10) NULL,
             cfop VARCHAR(6) NULL,
             cst_csosn VARCHAR(6) NULL,
+            codigo_servico_municipal VARCHAR(20) NULL,
             unidade VARCHAR(10) NOT NULL DEFAULT 'UN',
             quantidade DECIMAL(12,3) NOT NULL,
             valor_unitario DECIMAL(12,2) NOT NULL,
@@ -266,6 +268,31 @@ function prepararTabelaNotasFiscaisItens(PDO $db): void
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+}
+
+function colunaExisteNotas(PDO $db, string $tabela, string $coluna): bool
+{
+    $stmt = $db->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = :tabela
+           AND COLUMN_NAME = :coluna'
+    );
+    $stmt->execute(['tabela' => $tabela, 'coluna' => $coluna]);
+
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function prepararColunasFase2Notas(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'notas_fiscais', 'chave_acesso')) {
+        $db->exec('ALTER TABLE notas_fiscais ADD COLUMN chave_acesso VARCHAR(60) NULL AFTER informacoes_frete');
+    }
+
+    if (!colunaExisteNotas($db, 'notas_fiscais_itens', 'codigo_servico_municipal')) {
+        $db->exec('ALTER TABLE notas_fiscais_itens ADD COLUMN codigo_servico_municipal VARCHAR(20) NULL AFTER cst_csosn');
+    }
 }
 
 function prepararTabelaNotasFiscaisLog(PDO $db): void
@@ -321,6 +348,7 @@ try {
     prepararTabelaNotasFiscais($dbNotas);
     prepararTabelaNotasFiscaisItens($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
+    prepararColunasFase2Notas($dbNotas);
 
     prepararColunaPermiteNotasFiscais($db);
 
@@ -486,6 +514,7 @@ try {
             $ncms = $_POST['item_ncm'] ?? [];
             $cfops = $_POST['item_cfop'] ?? [];
             $csts = $_POST['item_cst'] ?? [];
+            $codigosServico = $_POST['item_codigo_servico'] ?? [];
             $unidades = $_POST['item_unidade'] ?? [];
             $quantidades = $_POST['item_quantidade'] ?? [];
             $valoresUnitarios = $_POST['item_valor_unitario'] ?? [];
@@ -511,6 +540,7 @@ try {
                     'ncm' => trim((string) ($ncms[$indice] ?? '')) ?: null,
                     'cfop' => trim((string) ($cfops[$indice] ?? '')) ?: null,
                     'cst_csosn' => trim((string) ($csts[$indice] ?? '')) ?: null,
+                    'codigo_servico_municipal' => trim((string) ($codigosServico[$indice] ?? '')) ?: null,
                     'unidade' => trim((string) ($unidades[$indice] ?? '')) ?: 'UN',
                     'quantidade' => $quantidade,
                     'valor_unitario' => $valorUnitario,
@@ -564,10 +594,10 @@ try {
 
                     $stmtItem = $dbNotas->prepare(
                         'INSERT INTO notas_fiscais_itens (
-                            nota_id, produto_servico_id, descricao, ncm, cfop, cst_csosn, unidade,
+                            nota_id, produto_servico_id, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade,
                             quantidade, valor_unitario, valor_total
                          ) VALUES (
-                            :nota_id, :produto_servico_id, :descricao, :ncm, :cfop, :cst_csosn, :unidade,
+                            :nota_id, :produto_servico_id, :descricao, :ncm, :cfop, :cst_csosn, :codigo_servico_municipal, :unidade,
                             :quantidade, :valor_unitario, :valor_total
                          )'
                     );
@@ -579,6 +609,7 @@ try {
                             'ncm' => $item['ncm'],
                             'cfop' => $item['cfop'],
                             'cst_csosn' => $item['cst_csosn'],
+                            'codigo_servico_municipal' => $item['codigo_servico_municipal'],
                             'unidade' => $item['unidade'],
                             'quantidade' => $item['quantidade'],
                             'valor_unitario' => $item['valor_unitario'],
@@ -644,6 +675,7 @@ try {
 
     $stmt = $dbNotas->prepare(
         'SELECT n.id, n.tipo_nota, n.numero_interno, n.status, n.valor_total, n.data_emissao, n.criado_em, n.funcionario_id,
+                n.chave_acesso, n.motivo_rejeicao,
                 e.razao_social AS empresa_razao_social, c.nome_razao_social AS cliente_nome
          FROM notas_fiscais n
          INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id
@@ -878,6 +910,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 <?php if ($podeAdministrar): ?>
                     <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
                     <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
+                    <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
                 <?php endif; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                 <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
@@ -1037,6 +1070,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                                 <th>NCM</th>
                                 <th>CFOP</th>
                                 <th>CST/CSOSN</th>
+                                <th>Cód. serviço (LC 116)</th>
                                 <th>Unid.</th>
                                 <th>Qtd.</th>
                                 <th>Valor unit.</th>
@@ -1091,7 +1125,15 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                                 <td><?php echo h($nota['cliente_nome']); ?></td>
                                 <?php if ($podeAdministrar): ?><td><?php echo h(nomeExibicao($nota['criado_por_usuario'])); ?></td><?php endif; ?>
                                 <td>R$ <?php echo number_format((float) $nota['valor_total'], 2, ',', '.'); ?></td>
-                                <td><span class="status-pill status-<?php echo h($nota['status']); ?>"><?php echo h(rotuloStatusNota($nota['status'])); ?></span></td>
+                                <td>
+                                    <span class="status-pill status-<?php echo h($nota['status']); ?>"><?php echo h(rotuloStatusNota($nota['status'])); ?></span>
+                                    <?php if (($nota['chave_acesso'] ?? '') !== ''): ?>
+                                        <div class="muted" style="font-size: 0.7rem; margin-top: 0.3rem;">Chave: <?php echo h($nota['chave_acesso']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if ($nota['status'] === 'rejeitada' && ($nota['motivo_rejeicao'] ?? '') !== ''): ?>
+                                        <div class="muted" style="font-size: 0.7rem; margin-top: 0.3rem; color: #FFD1CE;"><?php echo h($nota['motivo_rejeicao']); ?></div>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <div class="row-actions">
                                         <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> PDF</a>
@@ -1163,6 +1205,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 '<td><input type="text" name="item_ncm[]" class="item-ncm"></td>' +
                 '<td><input type="text" name="item_cfop[]" class="item-cfop"></td>' +
                 '<td><input type="text" name="item_cst[]" class="item-cst"></td>' +
+                '<td><input type="text" name="item_codigo_servico[]" class="item-codigo-servico"></td>' +
                 '<td><input type="text" name="item_unidade[]" class="item-unidade" value="UN"></td>' +
                 '<td><input type="text" name="item_quantidade[]" class="item-quantidade" value="1"></td>' +
                 '<td><input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00"></td>' +
@@ -1181,6 +1224,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                     linha.querySelector('.item-ncm').value = item.ncm || '';
                     linha.querySelector('.item-cfop').value = item.cfop || '';
                     linha.querySelector('.item-cst').value = item.cst_csosn || '';
+                    linha.querySelector('.item-codigo-servico').value = item.codigo_servico_municipal || '';
                     linha.querySelector('.item-unidade').value = item.unidade || 'UN';
                     linha.querySelector('.item-valor').value = Number(item.valor_unitario_padrao || 0).toFixed(2).replace('.', ',');
                     linha.querySelector('.item-produto-id').value = item.id;
