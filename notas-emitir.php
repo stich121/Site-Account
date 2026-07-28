@@ -11,6 +11,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfse-codigos-tributacao-nacional.php';
+require_once __DIR__ . '/nfse-codigos-complementares-bh.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -785,6 +786,7 @@ $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
 $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
+$variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -1278,8 +1280,9 @@ $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
                             </div>
                             <div class="field">
                                 <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
+                                <select id="nfse_codigo_tributacao_municipal_opcoes" style="display:none; margin-bottom: 0.5rem;"></select>
                                 <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="text">
-                                <span class="muted" style="font-size: 0.78rem;">Preenchido automaticamente como "<código>.001" (padrão da maioria dos municípios, inclusive BH, quando não há especialização própria). Se o seu município tiver um código diferente, ajuste aqui — para Belo Horizonte, confira no <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">código de tributação municipal (BHISS)</a>.</span>
+                                <span class="muted" style="font-size: 0.78rem;" id="ajudaCodigoComplementarMunicipal">Preenchido automaticamente como "&lt;código&gt;.001" (padrão da maioria dos municípios quando não há especialização própria). Ajuste se o seu município tiver um código diferente.</span>
                             </div>
                             <div class="field">
                                 <label for="nfse_imune_exportacao">Imunidade, exportação ou não incidência do ISSQN?</label>
@@ -1670,11 +1673,45 @@ $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
         codigosTributacaoNacional.forEach(function (item) {
             mapaCodigosTributacaoNacional[item.codigo] = item.descricao;
         });
+        const variacoesComplementarBH = <?php echo json_encode($variacoesComplementarBH, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
         const campoCodigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
         const campoDescricaoServico = document.getElementById('nfse_descricao_servico');
         const campoCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal');
+        const selectCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal_opcoes');
+        const ajudaCodigoComplementarMunicipal = document.getElementById('ajudaCodigoComplementarMunicipal');
         let ultimoCodigoComplementarAutomatico = '';
+
+        function preencherVariacoesComplementarBH(codigo) {
+            if (!selectCodigoTributacaoMunicipal) return;
+
+            const partes = codigo.split('.');
+            const subitem = partes.length >= 2 ? partes[0] + '.' + partes[1] : null;
+            const variacoes = subitem ? variacoesComplementarBH[subitem] : null;
+
+            if (!variacoes || variacoes.length === 0) {
+                selectCodigoTributacaoMunicipal.style.display = 'none';
+                selectCodigoTributacaoMunicipal.innerHTML = '';
+                if (ajudaCodigoComplementarMunicipal) {
+                    ajudaCodigoComplementarMunicipal.textContent = 'Preenchido automaticamente como "<código>.001" (padrão da maioria dos municípios quando não há especialização própria). Ajuste se o seu município tiver um código diferente.';
+                }
+                return;
+            }
+
+            let opcoes = '';
+            variacoes.forEach(function (descricao, indice) {
+                const sufixo = String(indice + 1).padStart(3, '0');
+                const valor = codigo + '.' + sufixo;
+                opcoes += '<option value="' + valor + '">' + valor + ' - ' + descricao + '</option>';
+            });
+            selectCodigoTributacaoMunicipal.innerHTML = opcoes;
+            selectCodigoTributacaoMunicipal.style.display = '';
+            if (ajudaCodigoComplementarMunicipal) {
+                ajudaCodigoComplementarMunicipal.textContent = variacoes.length > 1
+                    ? ('Encontradas ' + variacoes.length + ' variações para Belo Horizonte (BHISS). Escolha a que corresponde ao seu serviço, ou ajuste manualmente para outro município.')
+                    : 'Variação encontrada para Belo Horizonte (BHISS). Ajuste manualmente se o seu município tiver um código diferente.';
+            }
+        }
 
         if (campoCodigoTributacaoNacional && campoDescricaoServico) {
             campoCodigoTributacaoNacional.addEventListener('input', function () {
@@ -1695,6 +1732,22 @@ $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
                         ultimoCodigoComplementarAutomatico = '';
                         campoCodigoTributacaoMunicipal.value = '';
                     }
+                }
+
+                if (descricaoPadrao) {
+                    preencherVariacoesComplementarBH(codigo);
+                } else if (selectCodigoTributacaoMunicipal) {
+                    selectCodigoTributacaoMunicipal.style.display = 'none';
+                    selectCodigoTributacaoMunicipal.innerHTML = '';
+                }
+            });
+        }
+
+        if (selectCodigoTributacaoMunicipal && campoCodigoTributacaoMunicipal) {
+            selectCodigoTributacaoMunicipal.addEventListener('change', function () {
+                if (selectCodigoTributacaoMunicipal.value) {
+                    ultimoCodigoComplementarAutomatico = selectCodigoTributacaoMunicipal.value;
+                    campoCodigoTributacaoMunicipal.value = selectCodigoTributacaoMunicipal.value;
                 }
             });
         }
