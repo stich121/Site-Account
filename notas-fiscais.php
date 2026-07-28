@@ -134,6 +134,7 @@ function prepararTabelaEmpresasEmissorasNotas(PDO $db): void
             certificado_senha_cifrada VARCHAR(512) NULL,
             certificado_atualizado_em TIMESTAMP NULL,
             certificado_atualizado_por INT UNSIGNED NULL,
+            certificado_validade DATE NULL,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -320,6 +321,10 @@ function prepararColunasCertificadoEmpresa(PDO $db): void
 
     if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_atualizado_por')) {
         $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em');
+    }
+
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_validade')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_validade DATE NULL AFTER certificado_atualizado_por');
     }
 }
 

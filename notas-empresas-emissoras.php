@@ -50,6 +50,7 @@ function prepararTabelaEmpresasEmissoras(PDO $db): void
             certificado_senha_cifrada VARCHAR(512) NULL,
             certificado_atualizado_em TIMESTAMP NULL,
             certificado_atualizado_por INT UNSIGNED NULL,
+            certificado_validade DATE NULL,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -80,6 +81,7 @@ function prepararColunasCertificadoEmpresaEmissoras(PDO $db): void
         'certificado_senha_cifrada' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_senha_cifrada VARCHAR(512) NULL AFTER certificado_arquivo",
         'certificado_atualizado_em' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada",
         'certificado_atualizado_por' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em",
+        'certificado_validade' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_validade DATE NULL AFTER certificado_atualizado_por",
     ];
 
     foreach ($campos as $coluna => $sql) {

@@ -25,6 +25,28 @@ function nomeExibicaoCertificados(?string $usuario): string
     return trim(str_replace('.', ' ', $usuario ?? ''));
 }
 
+function rotuloValidadeCertificado(?string $dataValidade): string
+{
+    if ($dataValidade === null || $dataValidade === '') {
+        return '<span class="muted">—</span>';
+    }
+
+    $hoje = new DateTimeImmutable('today');
+    $validade = new DateTimeImmutable($dataValidade);
+    $diasRestantes = (int) $hoje->diff($validade)->format('%r%a');
+    $dataFormatada = htmlspecialchars($validade->format('d/m/Y'), ENT_QUOTES, 'UTF-8');
+
+    if ($diasRestantes < 0) {
+        return '<span class="status-inactive">' . $dataFormatada . ' (vencido)</span>';
+    }
+
+    if ($diasRestantes <= 30) {
+        return '<span style="color: #FFE8A3; font-weight: 700;">' . $dataFormatada . ' (vence em ' . $diasRestantes . ' dia' . ($diasRestantes === 1 ? '' : 's') . ')</span>';
+    }
+
+    return '<span class="status-active">' . $dataFormatada . '</span>';
+}
+
 function colunaExisteEmpresasCert(PDO $db, string $coluna): bool
 {
     $stmt = $db->prepare(
@@ -46,6 +68,7 @@ function prepararColunasCertificadoPagina(PDO $db): void
         'certificado_senha_cifrada' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_senha_cifrada VARCHAR(512) NULL AFTER certificado_arquivo",
         'certificado_atualizado_em' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada",
         'certificado_atualizado_por' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em",
+        'certificado_validade' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_validade DATE NULL AFTER certificado_atualizado_por",
     ];
 
     foreach ($campos as $coluna => $sql) {
@@ -99,7 +122,7 @@ function salvarArquivoCertificado(array $arquivo): string
     return $nomeArquivo;
 }
 
-function validarCertificadoPfx(string $caminho, string $senha): void
+function validarCertificadoPfx(string $caminho, string $senha): string
 {
     $conteudo = file_get_contents($caminho);
     if ($conteudo === false) {
@@ -108,8 +131,32 @@ function validarCertificadoPfx(string $caminho, string $senha): void
 
     $certs = [];
     if (!openssl_pkcs12_read($conteudo, $certs, $senha)) {
-        throw new RuntimeException('Certificado inválido ou senha incorreta. Confira o arquivo e a senha e tente novamente.');
+        $errosOpenssl = [];
+        while (($msg = openssl_error_string()) !== false) {
+            $errosOpenssl[] = $msg;
+        }
+        $detalhe = implode(' | ', $errosOpenssl);
+
+        if ($detalhe !== '' && (stripos($detalhe, 'digital envelope') !== false || stripos($detalhe, 'unsupported') !== false || stripos($detalhe, 'algorithm') !== false)) {
+            throw new RuntimeException(
+                'O servidor não conseguiu abrir este certificado porque ele usa uma criptografia antiga (RC2/3DES) '
+                . 'que o OpenSSL 3 do servidor desabilitou por padrão (isso não é sobre a senha estar errada). '
+                . 'Detalhe técnico: ' . $detalhe
+            );
+        }
+
+        throw new RuntimeException(
+            'Certificado inválido ou senha incorreta. Confira o arquivo e a senha e tente novamente.'
+            . ($detalhe !== '' ? (' Detalhe técnico: ' . $detalhe) : '')
+        );
     }
+
+    $infoCertificado = openssl_x509_parse($certs['cert'] ?? '');
+    if ($infoCertificado === false || empty($infoCertificado['validTo_time_t'])) {
+        throw new RuntimeException('Não foi possível ler a data de validade do certificado.');
+    }
+
+    return (new DateTimeImmutable('@' . $infoCertificado['validTo_time_t']))->format('Y-m-d');
 }
 
 $erro = '';
@@ -150,20 +197,22 @@ try {
             } else {
                 try {
                     $nomeArquivo = salvarArquivoCertificado($_FILES['certificado'] ?? []);
-                    validarCertificadoPfx(pastaCertificados() . '/' . $nomeArquivo, $senha);
+                    $validade = validarCertificadoPfx(pastaCertificados() . '/' . $nomeArquivo, $senha);
 
                     $stmt = $dbNotas->prepare(
                         'UPDATE empresas_emissoras
                          SET certificado_arquivo = :certificado_arquivo,
                              certificado_senha_cifrada = :certificado_senha_cifrada,
                              certificado_atualizado_em = NOW(),
-                             certificado_atualizado_por = :funcionario_id
+                             certificado_atualizado_por = :funcionario_id,
+                             certificado_validade = :certificado_validade
                          WHERE id = :id'
                     );
                     $stmt->execute([
                         'certificado_arquivo' => $nomeArquivo,
                         'certificado_senha_cifrada' => criptografarSegredo($senha),
                         'funcionario_id' => $funcionarioId,
+                        'certificado_validade' => $validade,
                         'id' => $empresaId,
                     ]);
 
@@ -197,7 +246,8 @@ try {
                 $stmt = $dbNotas->prepare(
                     'UPDATE empresas_emissoras
                      SET certificado_arquivo = NULL, certificado_senha_cifrada = NULL,
-                         certificado_atualizado_em = NULL, certificado_atualizado_por = NULL
+                         certificado_atualizado_em = NULL, certificado_atualizado_por = NULL,
+                         certificado_validade = NULL
                      WHERE id = :id'
                 );
                 $stmt->execute(['id' => $empresaId]);
@@ -207,7 +257,7 @@ try {
     }
 
     $stmt = $dbNotas->query(
-        'SELECT id, razao_social, cnpj, certificado_arquivo, certificado_atualizado_em, certificado_atualizado_por
+        'SELECT id, razao_social, cnpj, certificado_arquivo, certificado_atualizado_em, certificado_atualizado_por, certificado_validade
          FROM empresas_emissoras
          WHERE ativo = 1
          ORDER BY razao_social ASC'
@@ -493,6 +543,7 @@ $csrf = h($_SESSION['csrf_notas_certificados'] ?? '');
                             <th>Empresa</th>
                             <th>CNPJ</th>
                             <th>Status</th>
+                            <th>Validade</th>
                             <th>Atualizado em</th>
                             <th>Atualizado por</th>
                             <th>Ação</th>
@@ -510,6 +561,7 @@ $csrf = h($_SESSION['csrf_notas_certificados'] ?? '');
                                         <span class="status-inactive">Não configurado</span>
                                     <?php endif; ?>
                                 </td>
+                                <td><?php echo rotuloValidadeCertificado($empresa['certificado_validade'] ?? null); ?></td>
                                 <td><?php echo h($empresa['certificado_atualizado_em'] ? (new DateTimeImmutable($empresa['certificado_atualizado_em']))->format('d/m/Y H:i') : '—'); ?></td>
                                 <td><?php echo h(nomeExibicaoCertificados($usuariosPorId[$empresa['certificado_atualizado_por']] ?? null) ?: '—'); ?></td>
                                 <td>
