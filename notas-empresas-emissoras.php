@@ -621,6 +621,49 @@ function rotuloCrt(?int $crt): string
     </div>
 
     <script>
+        function formatarCnpj(valor) {
+            const digitos = (valor || '').replace(/\D/g, '').slice(0, 14);
+            let resultado = digitos;
+            if (digitos.length > 12) {
+                resultado = digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})$/, '$1.$2.$3/$4-$5').replace(/-$/, '');
+            } else if (digitos.length > 8) {
+                resultado = digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4})$/, '$1.$2.$3/$4');
+            } else if (digitos.length > 5) {
+                resultado = digitos.replace(/^(\d{2})(\d{3})(\d{0,3})$/, '$1.$2.$3');
+            } else if (digitos.length > 2) {
+                resultado = digitos.replace(/^(\d{2})(\d{0,3})$/, '$1.$2');
+            }
+            return resultado;
+        }
+
+        function formatarCep(valor) {
+            const digitos = (valor || '').replace(/\D/g, '').slice(0, 8);
+            if (digitos.length > 5) {
+                return digitos.replace(/^(\d{5})(\d{0,3})$/, '$1-$2');
+            }
+            return digitos;
+        }
+
+        function aplicarMascara(idCampo, funcaoFormatar) {
+            const campo = document.getElementById(idCampo);
+            if (!campo) {
+                return;
+            }
+            campo.value = funcaoFormatar(campo.value);
+            campo.addEventListener('input', function () {
+                const posicaoOriginal = campo.selectionStart;
+                const tamanhoAntes = campo.value.length;
+                campo.value = funcaoFormatar(campo.value);
+                const diferenca = campo.value.length - tamanhoAntes;
+                if (posicaoOriginal !== null) {
+                    campo.setSelectionRange(posicaoOriginal + diferenca, posicaoOriginal + diferenca);
+                }
+            });
+        }
+
+        aplicarMascara('cnpj', formatarCnpj);
+        aplicarMascara('cep', formatarCep);
+
         const btnBuscarCnpj = document.getElementById('btnBuscarCnpj');
         if (btnBuscarCnpj) {
             btnBuscarCnpj.addEventListener('click', function () {
@@ -654,7 +697,7 @@ function rotuloCrt(?int $crt): string
                         document.getElementById('numero').value = dados.numero || '';
                         document.getElementById('complemento').value = dados.complemento || '';
                         document.getElementById('bairro').value = dados.bairro || '';
-                        document.getElementById('cep').value = dados.cep || '';
+                        document.getElementById('cep').value = formatarCep(dados.cep || '');
                         document.getElementById('municipio').value = dados.municipio || '';
                         document.getElementById('codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
                         document.getElementById('uf').value = dados.uf || '';
