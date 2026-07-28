@@ -1696,19 +1696,21 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <select id="nfse_tributos_modo" name="nfse_tributos_modo">
                                     <option value="percentuais" selected>Configurar os valores percentuais</option>
                                     <option value="valores">Preencher os valores monetários</option>
+                                    <option value="simples">Simples Nacional (alíquota única)</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-grid" id="tributosPercentuais">
                             <div class="field">
-                                <label for="nfse_tributos_federal_percentual">Federal (%)</label>
+                                <label for="nfse_tributos_federal_percentual" id="labelTributosFederalPercentual">Federal (%)</label>
                                 <input id="nfse_tributos_federal_percentual" name="nfse_tributos_federal_percentual" type="text">
+                                <span class="muted" id="statusTributosSimples" style="font-size: 0.78rem; display: none;">Informe a alíquota total do DAS (conforme o Anexo e a faixa de receita da empresa); será enviada como tributo federal aproximado.</span>
                             </div>
-                            <div class="field">
+                            <div class="field" id="campoTributosEstadualPercentual">
                                 <label for="nfse_tributos_estadual_percentual">Estadual (%)</label>
                                 <input id="nfse_tributos_estadual_percentual" name="nfse_tributos_estadual_percentual" type="text">
                             </div>
-                            <div class="field">
+                            <div class="field" id="campoTributosMunicipalPercentual">
                                 <label for="nfse_tributos_municipal_percentual">Municipal (%)</label>
                                 <input id="nfse_tributos_municipal_percentual" name="nfse_tributos_municipal_percentual" type="text">
                             </div>
@@ -2633,15 +2635,31 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
         const selectTributosModo = document.getElementById('nfse_tributos_modo');
         const blocoTributosPercentuais = document.getElementById('tributosPercentuais');
         const blocoTributosValores = document.getElementById('tributosValores');
+        const labelTributosFederalPercentual = document.getElementById('labelTributosFederalPercentual');
+        const statusTributosSimples = document.getElementById('statusTributosSimples');
+        const campoTributosEstadualPercentual = document.getElementById('campoTributosEstadualPercentual');
+        const campoTributosMunicipalPercentual = document.getElementById('campoTributosMunicipalPercentual');
         if (selectTributosModo && blocoTributosPercentuais && blocoTributosValores) {
-            selectTributosModo.addEventListener('change', function () {
+            function aplicarModoTributos() {
                 const ehValores = selectTributosModo.value === 'valores';
+                const ehSimples = selectTributosModo.value === 'simples';
                 blocoTributosPercentuais.style.display = ehValores ? 'none' : '';
                 blocoTributosValores.style.display = ehValores ? '' : 'none';
-            });
-            const ehValoresInicial = selectTributosModo.value === 'valores';
-            blocoTributosPercentuais.style.display = ehValoresInicial ? 'none' : '';
-            blocoTributosValores.style.display = ehValoresInicial ? '' : 'none';
+                if (labelTributosFederalPercentual) {
+                    labelTributosFederalPercentual.textContent = ehSimples ? 'Alíquota do Simples Nacional (%)' : 'Federal (%)';
+                }
+                if (statusTributosSimples) statusTributosSimples.style.display = ehSimples ? '' : 'none';
+                if (campoTributosEstadualPercentual) campoTributosEstadualPercentual.style.display = ehSimples ? 'none' : '';
+                if (campoTributosMunicipalPercentual) campoTributosMunicipalPercentual.style.display = ehSimples ? 'none' : '';
+                if (ehSimples) {
+                    const campoEstadual = document.getElementById('nfse_tributos_estadual_percentual');
+                    const campoMunicipal = document.getElementById('nfse_tributos_municipal_percentual');
+                    if (campoEstadual) campoEstadual.value = '';
+                    if (campoMunicipal) campoMunicipal.value = '';
+                }
+            }
+            selectTributosModo.addEventListener('change', aplicarModoTributos);
+            aplicarModoTributos();
         }
 
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
