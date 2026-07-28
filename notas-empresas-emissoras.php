@@ -495,11 +495,11 @@ function rotuloCrt(?int $crt): string
                         <span class="muted" id="statusBuscaCnpj" style="font-size: 0.78rem;"></span>
                     </div>
                     <div class="field">
-                        <label for="inscricao_estadual">Inscrição Estadual</label>
+                        <label for="inscricao_estadual">Inscrição Estadual <a href="https://www.sintegra.gov.br" target="_blank" rel="noopener" class="muted" style="font-weight:400; text-decoration:underline;">(consultar no Sintegra)</a></label>
                         <input id="inscricao_estadual" name="inscricao_estadual" type="text" value="<?php echo h($empresaEmEdicao['inscricao_estadual'] ?? ''); ?>">
                     </div>
                     <div class="field">
-                        <label for="inscricao_municipal">Inscrição Municipal</label>
+                        <label for="inscricao_municipal">Inscrição Municipal <a href="https://mobiliarioonline.pbh.gov.br" target="_blank" rel="noopener" class="muted" style="font-weight:400; text-decoration:underline;">(consultar na PBH)</a></label>
                         <input id="inscricao_municipal" name="inscricao_municipal" type="text" value="<?php echo h($empresaEmEdicao['inscricao_municipal'] ?? ''); ?>">
                     </div>
                     <div class="field">
