@@ -3600,6 +3600,45 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             <a class="admin-menu-link active" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
         </aside>
     <?php endif; ?>
+    <?php if ($podeAdministrar): ?>
+        <?php
+            $csvAdminUrl = 'painel?export=csv&' . http_build_query([
+                'scope' => 'all',
+                'empresa_nome' => $_GET['empresa_nome'] ?? '',
+                'funcionario_id' => $_GET['funcionario_id'] ?? '',
+                'data_inicio' => $dataInicioFiltro,
+                'data_fim' => $dataFimFiltro,
+            ]);
+            $pdfAdminUrl = 'gerar-pdf-ponto.php?' . http_build_query([
+                'export' => 'pdf',
+                'scope' => 'all',
+                'funcionario_id' => $_GET['funcionario_id'] ?? '',
+                'data_inicio' => $dataInicioFiltro,
+                'data_fim' => $dataFimFiltro,
+            ]);
+        ?>
+        <aside class="panel admin-sidebar" id="adminSidebar" aria-label="Menu administrativo">
+            <button class="admin-sidebar-close" type="button" id="adminSidebarClose" aria-label="Fechar menu administrativo">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <a class="admin-menu-link active" href="#painel-geral"><i class="fa-solid fa-chart-column"></i> Dashboard</a>
+            <div class="admin-sidebar-title">Gestão de ponto</div>
+            <a class="admin-menu-link" href="#solicitacoes-ajuste-admin"><i class="fa-solid fa-clipboard-check"></i> Solicitações</a>
+            <a class="admin-menu-link" href="apuracao-ponto"><i class="fa-regular fa-clock"></i> Apuração de ponto</a>
+            <a class="admin-menu-link" href="banco-horas"><i class="fa-solid fa-scale-balanced"></i> Banco de Horas</a>
+            <a class="admin-menu-link" href="afastamentos"><i class="fa-regular fa-calendar-xmark"></i> Afastamentos</a>
+            <a class="admin-menu-link" href="tipos-afastamentos"><i class="fa-solid fa-sliders"></i> Tipos de afastamento</a>
+            <div class="admin-sidebar-title">Notas Fiscais</div>
+            <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
+            <div class="admin-sidebar-title">Programas internos</div>
+            <a class="admin-menu-link" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
+            <div class="admin-sidebar-title">Relatórios</div>
+            <a class="admin-menu-link" href="historico-espelho"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de espelho</a>
+            <a class="admin-menu-link" href="historico-download"><i class="fa-solid fa-download"></i> Histórico de download</a>
+            <a class="admin-menu-link" href="<?php echo h($csvAdminUrl); ?>"><i class="fa-solid fa-file-csv"></i> Exportar CSV</a>
+            <a class="admin-menu-link" href="<?php echo h($pdfAdminUrl); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</a>
+        </aside>
+    <?php endif; ?>
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="/" aria-label="Voltar para o site">
@@ -3893,28 +3932,6 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                 $pdfAdminUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQueryBase);
             ?>
             <div class="admin-layout">
-                <aside class="panel admin-sidebar" id="adminSidebar" aria-label="Menu administrativo">
-                    <button class="admin-sidebar-close" type="button" id="adminSidebarClose" aria-label="Fechar menu administrativo">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                    <a class="admin-menu-link active" href="#painel-geral"><i class="fa-solid fa-chart-column"></i> Dashboard</a>
-                    <div class="admin-sidebar-title">Gestão de ponto</div>
-                    <a class="admin-menu-link" href="#solicitacoes-ajuste-admin"><i class="fa-solid fa-clipboard-check"></i> Solicitações</a>
-                    <a class="admin-menu-link" href="apuracao-ponto"><i class="fa-regular fa-clock"></i> Apuração de ponto</a>
-                    <a class="admin-menu-link" href="banco-horas"><i class="fa-solid fa-scale-balanced"></i> Banco de Horas</a>
-                    <a class="admin-menu-link" href="afastamentos"><i class="fa-regular fa-calendar-xmark"></i> Afastamentos</a>
-                    <a class="admin-menu-link" href="tipos-afastamentos"><i class="fa-solid fa-sliders"></i> Tipos de afastamento</a>
-                    <div class="admin-sidebar-title">Notas Fiscais</div>
-                    <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
-                    <div class="admin-sidebar-title">Programas internos</div>
-                    <a class="admin-menu-link" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
-                    <div class="admin-sidebar-title">Relatórios</div>
-                    <a class="admin-menu-link" href="historico-espelho"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de espelho</a>
-                    <a class="admin-menu-link" href="historico-download"><i class="fa-solid fa-download"></i> Histórico de download</a>
-                    <a class="admin-menu-link" href="<?php echo h($csvAdminUrl); ?>"><i class="fa-solid fa-file-csv"></i> Exportar CSV</a>
-                    <a class="admin-menu-link" href="<?php echo h($pdfAdminUrl); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</a>
-                </aside>
-
                 <div class="admin-content">
             <section class="panel collapsible-panel" id="solicitacoes-ajuste-admin">
                 <div class="section-title">
@@ -4135,7 +4152,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                                         Justificativa: <?php echo h($ajusteManual['observacoes']); ?><br>
                                         Operador: <?php echo h(nomeExibicao($ajusteManual['operador_nome'] ?? '')); ?>
                                         <?php if (!empty($ajusteManual['documento_caminho'])): ?>
-                                            <br>Documento: <a href="<?php echo h($ajusteManual['documento_caminho']); ?>" target="_blank" rel="noopener"><?php echo h($ajusteManual['documento_nome'] ?? 'Abrir arquivo'); ?></a>
+                                            <br>Documento: <a href="<?php echo h('download-documento.php?caminho=' . rawurlencode($ajusteManual['documento_caminho'])); ?>" target="_blank" rel="noopener"><?php echo h($ajusteManual['documento_nome'] ?? 'Abrir arquivo'); ?></a>
                                         <?php endif; ?>
                                     </p>
                                 </article>

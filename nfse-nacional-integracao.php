@@ -66,12 +66,26 @@ function opSimpNacAPartirDoCrt(?int $crt): int
     };
 }
 
-function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $itens): array
+function tribIssqnAPartirDaTributacao(?string $tributacao): int
+{
+    // tribISSQN (padrão NFS-e Nacional): 1 = Operação tributável, 2 = Isenção, 3 = Imune,
+    // 4 = Exportação de serviço, 5 = Não incidência, 6 = Imunidade/isenção parcial.
+    return match ($tributacao) {
+        'isenta' => 2,
+        'imune' => 3,
+        'exportacao' => 4,
+        'nao_incidencia' => 5,
+        default => 1,
+    };
+}
+
+function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $itens, ?array $nfse = null): array
 {
     $cnpjPrestador = preg_replace('/\D/', '', (string) ($empresa['cnpj'] ?? ''));
     $codigoMunicipio = (string) ($empresa['codigo_ibge_municipio'] ?? '');
-    $serie = '1';
-    $numero = (string) $nota['numero_interno'];
+    $serie = ($nfse['serie_dps'] ?? '') !== '' ? (string) $nfse['serie_dps'] : '1';
+    $numero = ($nfse['numero_dps'] ?? '') !== '' ? (string) $nfse['numero_dps'] : (string) $nota['numero_interno'];
+    $dataCompetencia = $nfse['data_competencia'] ?? $nota['data_emissao'];
 
     $idDps = \Nfse\Support\IdGenerator::generateDpsId(
         cpfCnpj: $cnpjPrestador,
@@ -80,14 +94,22 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
         numDps: $numero
     );
 
-    $servicoDescricao = implode('; ', array_map(
+    $servicoDescricao = $nfse['descricao_servico'] ?? implode('; ', array_map(
         static fn (array $item): string => $item['descricao'],
         $itens
     ));
-    $codigoServico = $itens[0]['codigo_servico_municipal'] ?? null;
+    $codigoServicoNacional = $nfse['codigo_tributacao_nacional'] ?? ($itens[0]['codigo_servico_municipal'] ?? null);
+    $codigoServicoMunicipal = $nfse['codigo_tributacao_municipal'] ?? null;
 
     $chaveDocumentoTomador = $cliente['tipo_pessoa'] === 'PF' ? 'CPF' : 'CNPJ';
     $documentoTomador = preg_replace('/\D/', '', (string) ($cliente['cnpj_cpf'] ?? ''));
+
+    $issqnRetido = ($nfse['issqn_retido'] ?? 'nao') === 'sim';
+    // tpRetISSQN (padrão NFS-e Nacional): 1 = Não retido, 2 = Retido pelo tomador, 3 = Retido pelo intermediário.
+    $tpRetIssqn = 1;
+    if ($issqnRetido) {
+        $tpRetIssqn = ($nfse['issqn_retido_por'] ?? 'tomador') === 'intermediario' ? 3 : 2;
+    }
 
     return [
         'idDps' => $idDps,
@@ -104,7 +126,7 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
                 'verAplic' => 'AccountContabilidade-1.0',
                 'serie' => $serie,
                 'nDPS' => $numero,
-                'dCompet' => $nota['data_emissao'],
+                'dCompet' => $dataCompetencia,
                 'tpEmit' => 1, // 1 = Prestador emite a própria DPS.
                 'cLocEmi' => $codigoMunicipio,
                 'prest' => [
@@ -130,13 +152,16 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
                 'toma' => [
                     $chaveDocumentoTomador => $documentoTomador,
                     'xNome' => $cliente['nome_razao_social'],
+                    'email' => $cliente['email'] ?? null,
+                    'fone' => $nfse['tomador_telefone'] ?? null,
                 ],
                 'serv' => [
                     'locPrest' => [
-                        'cLocPrestacao' => $codigoMunicipio,
+                        'cLocPrestacao' => $nfse['municipio_prestacao'] ?? $codigoMunicipio,
                     ],
                     'cServ' => [
-                        'cTribNac' => $codigoServico,
+                        'cTribNac' => $codigoServicoNacional,
+                        'cTribMun' => $codigoServicoMunicipal,
                         'xDescServ' => $servicoDescricao,
                     ],
                 ],
@@ -144,18 +169,20 @@ function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $it
                     'vServPrest' => [
                         'vServ' => round((float) $nota['valor_total'], 2),
                     ],
-                    // TODO(fase 2 - homologação): confirmar com o contador os códigos de
-                    // tributação (tribISSQN, tpRetISSQN, CST do PIS/COFINS, indTotTrib) antes
-                    // de emitir qualquer nota em produção — valores abaixo são só um ponto
-                    // de partida (mesmo usado no exemplo oficial da lib).
+                    'vDescCondIncond' => [
+                        'vDescIncond' => $nfse['desconto_incondicionado'] ?? null,
+                        'vDescCond' => $nfse['desconto_condicionado'] ?? null,
+                    ],
+                    // Confirmar com o contador antes de produção: CST do PIS/COFINS e indTotTrib
+                    // ainda usam um valor de partida quando o campo não é preenchido no formulário.
                     'trib' => [
                         'tribMun' => [
-                            'tribISSQN' => 1,
-                            'tpRetISSQN' => 1,
+                            'tribISSQN' => tribIssqnAPartirDaTributacao($nfse['tributacao_issqn'] ?? null),
+                            'tpRetISSQN' => $tpRetIssqn,
                         ],
                         'tribFed' => [
                             'piscofins' => [
-                                'CST' => '08',
+                                'CST' => ($nfse['situacao_tributaria_pis_cofins'] ?? '') !== '' ? $nfse['situacao_tributaria_pis_cofins'] : '08',
                             ],
                         ],
                         'totTrib' => [

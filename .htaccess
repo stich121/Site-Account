@@ -50,6 +50,7 @@ Options -Indexes
     RewriteRule ^(config_db|config_db_notas|config_app_key|seguranca|google_drive_config|google_drive_service)/?$ - [F,L]
     RewriteRule ^downloads/programa-(fiscal-verificador-zip|contabil-ofx2excel)\.zip$ - [L]
     RewriteRule ^downloads/ - [F,L]
+    RewriteRule ^uploads/ - [F,L]
     RewriteRule ^certificados-nfse/ - [F,L]
 
     RewriteCond %{DOCUMENT_ROOT}/$1.php -f

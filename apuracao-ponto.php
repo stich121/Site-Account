@@ -1048,7 +1048,7 @@ $pdfTodosUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQuery);
                                     Justificativa: <?php echo h($ajusteManual['observacoes']); ?><br>
                                     Operador: <?php echo h(nomeExibicao($ajusteManual['operador_nome'] ?? '')); ?>
                                     <?php if (!empty($ajusteManual['documento_caminho'])): ?>
-                                        <br>Documento: <a href="<?php echo h($ajusteManual['documento_caminho']); ?>" target="_blank" rel="noopener"><?php echo h($ajusteManual['documento_nome'] ?? 'Abrir arquivo'); ?></a>
+                                        <br>Documento: <a href="<?php echo h('download-documento.php?caminho=' . rawurlencode($ajusteManual['documento_caminho'])); ?>" target="_blank" rel="noopener"><?php echo h($ajusteManual['documento_nome'] ?? 'Abrir arquivo'); ?></a>
                                     <?php endif; ?>
                                 </p>
                             </article>

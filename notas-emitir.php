@@ -268,6 +268,62 @@ function prepararColunasCertificadoEmpresa(PDO $db): void
     }
 }
 
+function prepararTabelaNotasFiscaisNfse(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
+            nota_id BIGINT UNSIGNED NOT NULL,
+            data_competencia DATE NOT NULL,
+            serie_dps VARCHAR(5) NULL,
+            numero_dps VARCHAR(15) NULL,
+            tomador_local ENUM('nao_informado','brasil','exterior') NOT NULL DEFAULT 'nao_informado',
+            tomador_indicador_municipal VARCHAR(20) NULL,
+            tomador_telefone VARCHAR(20) NULL,
+            intermediario_incluido TINYINT(1) NOT NULL DEFAULT 0,
+            intermediario_local ENUM('nao_informado','brasil') NOT NULL DEFAULT 'nao_informado',
+            intermediario_cpf_cnpj VARCHAR(20) NULL,
+            intermediario_nome VARCHAR(180) NULL,
+            pais_prestacao VARCHAR(60) NOT NULL DEFAULT 'Brasil',
+            municipio_prestacao VARCHAR(120) NULL,
+            codigo_tributacao_nacional VARCHAR(20) NULL,
+            codigo_tributacao_municipal VARCHAR(20) NULL,
+            imune_exportacao_nao_incidencia ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            item_nbs VARCHAR(20) NULL,
+            descricao_servico TEXT NULL,
+            documento_responsabilidade_tecnica VARCHAR(60) NULL,
+            documento_referencia VARCHAR(255) NULL,
+            informacoes_complementares TEXT NULL,
+            numero_pedido_b2b VARCHAR(120) NULL,
+            valor_recebido_intermediario DECIMAL(12,2) NULL,
+            desconto_incondicionado DECIMAL(12,2) NULL,
+            desconto_condicionado DECIMAL(12,2) NULL,
+            tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
+            regime_especial_tributacao VARCHAR(60) NULL,
+            exigibilidade_issqn_suspensa ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            issqn_retido ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            issqn_retido_por ENUM('tomador','intermediario') NULL,
+            beneficio_municipal ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            deducao_reducao_base_calculo DECIMAL(12,2) NULL,
+            situacao_tributaria_pis_cofins VARCHAR(10) NULL,
+            tipo_retencao_pis_cofins_csll VARCHAR(10) NULL,
+            irrf DECIMAL(12,2) NULL,
+            contribuicoes_sociais_retidas DECIMAL(12,2) NULL,
+            contribuicao_previdenciaria_retida DECIMAL(12,2) NULL,
+            tributos_modo ENUM('valores','percentuais') NOT NULL DEFAULT 'percentuais',
+            tributos_federal_percentual DECIMAL(6,3) NULL,
+            tributos_estadual_percentual DECIMAL(6,3) NULL,
+            tributos_municipal_percentual DECIMAL(6,3) NULL,
+            tributos_federal_valor DECIMAL(12,2) NULL,
+            tributos_estadual_valor DECIMAL(12,2) NULL,
+            tributos_municipal_valor DECIMAL(12,2) NULL,
+            PRIMARY KEY (nota_id),
+            CONSTRAINT fk_notas_fiscais_nfse_nota
+                FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
 function prepararTabelaNotasFiscaisLog(PDO $db): void
 {
     $db->exec(
@@ -309,6 +365,7 @@ try {
     prepararTabelaNotasClientes($dbNotas);
     prepararTabelaNotasFiscais($dbNotas);
     prepararTabelaNotasFiscaisItens($dbNotas);
+    prepararTabelaNotasFiscaisNfse($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);
@@ -393,42 +450,162 @@ try {
             $dataSaidaEntrada = trim($_POST['data_saida_entrada'] ?? '');
             $informacoesFrete = trim($_POST['informacoes_frete'] ?? '');
 
-            $descricoes = $_POST['item_descricao'] ?? [];
-            $ncms = $_POST['item_ncm'] ?? [];
-            $cfops = $_POST['item_cfop'] ?? [];
-            $csts = $_POST['item_cst'] ?? [];
-            $codigosServico = $_POST['item_codigo_servico'] ?? [];
-            $unidades = $_POST['item_unidade'] ?? [];
-            $quantidades = $_POST['item_quantidade'] ?? [];
-            $valoresUnitarios = $_POST['item_valor_unitario'] ?? [];
-            $produtoIds = $_POST['item_produto_id'] ?? [];
-
             $itensValidos = [];
             $valorTotalNota = 0.0;
-            foreach ($descricoes as $indice => $descricaoItem) {
-                $descricaoItem = trim((string) $descricaoItem);
-                $quantidade = (float) str_replace(',', '.', (string) ($quantidades[$indice] ?? '0'));
-                $valorUnitario = (float) str_replace(',', '.', (string) ($valoresUnitarios[$indice] ?? '0'));
+            $dadosNfse = null;
 
-                if ($descricaoItem === '' || $quantidade <= 0) {
-                    continue;
+            if ($tipoNota === 'nfse') {
+                $numerico = static function (string $campo): ?float {
+                    $valor = trim((string) ($_POST[$campo] ?? ''));
+                    return $valor !== '' ? (float) str_replace(',', '.', $valor) : null;
+                };
+
+                $dataCompetencia = trim($_POST['nfse_data_competencia'] ?? '') !== '' ? trim($_POST['nfse_data_competencia']) : $dataEmissao;
+                $informarDps = isset($_POST['nfse_informar_dps']);
+                $serieDps = $informarDps ? trim($_POST['nfse_serie_dps'] ?? '') : '';
+                $numeroDps = $informarDps ? trim($_POST['nfse_numero_dps'] ?? '') : '';
+                $tomadorLocal = in_array($_POST['nfse_tomador_local'] ?? '', ['brasil', 'exterior'], true) ? $_POST['nfse_tomador_local'] : 'nao_informado';
+                $tomadorIndicadorMunicipal = trim($_POST['nfse_tomador_indicador_municipal'] ?? '');
+                $tomadorTelefone = trim($_POST['nfse_tomador_telefone'] ?? '');
+                $intermediarioIncluido = isset($_POST['nfse_intermediario_incluido']);
+                $intermediarioLocal = $intermediarioIncluido && ($_POST['nfse_intermediario_local'] ?? '') === 'brasil' ? 'brasil' : 'nao_informado';
+                $intermediarioCpfCnpj = $intermediarioIncluido ? trim($_POST['nfse_intermediario_cpf_cnpj'] ?? '') : '';
+                $intermediarioNome = $intermediarioIncluido ? trim($_POST['nfse_intermediario_nome'] ?? '') : '';
+                $paisPrestacao = trim($_POST['nfse_pais_prestacao'] ?? '') !== '' ? trim($_POST['nfse_pais_prestacao']) : 'Brasil';
+                $municipioPrestacao = trim($_POST['nfse_municipio_prestacao'] ?? '');
+                $codigoTributacaoNacional = trim($_POST['nfse_codigo_tributacao_nacional'] ?? '');
+                $codigoTributacaoMunicipal = trim($_POST['nfse_codigo_tributacao_municipal'] ?? '');
+                $imuneExportacao = ($_POST['nfse_imune_exportacao'] ?? '') === 'sim' ? 'sim' : 'nao';
+                $itemNbs = trim($_POST['nfse_item_nbs'] ?? '');
+                $descricaoServico = trim($_POST['nfse_descricao_servico'] ?? '');
+                $documentoResponsabilidadeTecnica = trim($_POST['nfse_documento_responsabilidade_tecnica'] ?? '');
+                $documentoReferencia = trim($_POST['nfse_documento_referencia'] ?? '');
+                $informacoesComplementaresNfse = trim($_POST['nfse_informacoes_complementares'] ?? '');
+                $numeroPedidoB2b = trim($_POST['nfse_numero_pedido_b2b'] ?? '');
+
+                $valorServico = $numerico('nfse_valor_servico') ?? 0.0;
+                $valorRecebidoIntermediario = $numerico('nfse_valor_recebido_intermediario');
+                $descontoIncondicionado = $numerico('nfse_desconto_incondicionado');
+                $descontoCondicionado = $numerico('nfse_desconto_condicionado');
+
+                $tributacaoIssqn = trim($_POST['nfse_tributacao_issqn'] ?? '') !== '' ? trim($_POST['nfse_tributacao_issqn']) : 'operacao_tributavel';
+                $regimeEspecialTributacao = trim($_POST['nfse_regime_especial_tributacao'] ?? '');
+                $exigibilidadeSuspensa = ($_POST['nfse_exigibilidade_suspensa'] ?? '') === 'sim' ? 'sim' : 'nao';
+                $issqnRetido = ($_POST['nfse_issqn_retido'] ?? '') === 'sim' ? 'sim' : 'nao';
+                $issqnRetidoPor = $issqnRetido === 'sim' ? (($_POST['nfse_issqn_retido_por'] ?? '') === 'intermediario' ? 'intermediario' : 'tomador') : null;
+                $beneficioMunicipal = ($_POST['nfse_beneficio_municipal'] ?? '') === 'sim' ? 'sim' : 'nao';
+                $deducaoReducaoBase = $numerico('nfse_deducao_reducao_base');
+
+                $situacaoTributariaPisCofins = trim($_POST['nfse_situacao_pis_cofins'] ?? '');
+                $tipoRetencaoPisCofinsCsll = trim($_POST['nfse_tipo_retencao_pis_cofins_csll'] ?? '');
+                $irrf = $numerico('nfse_irrf');
+                $contribuicoesSociaisRetidas = $numerico('nfse_contribuicoes_sociais_retidas');
+                $contribuicaoPrevidenciariaRetida = $numerico('nfse_contribuicao_previdenciaria_retida');
+
+                $tributosModo = ($_POST['nfse_tributos_modo'] ?? '') === 'valores' ? 'valores' : 'percentuais';
+                $tributosFederalPercentual = $numerico('nfse_tributos_federal_percentual');
+                $tributosEstadualPercentual = $numerico('nfse_tributos_estadual_percentual');
+                $tributosMunicipalPercentual = $numerico('nfse_tributos_municipal_percentual');
+                $tributosFederalValor = $numerico('nfse_tributos_federal_valor');
+                $tributosEstadualValor = $numerico('nfse_tributos_estadual_valor');
+                $tributosMunicipalValor = $numerico('nfse_tributos_municipal_valor');
+
+                if ($descricaoServico !== '' && $valorServico > 0) {
+                    $itensValidos[] = [
+                        'produto_servico_id' => null,
+                        'descricao' => $descricaoServico,
+                        'ncm' => null,
+                        'cfop' => null,
+                        'cst_csosn' => null,
+                        'codigo_servico_municipal' => $codigoTributacaoMunicipal !== '' ? $codigoTributacaoMunicipal : ($codigoTributacaoNacional !== '' ? $codigoTributacaoNacional : null),
+                        'unidade' => 'UN',
+                        'quantidade' => 1,
+                        'valor_unitario' => $valorServico,
+                        'valor_total' => round($valorServico, 2),
+                    ];
+                    $valorTotalNota = round($valorServico - (float) $descontoIncondicionado - (float) $descontoCondicionado, 2);
                 }
 
-                $valorTotalItem = round($quantidade * $valorUnitario, 2);
-                $valorTotalNota += $valorTotalItem;
-
-                $itensValidos[] = [
-                    'produto_servico_id' => (int) ($produtoIds[$indice] ?? 0) > 0 ? (int) $produtoIds[$indice] : null,
-                    'descricao' => $descricaoItem,
-                    'ncm' => trim((string) ($ncms[$indice] ?? '')) ?: null,
-                    'cfop' => trim((string) ($cfops[$indice] ?? '')) ?: null,
-                    'cst_csosn' => trim((string) ($csts[$indice] ?? '')) ?: null,
-                    'codigo_servico_municipal' => trim((string) ($codigosServico[$indice] ?? '')) ?: null,
-                    'unidade' => trim((string) ($unidades[$indice] ?? '')) ?: 'UN',
-                    'quantidade' => $quantidade,
-                    'valor_unitario' => $valorUnitario,
-                    'valor_total' => $valorTotalItem,
+                $dadosNfse = [
+                    'data_competencia' => $dataCompetencia,
+                    'serie_dps' => $serieDps !== '' ? $serieDps : null,
+                    'numero_dps' => $numeroDps !== '' ? $numeroDps : null,
+                    'tomador_local' => $tomadorLocal,
+                    'tomador_indicador_municipal' => $tomadorIndicadorMunicipal !== '' ? $tomadorIndicadorMunicipal : null,
+                    'tomador_telefone' => $tomadorTelefone !== '' ? $tomadorTelefone : null,
+                    'intermediario_incluido' => $intermediarioIncluido ? 1 : 0,
+                    'intermediario_local' => $intermediarioLocal,
+                    'intermediario_cpf_cnpj' => $intermediarioCpfCnpj !== '' ? $intermediarioCpfCnpj : null,
+                    'intermediario_nome' => $intermediarioNome !== '' ? $intermediarioNome : null,
+                    'pais_prestacao' => $paisPrestacao,
+                    'municipio_prestacao' => $municipioPrestacao !== '' ? $municipioPrestacao : null,
+                    'codigo_tributacao_nacional' => $codigoTributacaoNacional !== '' ? $codigoTributacaoNacional : null,
+                    'codigo_tributacao_municipal' => $codigoTributacaoMunicipal !== '' ? $codigoTributacaoMunicipal : null,
+                    'imune_exportacao_nao_incidencia' => $imuneExportacao,
+                    'item_nbs' => $itemNbs !== '' ? $itemNbs : null,
+                    'descricao_servico' => $descricaoServico !== '' ? $descricaoServico : null,
+                    'documento_responsabilidade_tecnica' => $documentoResponsabilidadeTecnica !== '' ? $documentoResponsabilidadeTecnica : null,
+                    'documento_referencia' => $documentoReferencia !== '' ? $documentoReferencia : null,
+                    'informacoes_complementares' => $informacoesComplementaresNfse !== '' ? $informacoesComplementaresNfse : null,
+                    'numero_pedido_b2b' => $numeroPedidoB2b !== '' ? $numeroPedidoB2b : null,
+                    'valor_recebido_intermediario' => $valorRecebidoIntermediario,
+                    'desconto_incondicionado' => $descontoIncondicionado,
+                    'desconto_condicionado' => $descontoCondicionado,
+                    'tributacao_issqn' => $tributacaoIssqn,
+                    'regime_especial_tributacao' => $regimeEspecialTributacao !== '' ? $regimeEspecialTributacao : null,
+                    'exigibilidade_issqn_suspensa' => $exigibilidadeSuspensa,
+                    'issqn_retido' => $issqnRetido,
+                    'issqn_retido_por' => $issqnRetidoPor,
+                    'beneficio_municipal' => $beneficioMunicipal,
+                    'deducao_reducao_base_calculo' => $deducaoReducaoBase,
+                    'situacao_tributaria_pis_cofins' => $situacaoTributariaPisCofins !== '' ? $situacaoTributariaPisCofins : null,
+                    'tipo_retencao_pis_cofins_csll' => $tipoRetencaoPisCofinsCsll !== '' ? $tipoRetencaoPisCofinsCsll : null,
+                    'irrf' => $irrf,
+                    'contribuicoes_sociais_retidas' => $contribuicoesSociaisRetidas,
+                    'contribuicao_previdenciaria_retida' => $contribuicaoPrevidenciariaRetida,
+                    'tributos_modo' => $tributosModo,
+                    'tributos_federal_percentual' => $tributosFederalPercentual,
+                    'tributos_estadual_percentual' => $tributosEstadualPercentual,
+                    'tributos_municipal_percentual' => $tributosMunicipalPercentual,
+                    'tributos_federal_valor' => $tributosFederalValor,
+                    'tributos_estadual_valor' => $tributosEstadualValor,
+                    'tributos_municipal_valor' => $tributosMunicipalValor,
                 ];
+            } else {
+                $descricoes = $_POST['item_descricao'] ?? [];
+                $ncms = $_POST['item_ncm'] ?? [];
+                $cfops = $_POST['item_cfop'] ?? [];
+                $csts = $_POST['item_cst'] ?? [];
+                $unidades = $_POST['item_unidade'] ?? [];
+                $quantidades = $_POST['item_quantidade'] ?? [];
+                $valoresUnitarios = $_POST['item_valor_unitario'] ?? [];
+                $produtoIds = $_POST['item_produto_id'] ?? [];
+
+                foreach ($descricoes as $indice => $descricaoItem) {
+                    $descricaoItem = trim((string) $descricaoItem);
+                    $quantidade = (float) str_replace(',', '.', (string) ($quantidades[$indice] ?? '0'));
+                    $valorUnitario = (float) str_replace(',', '.', (string) ($valoresUnitarios[$indice] ?? '0'));
+
+                    if ($descricaoItem === '' || $quantidade <= 0) {
+                        continue;
+                    }
+
+                    $valorTotalItem = round($quantidade * $valorUnitario, 2);
+                    $valorTotalNota += $valorTotalItem;
+
+                    $itensValidos[] = [
+                        'produto_servico_id' => (int) ($produtoIds[$indice] ?? 0) > 0 ? (int) $produtoIds[$indice] : null,
+                        'descricao' => $descricaoItem,
+                        'ncm' => trim((string) ($ncms[$indice] ?? '')) ?: null,
+                        'cfop' => trim((string) ($cfops[$indice] ?? '')) ?: null,
+                        'cst_csosn' => trim((string) ($csts[$indice] ?? '')) ?: null,
+                        'codigo_servico_municipal' => null,
+                        'unidade' => trim((string) ($unidades[$indice] ?? '')) ?: 'UN',
+                        'quantidade' => $quantidade,
+                        'valor_unitario' => $valorUnitario,
+                        'valor_total' => $valorTotalItem,
+                    ];
+                }
             }
 
             if ($empresaId <= 0) {
@@ -437,8 +614,12 @@ try {
                 $erro = 'Selecione o cliente destinatário.';
             } elseif ($naturezaOperacao === '') {
                 $erro = 'Informe a natureza da operação.';
+            } elseif ($tipoNota === 'nfse' && ($dadosNfse === null || $dadosNfse['municipio_prestacao'] === null || $dadosNfse['codigo_tributacao_nacional'] === null)) {
+                $erro = 'Informe o município da prestação e o código de tributação nacional do serviço.';
             } elseif (empty($itensValidos)) {
-                $erro = 'Adicione ao menos um item com descrição e quantidade maior que zero.';
+                $erro = $tipoNota === 'nfse'
+                    ? 'Informe a descrição do serviço e um valor do serviço maior que zero.'
+                    : 'Adicione ao menos um item com descrição e quantidade maior que zero.';
             } else {
                 $dbNotas->beginTransaction();
                 try {
@@ -498,6 +679,35 @@ try {
                             'valor_unitario' => $item['valor_unitario'],
                             'valor_total' => $item['valor_total'],
                         ]);
+                    }
+
+                    if ($tipoNota === 'nfse' && $dadosNfse !== null) {
+                        $stmtNfse = $dbNotas->prepare(
+                            'INSERT INTO notas_fiscais_nfse (
+                                nota_id, data_competencia, serie_dps, numero_dps, tomador_local, tomador_indicador_municipal, tomador_telefone,
+                                intermediario_incluido, intermediario_local, intermediario_cpf_cnpj, intermediario_nome,
+                                pais_prestacao, municipio_prestacao, codigo_tributacao_nacional, codigo_tributacao_municipal,
+                                imune_exportacao_nao_incidencia, item_nbs, descricao_servico, documento_responsabilidade_tecnica,
+                                documento_referencia, informacoes_complementares, numero_pedido_b2b, valor_recebido_intermediario,
+                                desconto_incondicionado, desconto_condicionado, tributacao_issqn, regime_especial_tributacao,
+                                exigibilidade_issqn_suspensa, issqn_retido, issqn_retido_por, beneficio_municipal, deducao_reducao_base_calculo,
+                                situacao_tributaria_pis_cofins, tipo_retencao_pis_cofins_csll, irrf, contribuicoes_sociais_retidas,
+                                contribuicao_previdenciaria_retida, tributos_modo, tributos_federal_percentual, tributos_estadual_percentual,
+                                tributos_municipal_percentual, tributos_federal_valor, tributos_estadual_valor, tributos_municipal_valor
+                             ) VALUES (
+                                :nota_id, :data_competencia, :serie_dps, :numero_dps, :tomador_local, :tomador_indicador_municipal, :tomador_telefone,
+                                :intermediario_incluido, :intermediario_local, :intermediario_cpf_cnpj, :intermediario_nome,
+                                :pais_prestacao, :municipio_prestacao, :codigo_tributacao_nacional, :codigo_tributacao_municipal,
+                                :imune_exportacao_nao_incidencia, :item_nbs, :descricao_servico, :documento_responsabilidade_tecnica,
+                                :documento_referencia, :informacoes_complementares, :numero_pedido_b2b, :valor_recebido_intermediario,
+                                :desconto_incondicionado, :desconto_condicionado, :tributacao_issqn, :regime_especial_tributacao,
+                                :exigibilidade_issqn_suspensa, :issqn_retido, :issqn_retido_por, :beneficio_municipal, :deducao_reducao_base_calculo,
+                                :situacao_tributaria_pis_cofins, :tipo_retencao_pis_cofins_csll, :irrf, :contribuicoes_sociais_retidas,
+                                :contribuicao_previdenciaria_retida, :tributos_modo, :tributos_federal_percentual, :tributos_estadual_percentual,
+                                :tributos_municipal_percentual, :tributos_federal_valor, :tributos_estadual_valor, :tributos_municipal_valor
+                             )'
+                        );
+                        $stmtNfse->execute(array_merge(['nota_id' => $notaId], $dadosNfse));
                     }
 
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, 'criada', 'Rascunho criado com ' . count($itensValidos) . ' item(ns).');
@@ -904,27 +1114,307 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                         </div>
                     </div>
 
-                    <h3 style="margin-top: 1.5rem;">Itens</h3>
-                    <table class="itens-table" id="tabelaItens">
-                        <thead>
-                            <tr>
-                                <th style="min-width: 220px;">Catálogo (opcional)</th>
-                                <th style="min-width: 200px;">Descrição</th>
-                                <th>NCM</th>
-                                <th>CFOP</th>
-                                <th>CST/CSOSN</th>
-                                <th>Cód. serviço (LC 116)</th>
-                                <th>Unid.</th>
-                                <th>Qtd.</th>
-                                <th>Valor unit.</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="corpoItens"></tbody>
-                    </table>
-                    <button class="btn btn-outline btn-small" type="button" id="btnAddItem"><i class="fa-solid fa-plus"></i> Adicionar item</button>
+                    <div id="secaoNfe">
+                        <h3 style="margin-top: 1.5rem;">Itens (produtos)</h3>
+                        <table class="itens-table" id="tabelaItens">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 220px;">Catálogo (opcional)</th>
+                                    <th style="min-width: 200px;">Descrição</th>
+                                    <th>NCM</th>
+                                    <th>CFOP</th>
+                                    <th>CST/CSOSN</th>
+                                    <th>Unid.</th>
+                                    <th>Qtd.</th>
+                                    <th>Valor unit.</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpoItens"></tbody>
+                        </table>
+                        <button class="btn btn-outline btn-small" type="button" id="btnAddItem"><i class="fa-solid fa-plus"></i> Adicionar item</button>
 
-                    <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
+                        <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
+                    </div>
+
+                    <div id="secaoNfse">
+                        <div class="form-grid" style="margin-top: 1.5rem;">
+                            <div class="field">
+                                <label for="nfse_data_competencia">Data de competência</label>
+                                <input id="nfse_data_competencia" name="nfse_data_competencia" type="date" value="<?php echo h(date('Y-m-d')); ?>">
+                            </div>
+                            <label class="check-row">
+                                <input type="checkbox" id="nfse_informar_dps" name="nfse_informar_dps">
+                                Informar série e número da DPS
+                            </label>
+                        </div>
+                        <div class="form-grid" id="camposDpsManual" style="display:none;">
+                            <div class="field">
+                                <label for="nfse_serie_dps">Série da DPS</label>
+                                <input id="nfse_serie_dps" name="nfse_serie_dps" type="text" maxlength="5">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_numero_dps">Número da DPS</label>
+                                <input id="nfse_numero_dps" name="nfse_numero_dps" type="text" maxlength="15">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Tomador do serviço</h3>
+                        <p class="muted" style="margin-bottom: 0.75rem;">Documento, nome e e-mail do tomador vêm do cliente destinatário selecionado acima.</p>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_tomador_local">Onde está localizado o estabelecimento/domicílio?</label>
+                                <select id="nfse_tomador_local" name="nfse_tomador_local">
+                                    <option value="nao_informado">Tomador não informado</option>
+                                    <option value="brasil" selected>Brasil</option>
+                                    <option value="exterior">Exterior</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tomador_indicador_municipal">Indicador municipal (opcional)</label>
+                                <input id="nfse_tomador_indicador_municipal" name="nfse_tomador_indicador_municipal" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tomador_telefone">Telefone (opcional)</label>
+                                <input id="nfse_tomador_telefone" name="nfse_tomador_telefone" type="text">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Intermediário do serviço</h3>
+                        <label class="check-row" style="margin-top: 0;">
+                            <input type="checkbox" id="nfse_intermediario_incluido" name="nfse_intermediario_incluido">
+                            Esta NFS-e tem intermediário
+                        </label>
+                        <div class="form-grid" id="camposIntermediario" style="display:none; margin-top: 1rem;">
+                            <div class="field">
+                                <label for="nfse_intermediario_local">Onde está localizado o estabelecimento/domicílio?</label>
+                                <select id="nfse_intermediario_local" name="nfse_intermediario_local">
+                                    <option value="nao_informado">Intermediário não informado</option>
+                                    <option value="brasil">Brasil</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_intermediario_cpf_cnpj">CPF/CNPJ do intermediário</label>
+                                <input id="nfse_intermediario_cpf_cnpj" name="nfse_intermediario_cpf_cnpj" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_intermediario_nome">Nome/Razão social do intermediário</label>
+                                <input id="nfse_intermediario_nome" name="nfse_intermediario_nome" type="text">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Local da prestação do serviço</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_pais_prestacao">País</label>
+                                <input id="nfse_pais_prestacao" name="nfse_pais_prestacao" type="text" value="Brasil">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_municipio_prestacao">Município</label>
+                                <input id="nfse_municipio_prestacao" name="nfse_municipio_prestacao" type="text" placeholder="Ex.: Belo Horizonte/MG">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Serviço prestado</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116)</label>
+                                <input id="nfse_codigo_tributacao_nacional" name="nfse_codigo_tributacao_nacional" type="text" placeholder="Ex.: 17.19.01">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
+                                <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_imune_exportacao">Imunidade, exportação ou não incidência do ISSQN?</label>
+                                <select id="nfse_imune_exportacao" name="nfse_imune_exportacao">
+                                    <option value="nao" selected>Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_item_nbs">Item da NBS correspondente (opcional)</label>
+                                <input id="nfse_item_nbs" name="nfse_item_nbs" type="text">
+                            </div>
+                            <div class="field" style="grid-column: 1 / -1;">
+                                <label for="nfse_descricao_servico">Descrição do serviço</label>
+                                <textarea id="nfse_descricao_servico" name="nfse_descricao_servico" maxlength="2000" placeholder="Descreva o serviço prestado"></textarea>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Informações complementares</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_documento_responsabilidade_tecnica">Nº do documento de responsabilidade técnica</label>
+                                <input id="nfse_documento_responsabilidade_tecnica" name="nfse_documento_responsabilidade_tecnica" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_numero_pedido_b2b">Nº do Pedido/OC/OS/Projeto (B2B)</label>
+                                <input id="nfse_numero_pedido_b2b" name="nfse_numero_pedido_b2b" type="text">
+                            </div>
+                            <div class="field" style="grid-column: 1 / -1;">
+                                <label for="nfse_documento_referencia">Documento de referência</label>
+                                <textarea id="nfse_documento_referencia" name="nfse_documento_referencia"></textarea>
+                            </div>
+                            <div class="field" style="grid-column: 1 / -1;">
+                                <label for="nfse_informacoes_complementares">Informações complementares</label>
+                                <textarea id="nfse_informacoes_complementares" name="nfse_informacoes_complementares" maxlength="2000"></textarea>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Valores do serviço prestado</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_valor_servico">Valor do serviço prestado</label>
+                                <input id="nfse_valor_servico" name="nfse_valor_servico" type="text" value="0,00">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_valor_recebido_intermediario">Valor recebido pelo intermediário</label>
+                                <input id="nfse_valor_recebido_intermediario" name="nfse_valor_recebido_intermediario" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_desconto_incondicionado">Desconto incondicionado</label>
+                                <input id="nfse_desconto_incondicionado" name="nfse_desconto_incondicionado" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_desconto_condicionado">Desconto condicionado</label>
+                                <input id="nfse_desconto_condicionado" name="nfse_desconto_condicionado" type="text">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Tributação municipal</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_tributacao_issqn">Tributação do ISSQN sobre o serviço prestado</label>
+                                <select id="nfse_tributacao_issqn" name="nfse_tributacao_issqn">
+                                    <option value="operacao_tributavel" selected>Operação tributável</option>
+                                    <option value="isenta">Isenta</option>
+                                    <option value="imune">Imune</option>
+                                    <option value="exportacao">Exportação de serviço</option>
+                                    <option value="nao_incidencia">Não incidência</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_regime_especial_tributacao">Regime Especial de Tributação</label>
+                                <select id="nfse_regime_especial_tributacao" name="nfse_regime_especial_tributacao">
+                                    <option value="">Nenhum</option>
+                                    <option value="me_epp_simples_nacional">ME/EPP Simples Nacional</option>
+                                    <option value="mei">Microempreendedor Individual (MEI)</option>
+                                    <option value="cooperativa">Cooperativa</option>
+                                    <option value="estimativa">Estimativa</option>
+                                    <option value="sociedade_profissionais">Sociedade de profissionais</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_exigibilidade_suspensa">A exigibilidade do ISSQN está suspensa?</label>
+                                <select id="nfse_exigibilidade_suspensa" name="nfse_exigibilidade_suspensa">
+                                    <option value="nao" selected>Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_issqn_retido">Há retenção do ISSQN pelo Tomador ou Intermediário?</label>
+                                <select id="nfse_issqn_retido" name="nfse_issqn_retido">
+                                    <option value="nao" selected>Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            <div class="field" id="campoIssqnRetidoPor" style="display:none;">
+                                <label for="nfse_issqn_retido_por">Retido por</label>
+                                <select id="nfse_issqn_retido_por" name="nfse_issqn_retido_por">
+                                    <option value="tomador">Tomador</option>
+                                    <option value="intermediario">Intermediário</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_beneficio_municipal">Este serviço está amparado por algum benefício municipal?</label>
+                                <select id="nfse_beneficio_municipal" name="nfse_beneficio_municipal">
+                                    <option value="nao" selected>Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_deducao_reducao_base">Dedução/redução da base de cálculo do ISSQN (opcional)</label>
+                                <input id="nfse_deducao_reducao_base" name="nfse_deducao_reducao_base" type="text">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Tributação federal</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_situacao_pis_cofins">Situação Tributária do PIS/COFINS</label>
+                                <select id="nfse_situacao_pis_cofins" name="nfse_situacao_pis_cofins">
+                                    <option value="">Selecione...</option>
+                                    <option value="01">01 - Tributável (alíquota básica)</option>
+                                    <option value="04">04 - Tributável (alíquota zero)</option>
+                                    <option value="06">06 - Não tributável</option>
+                                    <option value="07">07 - Isenta</option>
+                                    <option value="08">08 - Sem incidência</option>
+                                    <option value="09">09 - Com suspensão</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tipo_retencao_pis_cofins_csll">Tipo de retenção do PIS/COFINS/CSLL</label>
+                                <select id="nfse_tipo_retencao_pis_cofins_csll" name="nfse_tipo_retencao_pis_cofins_csll">
+                                    <option value="">Selecione...</option>
+                                    <option value="nenhuma">Sem retenção</option>
+                                    <option value="lei_10833">Retenção conforme Lei 10.833/2003</option>
+                                    <option value="outras">Outras retenções</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="nfse_irrf">IRRF (opcional)</label>
+                                <input id="nfse_irrf" name="nfse_irrf" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_contribuicoes_sociais_retidas">Contribuições Sociais - Retidas (opcional)</label>
+                                <input id="nfse_contribuicoes_sociais_retidas" name="nfse_contribuicoes_sociais_retidas" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_contribuicao_previdenciaria_retida">Contribuição Previdenciária - Retida (opcional)</label>
+                                <input id="nfse_contribuicao_previdenciaria_retida" name="nfse_contribuicao_previdenciaria_retida" type="text">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">Valor aproximado dos tributos</h3>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="nfse_tributos_modo">Como informar</label>
+                                <select id="nfse_tributos_modo" name="nfse_tributos_modo">
+                                    <option value="percentuais" selected>Configurar os valores percentuais</option>
+                                    <option value="valores">Preencher os valores monetários</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-grid" id="tributosPercentuais">
+                            <div class="field">
+                                <label for="nfse_tributos_federal_percentual">Federal (%)</label>
+                                <input id="nfse_tributos_federal_percentual" name="nfse_tributos_federal_percentual" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tributos_estadual_percentual">Estadual (%)</label>
+                                <input id="nfse_tributos_estadual_percentual" name="nfse_tributos_estadual_percentual" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tributos_municipal_percentual">Municipal (%)</label>
+                                <input id="nfse_tributos_municipal_percentual" name="nfse_tributos_municipal_percentual" type="text">
+                            </div>
+                        </div>
+                        <div class="form-grid" id="tributosValores" style="display:none;">
+                            <div class="field">
+                                <label for="nfse_tributos_federal_valor">Federal (R$)</label>
+                                <input id="nfse_tributos_federal_valor" name="nfse_tributos_federal_valor" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tributos_estadual_valor">Estadual (R$)</label>
+                                <input id="nfse_tributos_estadual_valor" name="nfse_tributos_estadual_valor" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="nfse_tributos_municipal_valor">Municipal (R$)</label>
+                                <input id="nfse_tributos_municipal_valor" name="nfse_tributos_municipal_valor" type="text">
+                            </div>
+                        </div>
+                    </div>
 
                     <div style="margin-top: 1.5rem;">
                         <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar rascunho</button>
@@ -1089,7 +1579,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 '<td><input type="text" name="item_ncm[]" class="item-ncm"></td>' +
                 '<td><input type="text" name="item_cfop[]" class="item-cfop"></td>' +
                 '<td><input type="text" name="item_cst[]" class="item-cst"></td>' +
-                '<td><input type="text" name="item_codigo_servico[]" class="item-codigo-servico"></td>' +
                 '<td><input type="text" name="item_unidade[]" class="item-unidade" value="UN"></td>' +
                 '<td><input type="text" name="item_quantidade[]" class="item-quantidade" value="1"></td>' +
                 '<td><input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00"></td>' +
@@ -1108,7 +1597,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                     linha.querySelector('.item-ncm').value = item.ncm || '';
                     linha.querySelector('.item-cfop').value = item.cfop || '';
                     linha.querySelector('.item-cst').value = item.cst_csosn || '';
-                    linha.querySelector('.item-codigo-servico').value = item.codigo_servico_municipal || '';
                     linha.querySelector('.item-unidade').value = item.unidade || 'UN';
                     linha.querySelector('.item-valor').value = Number(item.valor_unitario_padrao || 0).toFixed(2).replace('.', ',');
                     linha.querySelector('.item-produto-id').value = item.id;
@@ -1139,6 +1627,70 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 corpoItens.querySelectorAll('.item-catalogo').forEach(function (select) {
                     select.innerHTML = montarOpcoesCatalogo(empresaSelect.value);
                 });
+            });
+        }
+
+        const tipoNotaSelect = document.getElementById('tipo_nota');
+        const secaoNfe = document.getElementById('secaoNfe');
+        const secaoNfse = document.getElementById('secaoNfse');
+
+        function alternarTipoNota() {
+            if (!tipoNotaSelect) return;
+            const ehNfse = tipoNotaSelect.value === 'nfse';
+
+            if (secaoNfe) secaoNfe.style.display = ehNfse ? 'none' : '';
+            if (secaoNfse) secaoNfse.style.display = ehNfse ? '' : 'none';
+
+            document.querySelectorAll('.item-descricao').forEach(function (campo) {
+                campo.required = !ehNfse;
+            });
+
+            const descricaoServico = document.getElementById('nfse_descricao_servico');
+            const valorServico = document.getElementById('nfse_valor_servico');
+            const municipioPrestacao = document.getElementById('nfse_municipio_prestacao');
+            const codigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
+            [descricaoServico, valorServico, municipioPrestacao, codigoTributacaoNacional].forEach(function (campo) {
+                if (campo) campo.required = ehNfse;
+            });
+        }
+
+        if (tipoNotaSelect) {
+            tipoNotaSelect.addEventListener('change', alternarTipoNota);
+            alternarTipoNota();
+        }
+
+        const checkboxInformarDps = document.getElementById('nfse_informar_dps');
+        const camposDpsManual = document.getElementById('camposDpsManual');
+        if (checkboxInformarDps && camposDpsManual) {
+            checkboxInformarDps.addEventListener('change', function () {
+                camposDpsManual.style.display = checkboxInformarDps.checked ? '' : 'none';
+            });
+        }
+
+        const checkboxIntermediario = document.getElementById('nfse_intermediario_incluido');
+        const camposIntermediario = document.getElementById('camposIntermediario');
+        if (checkboxIntermediario && camposIntermediario) {
+            checkboxIntermediario.addEventListener('change', function () {
+                camposIntermediario.style.display = checkboxIntermediario.checked ? '' : 'none';
+            });
+        }
+
+        const selectIssqnRetido = document.getElementById('nfse_issqn_retido');
+        const campoIssqnRetidoPor = document.getElementById('campoIssqnRetidoPor');
+        if (selectIssqnRetido && campoIssqnRetidoPor) {
+            selectIssqnRetido.addEventListener('change', function () {
+                campoIssqnRetidoPor.style.display = selectIssqnRetido.value === 'sim' ? '' : 'none';
+            });
+        }
+
+        const selectTributosModo = document.getElementById('nfse_tributos_modo');
+        const blocoTributosPercentuais = document.getElementById('tributosPercentuais');
+        const blocoTributosValores = document.getElementById('tributosValores');
+        if (selectTributosModo && blocoTributosPercentuais && blocoTributosValores) {
+            selectTributosModo.addEventListener('change', function () {
+                const ehValores = selectTributosModo.value === 'valores';
+                blocoTributosPercentuais.style.display = ehValores ? 'none' : '';
+                blocoTributosValores.style.display = ehValores ? '' : 'none';
             });
         }
 

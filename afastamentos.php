@@ -824,7 +824,7 @@ $csrf = h($_SESSION['csrf_ponto'] ?? '');
                                 </td>
                                 <td>
                                     <?php if (!empty($afastamentoAdmin['documento_caminho'])): ?>
-                                        <a class="btn btn-outline" href="<?php echo h($afastamentoAdmin['documento_caminho']); ?>" target="_blank" rel="noopener">Abrir</a>
+                                        <a class="btn btn-outline" href="<?php echo h('download-documento.php?caminho=' . rawurlencode($afastamentoAdmin['documento_caminho'])); ?>" target="_blank" rel="noopener">Abrir</a>
                                     <?php else: ?>
                                         <span class="muted">Sem arquivo</span>
                                     <?php endif; ?>

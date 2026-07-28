@@ -58,11 +58,15 @@ function processarNotaNfse(PDO $dbNotas, array $notaResumo, int $operadorId): ar
     $stmt->execute(['nota_id' => $notaResumo['id']]);
     $itens = $stmt->fetchAll();
 
+    $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
+    $stmt->execute(['nota_id' => $notaResumo['id']]);
+    $nfse = $stmt->fetch() ?: null;
+
     if (!$nota || !$empresa || !$cliente || empty($itens)) {
         return ['sucesso' => false, 'motivo_rejeicao' => 'Nota, empresa, cliente ou itens não encontrados.'];
     }
 
-    $dps = dpsAPartirDaNota($nota, $empresa, $cliente, $itens);
+    $dps = dpsAPartirDaNota($nota, $empresa, $cliente, $itens, $nfse);
     $resultado = enviarNfseNacional($dps, $nota['ambiente'], $empresa);
 
     if ($resultado['status'] !== 'pendente_envio') {

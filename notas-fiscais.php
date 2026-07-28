@@ -328,6 +328,62 @@ function prepararColunasCertificadoEmpresa(PDO $db): void
     }
 }
 
+function prepararTabelaNotasFiscaisNfse(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
+            nota_id BIGINT UNSIGNED NOT NULL,
+            data_competencia DATE NOT NULL,
+            serie_dps VARCHAR(5) NULL,
+            numero_dps VARCHAR(15) NULL,
+            tomador_local ENUM('nao_informado','brasil','exterior') NOT NULL DEFAULT 'nao_informado',
+            tomador_indicador_municipal VARCHAR(20) NULL,
+            tomador_telefone VARCHAR(20) NULL,
+            intermediario_incluido TINYINT(1) NOT NULL DEFAULT 0,
+            intermediario_local ENUM('nao_informado','brasil') NOT NULL DEFAULT 'nao_informado',
+            intermediario_cpf_cnpj VARCHAR(20) NULL,
+            intermediario_nome VARCHAR(180) NULL,
+            pais_prestacao VARCHAR(60) NOT NULL DEFAULT 'Brasil',
+            municipio_prestacao VARCHAR(120) NULL,
+            codigo_tributacao_nacional VARCHAR(20) NULL,
+            codigo_tributacao_municipal VARCHAR(20) NULL,
+            imune_exportacao_nao_incidencia ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            item_nbs VARCHAR(20) NULL,
+            descricao_servico TEXT NULL,
+            documento_responsabilidade_tecnica VARCHAR(60) NULL,
+            documento_referencia VARCHAR(255) NULL,
+            informacoes_complementares TEXT NULL,
+            numero_pedido_b2b VARCHAR(120) NULL,
+            valor_recebido_intermediario DECIMAL(12,2) NULL,
+            desconto_incondicionado DECIMAL(12,2) NULL,
+            desconto_condicionado DECIMAL(12,2) NULL,
+            tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
+            regime_especial_tributacao VARCHAR(60) NULL,
+            exigibilidade_issqn_suspensa ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            issqn_retido ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            issqn_retido_por ENUM('tomador','intermediario') NULL,
+            beneficio_municipal ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            deducao_reducao_base_calculo DECIMAL(12,2) NULL,
+            situacao_tributaria_pis_cofins VARCHAR(10) NULL,
+            tipo_retencao_pis_cofins_csll VARCHAR(10) NULL,
+            irrf DECIMAL(12,2) NULL,
+            contribuicoes_sociais_retidas DECIMAL(12,2) NULL,
+            contribuicao_previdenciaria_retida DECIMAL(12,2) NULL,
+            tributos_modo ENUM('valores','percentuais') NOT NULL DEFAULT 'percentuais',
+            tributos_federal_percentual DECIMAL(6,3) NULL,
+            tributos_estadual_percentual DECIMAL(6,3) NULL,
+            tributos_municipal_percentual DECIMAL(6,3) NULL,
+            tributos_federal_valor DECIMAL(12,2) NULL,
+            tributos_estadual_valor DECIMAL(12,2) NULL,
+            tributos_municipal_valor DECIMAL(12,2) NULL,
+            PRIMARY KEY (nota_id),
+            CONSTRAINT fk_notas_fiscais_nfse_nota
+                FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
 function prepararTabelaNotasFiscaisLog(PDO $db): void
 {
     $db->exec(
@@ -380,6 +436,7 @@ try {
     prepararTabelaNotasClientes($dbNotas);
     prepararTabelaNotasFiscais($dbNotas);
     prepararTabelaNotasFiscaisItens($dbNotas);
+    prepararTabelaNotasFiscaisNfse($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);
@@ -426,6 +483,13 @@ try {
         $stmt->execute(['nota_id' => $notaId]);
         $itensNota = $stmt->fetchAll();
 
+        $nfseNota = null;
+        if ($nota['tipo_nota'] === 'nfse') {
+            $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
+            $stmt->execute(['nota_id' => $notaId]);
+            $nfseNota = $stmt->fetch() ?: null;
+        }
+
         $linhas = [
             '*** RASCUNHO - SEM VALOR FISCAL ***',
             'Documento interno de conferencia. Nao e uma nota fiscal emitida.',
@@ -444,10 +508,19 @@ try {
             '',
             'Natureza da operacao: ' . $nota['natureza_operacao'],
             'Forma de pagamento: ' . (string) ($nota['forma_pagamento'] ?? 'nao informada'),
-            str_repeat('-', 90),
-            'ITENS',
-            str_repeat('-', 90),
         ];
+
+        if ($nfseNota !== null) {
+            $linhas[] = '';
+            $linhas[] = 'DADOS DA NFS-e (DPS - Portal Nacional)';
+            $linhas[] = 'Competencia: ' . $nfseNota['data_competencia'] . ' | Municipio da prestacao: ' . (string) ($nfseNota['municipio_prestacao'] ?? 'nao informado');
+            $linhas[] = 'Cod. tributacao nacional: ' . (string) ($nfseNota['codigo_tributacao_nacional'] ?? 'nao informado') . ' | Cod. municipal: ' . (string) ($nfseNota['codigo_tributacao_municipal'] ?? 'nao informado');
+            $linhas[] = 'Tributacao ISSQN: ' . (string) $nfseNota['tributacao_issqn'] . ' | Retencao ISSQN: ' . ($nfseNota['issqn_retido'] === 'sim' ? ('sim (' . $nfseNota['issqn_retido_por'] . ')') : 'nao');
+        }
+
+        $linhas[] = str_repeat('-', 90);
+        $linhas[] = 'ITENS';
+        $linhas[] = str_repeat('-', 90);
 
         foreach ($itensNota as $item) {
             $linhas[] = sprintf(
