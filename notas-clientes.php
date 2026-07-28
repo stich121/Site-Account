@@ -372,6 +372,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <div class="field">
                         <label for="cliente_codigo_ibge_municipio">Código IBGE do município</label>
                         <input id="cliente_codigo_ibge_municipio" name="cliente_codigo_ibge_municipio" type="text" inputmode="numeric" pattern="\d{7}" maxlength="7" value="<?php echo h($clienteEmEdicao['codigo_ibge_municipio'] ?? ''); ?>">
+                        <span class="muted" id="statusCodigoIbgeCliente" style="font-size: 0.78rem;"></span>
                     </div>
                     <div class="field">
                         <label for="cliente_codigo_pais">Código do país</label>
@@ -509,6 +510,51 @@ $usuario = h(nomeExibicao($usuarioRaw));
             });
         }
 
+        let municipiosIbge = [];
+        function normalizarTexto(valor) {
+            return String(valor || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').trim();
+        }
+        function buscarCodigoIbgePorNomeUf(nome, uf) {
+            const nomeNormalizado = normalizarTexto(nome);
+            const ufNormalizada = String(uf || '').toUpperCase().trim();
+            if (nomeNormalizado === '' || ufNormalizada === '') return '';
+            const municipio = municipiosIbge.find(function (item) {
+                return normalizarTexto(item.nome) === nomeNormalizado && String(item.uf).toUpperCase() === ufNormalizada;
+            });
+            return municipio ? String(municipio.codigo) : '';
+        }
+        function tentarPreencherCodigoIbge() {
+            const campoMunicipio = document.getElementById('cliente_municipio');
+            const campoUf = document.getElementById('cliente_uf');
+            const campoCodigo = document.getElementById('cliente_codigo_ibge_municipio');
+            const statusCodigo = document.getElementById('statusCodigoIbgeCliente');
+            if (!campoMunicipio || !campoUf || !campoCodigo) return;
+            if (campoCodigo.value.trim() !== '') return;
+            const codigo = buscarCodigoIbgePorNomeUf(campoMunicipio.value, campoUf.value);
+            if (codigo) {
+                campoCodigo.value = codigo;
+                if (statusCodigo) {
+                    statusCodigo.style.color = 'var(--primary)';
+                    statusCodigo.textContent = 'Preenchido automaticamente a partir do município/UF.';
+                }
+            } else if (statusCodigo && campoMunicipio.value.trim() !== '' && campoUf.value.trim() !== '') {
+                statusCodigo.style.color = '#FFD1CE';
+                statusCodigo.textContent = 'Não foi possível localizar automaticamente; confira o código oficial.';
+            }
+        }
+        fetch('ibge-municipios.json', { cache: 'force-cache' })
+            .then(function (resposta) { return resposta.ok ? resposta.json() : []; })
+            .then(function (municipios) {
+                municipiosIbge = Array.isArray(municipios) ? municipios : [];
+                tentarPreencherCodigoIbge();
+            })
+            .catch(function () { municipiosIbge = []; });
+
+        const campoMunicipioCliente = document.getElementById('cliente_municipio');
+        const campoUfCliente = document.getElementById('cliente_uf');
+        if (campoMunicipioCliente) campoMunicipioCliente.addEventListener('blur', tentarPreencherCodigoIbge);
+        if (campoUfCliente) campoUfCliente.addEventListener('blur', tentarPreencherCodigoIbge);
+
         if (btnBuscarCnpjCliente) {
             btnBuscarCnpjCliente.addEventListener('click', function () {
                 const statusEl = document.getElementById('statusBuscaCnpjCliente');
@@ -543,6 +589,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         document.getElementById('cliente_municipio').value = dados.municipio || '';
                         document.getElementById('cliente_codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
                         document.getElementById('cliente_uf').value = dados.uf || '';
+                        tentarPreencherCodigoIbge();
 
                         statusEl.style.color = 'var(--primary)';
                         statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de salvar.';
