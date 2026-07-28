@@ -1145,257 +1145,11 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg-main: #0A0A0A;
-            --bg-card: #161616;
-            --primary: #74C92C;
-            --primary-hover: #5EA522;
-            --danger: #FF453A;
-            --text-white: #FFFFFF;
-            --text-light: #F5F5F7;
-            --text-muted: #A1A1A6;
-            --border: rgba(255,255,255,0.1);
-            --font-titles: 'Montserrat', sans-serif;
-            --font-body: 'Inter', sans-serif;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            min-height: 100vh;
-            font-family: var(--font-body);
-            background: var(--bg-main);
-            color: var(--text-light);
-            padding: 2rem;
-        }
-
-        .shell { width: min(1180px, 100%); margin: 0 auto; }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .brand img { height: 34px; width: auto; display: block; }
-        a { color: inherit; text-decoration: none; }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        h1, h2, h3 {
-            font-family: var(--font-titles);
-            color: var(--text-white);
-            text-transform: uppercase;
-        }
-
-        h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 0.8rem; }
-        h2 { font-size: 1.25rem; margin-bottom: 1rem; }
-        h3 { font-size: 1rem; margin-bottom: 0.75rem; }
-        .muted { color: var(--text-muted); line-height: 1.6; }
-
-        .btn {
-            border: 0;
-            border-radius: 4px;
-            padding: 0.85rem 1rem;
-            color: var(--bg-main);
-            background: var(--primary);
-            font-family: var(--font-titles);
-            font-size: 0.82rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.45rem;
-        }
-
-        .btn:hover { background: var(--primary-hover); }
-
-        .btn-outline {
-            background: transparent;
-            color: var(--text-white);
-            border: 1px solid var(--border);
-        }
-
-        .menu-hamburguer { position: relative; }
-
-        .menu-dropdown {
-            position: absolute;
-            top: calc(100% + 0.5rem);
-            right: 0;
-            display: none;
-            flex-direction: column;
-            gap: 0.4rem;
-            min-width: 240px;
-            padding: 0.6rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-            z-index: 60;
-        }
-
-        .menu-dropdown.aberto { display: flex; }
-        .menu-dropdown .btn { justify-content: flex-start; width: 100%; }
-
-        .btn-danger {
-            background: transparent;
-            color: #FFD1CE;
-            border: 1px solid rgba(255, 69, 58, 0.35);
-        }
-
-        .btn-small { padding: 0.55rem 0.75rem; font-size: 0.72rem; }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1rem;
-        }
-
-        .field { display: grid; gap: 0.4rem; }
-        .field label { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
-
-        .field input,
-        .field select,
-        .field textarea {
-            width: 100%;
-            padding: 0.85rem;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            background: #0A0A0A;
-            color: var(--text-white);
-            font-family: var(--font-body);
-        }
-
-        .field textarea { resize: vertical; min-height: 4.5rem; }
-        .municipio-autocomplete,
-        .catalogo-autocomplete { position: relative; }
-        .municipio-sugestoes,
-        .catalogo-sugestoes {
-            position: absolute;
-            z-index: 30;
-            top: calc(100% - 1.2rem);
-            left: 0;
-            right: 0;
-            display: none;
-            max-height: 18rem;
-            overflow-y: auto;
-            padding: 0.35rem;
-            border: 1px solid var(--border);
-            border-radius: 0.65rem;
-            background: #111;
-            box-shadow: 0 16px 35px rgba(0, 0, 0, 0.38);
-        }
-        .municipio-sugestoes.aberto,
-        .catalogo-sugestoes.aberto { display: grid; }
-        .municipio-opcao,
-        .catalogo-opcao {
-            width: 100%;
-            padding: 0.65rem 0.75rem;
-            border: 0;
-            border-radius: 0.45rem;
-            color: var(--text);
-            background: transparent;
-            text-align: left;
-            cursor: pointer;
-        }
-        .municipio-opcao:hover,
-        .municipio-opcao:focus,
-        .catalogo-opcao:hover,
-        .catalogo-opcao:focus { background: rgba(201, 162, 39, 0.16); outline: none; }
-
-        .check-row {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            margin-top: 1.9rem;
-            color: var(--text-muted);
-            font-weight: 700;
-        }
-
-        .notice {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border-radius: 8px;
-            border: 1px solid rgba(116, 201, 44, 0.3);
-            background: rgba(116, 201, 44, 0.08);
-        }
-
-        .notice.error {
-            border-color: rgba(255, 69, 58, 0.35);
-            background: rgba(255, 69, 58, 0.08);
-            color: #FFD1CE;
-        }
-
-        .notice.warning {
-            border-color: rgba(255, 191, 0, 0.35);
-            background: rgba(255, 191, 0, 0.08);
-            color: #FFE8A3;
-        }
-
-        details.panel summary {
-            cursor: pointer;
-            font-family: var(--font-titles);
-            color: var(--text-white);
-            text-transform: uppercase;
-            font-size: 1.1rem;
-        }
-
-        details.panel[open] summary { margin-bottom: 1rem; }
-
-        .itens-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-        .itens-table th, .itens-table td { padding: 0.5rem; border-bottom: 1px solid var(--border); text-align: left; }
-        .itens-table th { color: var(--text-white); font-size: 0.72rem; text-transform: uppercase; font-family: var(--font-titles); }
-        .itens-table input, .itens-table select { width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border); background: #0A0A0A; color: var(--text-white); }
-
-        .row-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .totais { text-align: right; font-family: var(--font-titles); font-size: 1.1rem; color: var(--text-white); }
-
-        @media (max-width: 820px) {
-            body { padding: 1rem; }
-            .topbar { flex-direction: column; align-items: flex-start; }
-            .form-grid { grid-template-columns: 1fr; }
-            .btn { width: 100%; }
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/notas-fiscais.css">
 </head>
 <body>
     <div class="shell">
-        <header class="topbar">
-            <a class="brand" href="painel" aria-label="Voltar para o painel">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
-            </a>
-            <div class="menu-hamburguer">
-                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
-                    <i class="fa-solid fa-bars"></i> Menu
-                </button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                    <a class="btn btn-outline" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota fiscal</a>
-                    <a class="btn btn-outline" href="notas-emitir#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
-                    <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
-                    <?php if ($podeAdministrar): ?>
-                        <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
-                        <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
-                        <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
-                    <?php endif; ?>
-                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
-                </div>
-            </div>
-        </header>
+        <?php $paginaAtivaNotas = 'emitir'; include __DIR__ . '/includes/notas-nav.php'; ?>
 
         <section class="panel">
             <h1>Emitir Nota Fiscal</h1>
@@ -1569,7 +1323,9 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                     </div>
 
                     <div id="secaoNfe">
-                        <h3 style="margin-top: 1.5rem;">Itens (produtos)</h3>
+                        <details class="form-section" id="secaoItens" open>
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-boxes-stacked"></i> Itens (produtos)</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <table class="itens-table" id="tabelaItens">
                             <thead>
                                 <tr>
@@ -1589,10 +1345,29 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                         <button class="btn btn-outline btn-small" type="button" id="btnAddItem"><i class="fa-solid fa-plus"></i> Adicionar item</button>
 
                         <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
+                            </div>
+                        </details>
                     </div>
 
                     <div id="secaoNfse">
-                        <div class="form-grid" style="margin-top: 1.5rem;">
+                        <div class="form-jump" id="atalhosNfse">
+                            <button type="button" data-form-jump="secaoCompetencia"><i class="fa-solid fa-calendar-days"></i> Competência</button>
+                            <button type="button" data-form-jump="secaoTomador"><i class="fa-solid fa-user"></i> Tomador</button>
+                            <button type="button" data-form-jump="secaoIntermediario"><i class="fa-solid fa-people-arrows"></i> Intermediário</button>
+                            <button type="button" data-form-jump="secaoLocal"><i class="fa-solid fa-location-dot"></i> Local</button>
+                            <button type="button" data-form-jump="secaoServico"><i class="fa-solid fa-briefcase"></i> Serviço</button>
+                            <button type="button" data-form-jump="secaoIbscbs"><i class="fa-solid fa-scale-balanced"></i> IBS/CBS</button>
+                            <button type="button" data-form-jump="secaoComplementares"><i class="fa-solid fa-circle-info"></i> Complementares</button>
+                            <button type="button" data-form-jump="secaoValores"><i class="fa-solid fa-sack-dollar"></i> Valores</button>
+                            <button type="button" data-form-jump="secaoTributacaoMunicipal"><i class="fa-solid fa-city"></i> Trib. municipal</button>
+                            <button type="button" data-form-jump="secaoTributacaoFederal"><i class="fa-solid fa-landmark"></i> Trib. federal</button>
+                            <button type="button" data-form-jump="secaoTributosAproximados"><i class="fa-solid fa-percent"></i> Tributos aprox.</button>
+                        </div>
+
+                        <details class="form-section" id="secaoCompetencia" open>
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-calendar-days"></i> Competência e DPS</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
+                        <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_data_competencia">Data de competência</label>
                                 <input id="nfse_data_competencia" name="nfse_data_competencia" type="date" value="<?php echo h(date('Y-m-d')); ?>">
@@ -1612,8 +1387,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_numero_dps" name="nfse_numero_dps" type="text" maxlength="15">
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Tomador do serviço</h3>
+                        <details class="form-section" id="secaoTomador" open>
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-user"></i> Tomador do serviço</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <p class="muted" style="margin-bottom: 0.75rem;">Documento, nome e e-mail do tomador vêm do cliente destinatário selecionado acima.</p>
                         <div class="form-grid">
                             <div class="field">
@@ -1633,8 +1412,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_tomador_telefone" name="nfse_tomador_telefone" type="text">
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Intermediário do serviço</h3>
+                        <details class="form-section" id="secaoIntermediario">
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-people-arrows"></i> Intermediário do serviço</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <label class="check-row" style="margin-top: 0;">
                             <input type="checkbox" id="nfse_intermediario_incluido" name="nfse_intermediario_incluido">
                             Esta NFS-e tem intermediário
@@ -1656,8 +1439,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_intermediario_nome" name="nfse_intermediario_nome" type="text">
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Local da prestação do serviço</h3>
+                        <details class="form-section" id="secaoLocal" open>
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-location-dot"></i> Local da prestação do serviço</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_pais_prestacao">País</label>
@@ -1671,8 +1458,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <span class="muted" id="nfse_municipio_prestacao_status" style="font-size: 0.78rem;">Pesquise pelo início do nome e selecione o município.</span>
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Serviço prestado</h3>
+                        <details class="form-section" id="secaoServico" open>
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-briefcase"></i> Serviço prestado</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116)</label>
@@ -1705,8 +1496,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <textarea id="nfse_descricao_servico" name="nfse_descricao_servico" maxlength="2000" placeholder="Descreva o serviço prestado"></textarea>
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">IBS/CBS — Reforma Tributária (NT 004)</h3>
+                        <details class="form-section" id="secaoIbscbs">
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-scale-balanced"></i> IBS/CBS — Reforma Tributária (NT 004)</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <p class="muted">Pesquise e selecione os códigos das tabelas oficiais. Ao escolher a classificação tributária, o CST correspondente é preenchido automaticamente.</p>
                         <div class="form-grid">
                             <div class="field"><label for="nfse_ibscbs_finalidade">Finalidade</label><select id="nfse_ibscbs_finalidade" name="nfse_ibscbs_finalidade"><option value="0" selected>0 - NFS-e regular</option><option value="1">1 - Crédito</option><option value="2">2 - Débito</option></select></div>
@@ -1728,8 +1523,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <span class="muted" id="nfse_ibscbs_classificacao_tributaria_status" style="font-size: 0.78rem;">Selecione uma opção vigente e permitida para NFS-e.</span>
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Informações complementares</h3>
+                        <details class="form-section" id="secaoComplementares">
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-circle-info"></i> Informações complementares</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_documento_responsabilidade_tecnica">Nº do documento de responsabilidade técnica</label>
@@ -1748,8 +1547,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <textarea id="nfse_informacoes_complementares" name="nfse_informacoes_complementares" maxlength="2000"></textarea>
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Valores do serviço prestado</h3>
+                        <details class="form-section" id="secaoValores" open>
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-sack-dollar"></i> Valores do serviço prestado</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_valor_servico">Valor do serviço prestado</label>
@@ -1768,11 +1571,13 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_desconto_condicionado" name="nfse_desconto_condicionado" type="text">
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Tributação municipal</h3>
+                        <details class="form-section" id="secaoTributacaoMunicipal">
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-city"></i> Tributação municipal</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
-
-
                             <div class="field">
                                 <label for="nfse_exigibilidade_suspensa">A exigibilidade do ISSQN está suspensa?</label>
                                 <select id="nfse_exigibilidade_suspensa" name="nfse_exigibilidade_suspensa">
@@ -1809,8 +1614,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_deducao_reducao_base" name="nfse_deducao_reducao_base" type="text">
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Tributação federal</h3>
+                        <details class="form-section" id="secaoTributacaoFederal">
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-landmark"></i> Tributação federal</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_situacao_pis_cofins">Situação Tributária do PIS/COFINS</label>
@@ -1846,8 +1655,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_contribuicao_previdenciaria_retida" name="nfse_contribuicao_previdenciaria_retida" type="text">
                             </div>
                         </div>
+                            </div>
+                        </details>
 
-                        <h3 style="margin-top: 1.5rem;">Valor aproximado dos tributos</h3>
+                        <details class="form-section" id="secaoTributosAproximados">
+                            <summary><span class="form-section-titulo"><i class="fa-solid fa-percent"></i> Valor aproximado dos tributos</span><i class="fa-solid fa-chevron-down"></i></summary>
+                            <div class="form-section-corpo">
                         <div class="form-grid">
                             <div class="field">
                                 <label for="nfse_tributos_modo">Como informar</label>
@@ -1885,6 +1698,8 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 <input id="nfse_tributos_municipal_valor" name="nfse_tributos_municipal_valor" type="text">
                             </div>
                         </div>
+                            </div>
+                        </details>
                     </div>
 
                     <div style="margin-top: 1.5rem;">
@@ -2327,6 +2142,15 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                 if (opcao && opcao.dataset.ibge) selecionarMunicipioPorCodigo(opcao.dataset.ibge);
             });
         }
+
+        document.querySelectorAll('[data-form-jump]').forEach(function (botao) {
+            botao.addEventListener('click', function () {
+                const alvo = document.getElementById(botao.dataset.formJump);
+                if (!alvo) return;
+                alvo.open = true;
+                alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
 
         const tipoNotaSelect = document.getElementById('tipo_nota');
         const secaoNfe = document.getElementById('secaoNfe');

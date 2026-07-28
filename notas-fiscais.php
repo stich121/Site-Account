@@ -755,183 +755,11 @@ $usuario = h(nomeExibicao($usuarioRaw));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg-main: #0A0A0A;
-            --bg-card: #161616;
-            --primary: #74C92C;
-            --primary-hover: #5EA522;
-            --danger: #FF453A;
-            --text-white: #FFFFFF;
-            --text-light: #F5F5F7;
-            --text-muted: #A1A1A6;
-            --border: rgba(255,255,255,0.1);
-            --font-titles: 'Montserrat', sans-serif;
-            --font-body: 'Inter', sans-serif;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            min-height: 100vh;
-            font-family: var(--font-body);
-            background: var(--bg-main);
-            color: var(--text-light);
-            padding: 2rem;
-        }
-
-        .shell { width: min(1180px, 100%); margin: 0 auto; }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .brand img { height: 34px; width: auto; display: block; }
-        a { color: inherit; text-decoration: none; }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        h1, h2, h3 {
-            font-family: var(--font-titles);
-            color: var(--text-white);
-            text-transform: uppercase;
-        }
-
-        h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 0.8rem; }
-        h2 { font-size: 1.25rem; margin-bottom: 1rem; }
-        h3 { font-size: 1rem; margin-bottom: 0.75rem; }
-        .muted { color: var(--text-muted); line-height: 1.6; }
-
-        .btn {
-            border: 0;
-            border-radius: 4px;
-            padding: 0.85rem 1rem;
-            color: var(--bg-main);
-            background: var(--primary);
-            font-family: var(--font-titles);
-            font-size: 0.82rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.45rem;
-        }
-
-        .btn:hover { background: var(--primary-hover); }
-
-        .btn-outline {
-            background: transparent;
-            color: var(--text-white);
-            border: 1px solid var(--border);
-        }
-
-        .menu-hamburguer { position: relative; }
-
-        .menu-dropdown {
-            position: absolute;
-            top: calc(100% + 0.5rem);
-            right: 0;
-            display: none;
-            flex-direction: column;
-            gap: 0.4rem;
-            min-width: 240px;
-            padding: 0.6rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-            z-index: 60;
-        }
-
-        .menu-dropdown.aberto { display: flex; }
-        .menu-dropdown .btn { justify-content: flex-start; width: 100%; }
-
-        .btn-danger {
-            background: transparent;
-            color: #FFD1CE;
-            border: 1px solid rgba(255, 69, 58, 0.35);
-        }
-
-        .btn-small { padding: 0.55rem 0.75rem; font-size: 0.72rem; }
-
-        .notice {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border-radius: 8px;
-            border: 1px solid rgba(116, 201, 44, 0.3);
-            background: rgba(116, 201, 44, 0.08);
-        }
-
-        .notice.error {
-            border-color: rgba(255, 69, 58, 0.35);
-            background: rgba(255, 69, 58, 0.08);
-            color: #FFD1CE;
-        }
-
-        .notice.warning {
-            border-color: rgba(255, 191, 0, 0.35);
-            background: rgba(255, 191, 0, 0.08);
-            color: #FFE8A3;
-        }
-
-        .table-wrap { overflow-x: auto; }
-        table.lista { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 0.9rem; }
-        table.lista th, table.lista td { padding: 0.8rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-        table.lista th { color: var(--text-white); font-family: var(--font-titles); font-size: 0.75rem; text-transform: uppercase; }
-        .status-pill { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
-        .status-rascunho { background: rgba(161, 161, 166, 0.18); color: var(--text-muted); }
-        .status-pendente_envio { background: rgba(255, 191, 0, 0.15); color: #FFE8A3; }
-        .status-autorizada { background: rgba(116, 201, 44, 0.15); color: var(--primary); }
-        .status-rejeitada,
-        .status-cancelada { background: rgba(255, 69, 58, 0.15); color: #FFD1CE; }
-        .row-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-
-        @media (max-width: 820px) {
-            body { padding: 1rem; }
-            .topbar { flex-direction: column; align-items: flex-start; }
-            .btn { width: 100%; }
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/notas-fiscais.css">
 </head>
 <body>
     <div class="shell">
-        <header class="topbar">
-            <a class="brand" href="painel" aria-label="Voltar para o painel">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
-            </a>
-            <div class="menu-hamburguer">
-                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
-                    <i class="fa-solid fa-bars"></i> Menu
-                </button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                    <a class="btn btn-outline" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota fiscal</a>
-                    <a class="btn btn-outline" href="notas-emitir#cadastroCliente"><i class="fa-solid fa-user-plus"></i> Cadastrar clientes</a>
-                    <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
-                    <?php if ($podeAdministrar): ?>
-                        <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
-                        <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
-                        <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
-                    <?php endif; ?>
-                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
-                </div>
-            </div>
-        </header>
+        <?php $paginaAtivaNotas = 'notas'; include __DIR__ . '/includes/notas-nav.php'; ?>
 
         <section class="panel">
             <h1>Notas Fiscais</h1>
@@ -999,26 +827,41 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                     <?php endif; ?>
                                 </td>
                                 <td>
+                                    <?php $podeEditarNota = $nota['tipo_nota'] === 'nfse' && ($nota['status'] === 'rascunho' || ($nota['status'] === 'rejeitada' && str_starts_with((string) ($nota['motivo_rejeicao'] ?? ''), 'DPS não transmitida:'))); ?>
+                                    <?php
+                                        $temMaisAcoes = ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada')
+                                            || $nota['status'] === 'rascunho'
+                                            || ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada' && !$podeEditarNota)
+                                            || in_array($nota['status'], ['rascunho', 'pendente_envio'], true);
+                                    ?>
                                     <div class="row-actions">
-                                        <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Conferência</a>
-                                        <?php $podeEditarNota = $nota['tipo_nota'] === 'nfse' && ($nota['status'] === 'rascunho' || ($nota['status'] === 'rejeitada' && str_starts_with((string) ($nota['motivo_rejeicao'] ?? ''), 'DPS não transmitida:'))); ?>
                                         <?php if ($podeEditarNota): ?>
                                             <a class="btn btn-outline btn-small" href="notas-emitir?editar=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
                                         <?php endif; ?>
-                                        <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada'): ?>
-                                            <a class="btn btn-outline btn-small" href="notas-fiscais?xml=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-code"></i> XML fiscal</a>
-                                            <a class="btn btn-outline btn-small" href="notas-fiscais?danfse=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFSe</a>
-                                            <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="consultar"><button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-rotate"></i> Consultar</button></form>
-                                            <form method="post" onsubmit="return prepararCancelamentoFiscal(this);"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="cancelar_nfse"><input type="hidden" name="motivo_cancelamento" value=""><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar NFS-e</button></form>
-                                        <?php endif; ?>
-                                        <?php if ($nota['status'] === 'rascunho'): ?>
-                                            <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="marcar_pendente"><button class="btn btn-small" type="submit"><i class="fa-solid fa-paper-plane"></i> Pronta p/ envio</button></form>
-                                        <?php endif; ?>
-                                        <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada' && !$podeEditarNota): ?>
-                                            <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="reprocessar"><button class="btn btn-small" type="submit"><i class="fa-solid fa-rotate-right"></i> Reprocessar</button></form>
-                                        <?php endif; ?>
-                                        <?php if (in_array($nota['status'], ['rascunho', 'pendente_envio'], true)): ?>
-                                            <form method="post" onsubmit="return confirm('Descartar este documento local? Nenhum cancelamento fiscal será enviado.');"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="descartar"><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-trash"></i> Descartar</button></form>
+                                        <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Conferência</a>
+                                        <?php if ($temMaisAcoes): ?>
+                                            <div class="acoes-menu">
+                                                <button class="btn btn-outline btn-small" type="button" data-acoes-toggle aria-haspopup="true" aria-expanded="false" aria-label="Mais ações desta nota"><i class="fa-solid fa-ellipsis"></i> Mais ações</button>
+                                                <div class="acoes-menu-dropdown">
+                                                    <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada'): ?>
+                                                        <a class="btn btn-outline btn-small" href="notas-fiscais?xml=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-code"></i> XML fiscal</a>
+                                                        <a class="btn btn-outline btn-small" href="notas-fiscais?danfse=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFSe</a>
+                                                        <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="consultar"><button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-rotate"></i> Consultar</button></form>
+                                                    <?php endif; ?>
+                                                    <?php if ($nota['status'] === 'rascunho'): ?>
+                                                        <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="marcar_pendente"><button class="btn btn-small" type="submit"><i class="fa-solid fa-paper-plane"></i> Pronta p/ envio</button></form>
+                                                    <?php endif; ?>
+                                                    <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada' && !$podeEditarNota): ?>
+                                                        <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="reprocessar"><button class="btn btn-small" type="submit"><i class="fa-solid fa-rotate-right"></i> Reprocessar</button></form>
+                                                    <?php endif; ?>
+                                                    <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada'): ?>
+                                                        <form method="post" onsubmit="return prepararCancelamentoFiscal(this);"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="cancelar_nfse"><input type="hidden" name="motivo_cancelamento" value=""><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar NFS-e</button></form>
+                                                    <?php endif; ?>
+                                                    <?php if (in_array($nota['status'], ['rascunho', 'pendente_envio'], true)): ?>
+                                                        <form method="post" onsubmit="return confirm('Descartar este documento local? Nenhum cancelamento fiscal será enviado.');"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="descartar"><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-trash"></i> Descartar</button></form>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -1049,6 +892,31 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 }
             });
         }
+
+        document.addEventListener('click', function (evento) {
+            const botaoAlvo = evento.target.closest('[data-acoes-toggle]');
+            const menusAbertos = document.querySelectorAll('.acoes-menu-dropdown.aberto');
+            if (botaoAlvo) {
+                evento.stopPropagation();
+                const menu = botaoAlvo.closest('.acoes-menu').querySelector('.acoes-menu-dropdown');
+                const jaAberto = menu.classList.contains('aberto');
+                menusAbertos.forEach((m) => m.classList.remove('aberto'));
+                if (!jaAberto) {
+                    menu.classList.add('aberto');
+                    botaoAlvo.setAttribute('aria-expanded', 'true');
+                } else {
+                    botaoAlvo.setAttribute('aria-expanded', 'false');
+                }
+                return;
+            }
+            if (!evento.target.closest('.acoes-menu-dropdown')) {
+                menusAbertos.forEach((m) => {
+                    m.classList.remove('aberto');
+                    const botao = m.closest('.acoes-menu').querySelector('[data-acoes-toggle]');
+                    if (botao) botao.setAttribute('aria-expanded', 'false');
+                });
+            }
+        });
 
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
