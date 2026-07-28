@@ -695,7 +695,16 @@ try {
             if ($tipoNota === 'nfse') {
                 $numerico = static function (string $campo): ?float {
                     $valor = trim((string) ($_POST[$campo] ?? ''));
-                    return $valor !== '' ? (float) str_replace(',', '.', $valor) : null;
+                    if ($valor === '') {
+                        return null;
+                    }
+                    // Aceita tanto "1.234,56" (com separador de milhar) quanto "1234.56"
+                    // (valor vindo de preenchimento programático em JS, decimal com ponto).
+                    if (str_contains($valor, ',')) {
+                        $valor = str_replace('.', '', $valor);
+                        $valor = str_replace(',', '.', $valor);
+                    }
+                    return (float) $valor;
                 };
 
                 $dataCompetencia = trim($_POST['nfse_data_competencia'] ?? '') !== '' ? trim($_POST['nfse_data_competencia']) : $dataEmissao;
@@ -1756,7 +1765,41 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
             if (cindopBusca && nfse.ibscbs_codigo_indicador_operacao) cindopBusca.value = nfse.ibscbs_codigo_indicador_operacao;
             const cclassBusca = document.getElementById('nfse_ibscbs_classificacao_tributaria_busca');
             if (cclassBusca && nfse.ibscbs_classificacao_tributaria) cclassBusca.value = nfse.ibscbs_classificacao_tributaria;
+            CAMPOS_MOEDA_NFSE.forEach(function (id) { formatarCampoMoeda(document.getElementById(id)); });
         }
+
+        const CAMPOS_MOEDA_NFSE = [
+            'nfse_valor_servico',
+            'nfse_valor_recebido_intermediario',
+            'nfse_desconto_incondicionado',
+            'nfse_desconto_condicionado',
+            'nfse_deducao_reducao_base',
+            'nfse_irrf',
+            'nfse_contribuicoes_sociais_retidas',
+            'nfse_contribuicao_previdenciaria_retida',
+            'nfse_tributos_federal_valor',
+            'nfse_tributos_estadual_valor',
+            'nfse_tributos_municipal_valor'
+        ];
+
+        function formatarCampoMoeda(campo) {
+            if (!campo) return;
+            const bruto = campo.value.trim();
+            if (bruto === '') return;
+            const normalizado = bruto.includes(',') ? bruto.replace(/\./g, '').replace(',', '.') : bruto;
+            const numero = parseFloat(normalizado);
+            if (!isFinite(numero)) return;
+            campo.value = numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        CAMPOS_MOEDA_NFSE.forEach(function (id) {
+            const campo = document.getElementById(id);
+            if (!campo) return;
+            campo.setAttribute('inputmode', 'decimal');
+            campo.addEventListener('blur', function () { formatarCampoMoeda(campo); });
+            formatarCampoMoeda(campo);
+        });
+
         aplicarDadosEdicao();
 
         function formatarCnpjOuCpf(valor, tipoPessoa) {
