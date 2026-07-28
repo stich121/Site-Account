@@ -584,10 +584,8 @@ try {
         $stmtEdicao = $dbNotas->prepare($sqlEdicao);
         $stmtEdicao->execute($paramsEdicao);
         $candidataEdicao = $stmtEdicao->fetch() ?: null;
-        $rejeicaoLocal = $candidataEdicao && $candidataEdicao['status'] === 'rejeitada'
-            && str_starts_with((string) ($candidataEdicao['motivo_rejeicao'] ?? ''), 'DPS não transmitida:');
-        if (!$candidataEdicao || $candidataEdicao['tipo_nota'] !== 'nfse' || !($candidataEdicao['status'] === 'rascunho' || $rejeicaoLocal)) {
-            $erro = 'Esta nota não pode ser editada. Somente rascunhos e NFS-e rejeitadas antes da transmissão podem ser corrigidos.';
+        if (!$candidataEdicao || $candidataEdicao['tipo_nota'] !== 'nfse' || !in_array($candidataEdicao['status'], ['rascunho', 'rejeitada'], true)) {
+            $erro = 'Esta nota não pode ser editada. Somente rascunhos e NFS-e rejeitadas podem ser corrigidos.';
         } else {
             $notaEmEdicao = $candidataEdicao;
             $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
@@ -908,9 +906,7 @@ try {
                         $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais WHERE id = :id FOR UPDATE');
                         $stmt->execute(['id' => $notaEdicaoId]);
                         $notaBloqueada = $stmt->fetch();
-                        $rejeicaoLocalBloqueada = $notaBloqueada && $notaBloqueada['status'] === 'rejeitada'
-                            && str_starts_with((string) ($notaBloqueada['motivo_rejeicao'] ?? ''), 'DPS não transmitida:');
-                        if (!$notaBloqueada || !($notaBloqueada['status'] === 'rascunho' || $rejeicaoLocalBloqueada)) {
+                        if (!$notaBloqueada || !in_array($notaBloqueada['status'], ['rascunho', 'rejeitada'], true)) {
                             throw new RuntimeException('A nota mudou de estado e não pode mais ser editada.');
                         }
                         if (!$podeAdministrar && (int) $notaBloqueada['funcionario_id'] !== $funcionarioId) {

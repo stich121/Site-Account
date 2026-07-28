@@ -830,7 +830,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php $podeEditarNota = $nota['tipo_nota'] === 'nfse' && ($nota['status'] === 'rascunho' || ($nota['status'] === 'rejeitada' && str_starts_with((string) ($nota['motivo_rejeicao'] ?? ''), 'DPS não transmitida:'))); ?>
+                                    <?php $podeEditarNota = $nota['tipo_nota'] === 'nfse' && ($nota['status'] === 'rascunho' || $nota['status'] === 'rejeitada'); ?>
                                     <?php
                                         $temMaisAcoes = ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada')
                                             || $nota['status'] === 'rascunho'
