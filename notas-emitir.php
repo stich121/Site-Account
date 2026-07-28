@@ -140,6 +140,7 @@ function prepararTabelaNotasClientes(PDO $db): void
             nome_razao_social VARCHAR(180) NOT NULL,
             cnpj_cpf VARCHAR(20) NULL,
             inscricao_estadual VARCHAR(30) NULL,
+            inscricao_municipal VARCHAR(20) NULL,
             email VARCHAR(180) NULL,
             logradouro VARCHAR(180) NULL,
             numero VARCHAR(20) NULL,
@@ -340,6 +341,15 @@ function prepararColunasFase3bNotasFiscaisNfse(PDO $db): void
     }
 }
 
+function prepararColunaInscricaoMunicipalClientes(PDO $db): void
+{
+    // Guarda a última Inscrição Municipal informada para o cliente, para
+    // autopreencher o campo do tomador da próxima vez que ele for selecionado/buscado.
+    if (!colunaExisteNotas($db, 'notas_clientes', 'inscricao_municipal')) {
+        $db->exec('ALTER TABLE notas_clientes ADD COLUMN inscricao_municipal VARCHAR(20) NULL AFTER inscricao_estadual');
+    }
+}
+
 function prepararTabelaNotasFiscaisLog(PDO $db): void
 {
     $db->exec(
@@ -383,6 +393,7 @@ try {
     prepararTabelaNotasFiscaisItens($dbNotas);
     prepararTabelaNotasFiscaisNfse($dbNotas);
     prepararColunasFase3bNotasFiscaisNfse($dbNotas);
+    prepararColunaInscricaoMunicipalClientes($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);
@@ -729,6 +740,14 @@ try {
                              )'
                         );
                         $stmtNfse->execute(array_merge(['nota_id' => $notaId], $dadosNfse));
+
+                        if ($dadosNfse['tomador_inscricao_municipal'] !== null) {
+                            $dbNotas->prepare('UPDATE notas_clientes SET inscricao_municipal = :inscricao_municipal WHERE id = :cliente_id')
+                                ->execute([
+                                    'inscricao_municipal' => $dadosNfse['tomador_inscricao_municipal'],
+                                    'cliente_id' => $clienteId,
+                                ]);
+                        }
                     }
 
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, 'criada', 'Rascunho criado com ' . count($itensValidos) . ' item(ns).');
@@ -746,7 +765,7 @@ try {
     $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
     $empresasAtivas = $stmt->fetchAll();
 
-    $stmt = $dbNotas->query('SELECT id, nome_razao_social, cnpj_cpf, municipio, uf FROM notas_clientes ORDER BY nome_razao_social ASC');
+    $stmt = $dbNotas->query('SELECT id, nome_razao_social, cnpj_cpf, municipio, uf, inscricao_municipal FROM notas_clientes ORDER BY nome_razao_social ASC');
     $clientes = $stmt->fetchAll();
 
     $stmt = $dbNotas->query(
@@ -1117,7 +1136,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                             <select id="cliente_id" name="cliente_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($clientes as $cliente): ?>
-                                    <option value="<?php echo h((string) $cliente['id']); ?>" data-documento="<?php echo h(preg_replace('/\D/', '', (string) ($cliente['cnpj_cpf'] ?? ''))); ?>"><?php echo h($cliente['nome_razao_social'] . (($cliente['cnpj_cpf'] ?? '') !== '' ? ' - ' . $cliente['cnpj_cpf'] : '')); ?></option>
+                                    <option value="<?php echo h((string) $cliente['id']); ?>" data-documento="<?php echo h(preg_replace('/\D/', '', (string) ($cliente['cnpj_cpf'] ?? ''))); ?>" data-inscricao-municipal="<?php echo h((string) ($cliente['inscricao_municipal'] ?? '')); ?>"><?php echo h($cliente['nome_razao_social'] . (($cliente['cnpj_cpf'] ?? '') !== '' ? ' - ' . $cliente['cnpj_cpf'] : '')); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -1599,6 +1618,16 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                 if (evento.key === 'Enter') {
                     evento.preventDefault();
                     buscarClientePorDocumento();
+                }
+            });
+        }
+
+        if (selectClienteId) {
+            selectClienteId.addEventListener('change', function () {
+                const opcaoSelecionada = selectClienteId.options[selectClienteId.selectedIndex];
+                const campoInscricaoMunicipal = document.getElementById('nfse_tomador_inscricao_municipal');
+                if (campoInscricaoMunicipal && opcaoSelecionada) {
+                    campoInscricaoMunicipal.value = opcaoSelecionada.dataset.inscricaoMunicipal || '';
                 }
             });
         }

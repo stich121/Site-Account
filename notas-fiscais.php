@@ -200,6 +200,7 @@ function prepararTabelaNotasClientes(PDO $db): void
             nome_razao_social VARCHAR(180) NOT NULL,
             cnpj_cpf VARCHAR(20) NULL,
             inscricao_estadual VARCHAR(30) NULL,
+            inscricao_municipal VARCHAR(20) NULL,
             email VARCHAR(180) NULL,
             logradouro VARCHAR(180) NULL,
             numero VARCHAR(20) NULL,
@@ -400,6 +401,13 @@ function prepararColunasFase3bNotasFiscaisNfse(PDO $db): void
     }
 }
 
+function prepararColunaInscricaoMunicipalClientes(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'notas_clientes', 'inscricao_municipal')) {
+        $db->exec('ALTER TABLE notas_clientes ADD COLUMN inscricao_municipal VARCHAR(20) NULL AFTER inscricao_estadual');
+    }
+}
+
 function prepararTabelaNotasFiscaisLog(PDO $db): void
 {
     $db->exec(
@@ -454,6 +462,7 @@ try {
     prepararTabelaNotasFiscaisItens($dbNotas);
     prepararTabelaNotasFiscaisNfse($dbNotas);
     prepararColunasFase3bNotasFiscaisNfse($dbNotas);
+    prepararColunaInscricaoMunicipalClientes($dbNotas);
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);

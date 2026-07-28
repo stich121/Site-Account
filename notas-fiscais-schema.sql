@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS notas_clientes (
     nome_razao_social VARCHAR(180) NOT NULL,
     cnpj_cpf VARCHAR(20) NULL,
     inscricao_estadual VARCHAR(30) NULL,
+    inscricao_municipal VARCHAR(20) NULL,
     email VARCHAR(180) NULL,
     logradouro VARCHAR(180) NULL,
     numero VARCHAR(20) NULL,
@@ -255,3 +256,11 @@ ALTER TABLE notas_fiscais_nfse
 
 ALTER TABLE notas_fiscais_nfse
     ADD COLUMN IF NOT EXISTS codigo_interno_contribuinte VARCHAR(60) NULL AFTER codigo_tributacao_municipal;
+
+-- ============================================================
+-- FASE 3c — memoriza a Inscricao Municipal do tomador por cliente, para
+-- autopreencher o campo na proxima vez que o cliente for buscado/selecionado.
+-- ============================================================
+
+ALTER TABLE notas_clientes
+    ADD COLUMN IF NOT EXISTS inscricao_municipal VARCHAR(20) NULL AFTER inscricao_estadual;
