@@ -7,7 +7,7 @@ $viaCli = PHP_SAPI === 'cli';
 
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
-require_once __DIR__ . '/nfse-nacional-integracao.php';
+require_once __DIR__ . '/nfse-operacoes.php';
 
 function h(string $valor): string
 {
@@ -40,65 +40,109 @@ function buscarNotasPendentesNfse(PDO $dbNotas): array
     return $stmt->fetchAll();
 }
 
-function processarNotaNfse(PDO $dbNotas, array $notaResumo, int $operadorId): array
+function obterLockNotaNfse(PDO $dbNotas, int $notaId): bool
 {
-    $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais WHERE id = :id LIMIT 1');
-    $stmt->execute(['id' => $notaResumo['id']]);
-    $nota = $stmt->fetch();
-
-    $stmt = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
-    $stmt->execute(['id' => $notaResumo['empresa_emissora_id']]);
-    $empresa = $stmt->fetch();
-
-    $stmt = $dbNotas->prepare('SELECT * FROM notas_clientes WHERE id = :id LIMIT 1');
-    $stmt->execute(['id' => $notaResumo['cliente_id']]);
-    $cliente = $stmt->fetch();
-
-    $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_itens WHERE nota_id = :nota_id ORDER BY id ASC');
-    $stmt->execute(['nota_id' => $notaResumo['id']]);
-    $itens = $stmt->fetchAll();
-
-    $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
-    $stmt->execute(['nota_id' => $notaResumo['id']]);
-    $nfse = $stmt->fetch() ?: null;
-
-    if (!$nota || !$empresa || !$cliente || empty($itens)) {
-        return ['sucesso' => false, 'motivo_rejeicao' => 'Nota, empresa, cliente ou itens não encontrados.'];
-    }
-
-    $dps = dpsAPartirDaNota($nota, $empresa, $cliente, $itens, $nfse);
-    $resultado = enviarNfseNacional($dps, $nota['ambiente'], $empresa);
-
-    if ($resultado['status'] !== 'pendente_envio') {
-        $stmt = $dbNotas->prepare(
-            'UPDATE notas_fiscais
-             SET status = :status, chave_acesso = :chave_acesso, protocolo_autorizacao = :protocolo_autorizacao,
-                 xml_gerado = :xml_gerado, motivo_rejeicao = :motivo_rejeicao
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'status' => $resultado['status'],
-            'chave_acesso' => $resultado['chave_acesso'],
-            'protocolo_autorizacao' => $resultado['protocolo_autorizacao'],
-            'xml_gerado' => $resultado['xml_gerado'],
-            'motivo_rejeicao' => $resultado['motivo_rejeicao'],
-            'id' => $notaResumo['id'],
-        ]);
-
-        registrarLogNota(
-            $dbNotas,
-            $notaResumo['id'],
-            $operadorId,
-            $resultado['sucesso'] ? 'autorizada' : 'rejeitada',
-            $resultado['sucesso']
-                ? ('Chave de acesso: ' . $resultado['chave_acesso'])
-                : ('Rejeitada: ' . $resultado['motivo_rejeicao'])
-        );
-    }
-
-    return $resultado;
+    $stmt = $dbNotas->prepare('SELECT GET_LOCK(:nome, 0)');
+    $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
+    return (int) $stmt->fetchColumn() === 1;
 }
 
+function liberarLockNotaNfse(PDO $dbNotas, int $notaId): void
+{
+    $stmt = $dbNotas->prepare('SELECT RELEASE_LOCK(:nome)');
+    $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
+}
+
+function quantidadeTentativasNotaNfse(PDO $dbNotas, int $notaId): int
+{
+    $stmt = $dbNotas->prepare("SELECT COUNT(*) FROM notas_fiscais_log WHERE nota_id = :nota_id AND acao IN ('tentativa_envio', 'reconciliacao_dps')");
+    $stmt->execute(['nota_id' => $notaId]);
+    return (int) $stmt->fetchColumn();
+}
+
+function processarNotaNfse(PDO $dbNotas, array $notaResumo, int $operadorId): array
+{
+    $notaId = (int) $notaResumo['id'];
+    if (!obterLockNotaNfse($dbNotas, $notaId)) {
+        return ['sucesso' => false, 'status' => 'pendente_envio', 'motivo_rejeicao' => 'Nota já está sendo processada por outro trabalhador.', 'ignorada' => true];
+    }
+
+    try {
+        $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $notaId]);
+        $nota = $stmt->fetch();
+        if (!$nota || $nota['status'] !== 'pendente_envio' || $nota['tipo_nota'] !== 'nfse') {
+            return ['sucesso' => false, 'status' => $nota['status'] ?? 'pendente_envio', 'motivo_rejeicao' => 'Nota deixou de estar pendente antes do processamento.', 'ignorada' => true];
+        }
+
+        $stmt = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $nota['empresa_emissora_id']]);
+        $empresa = $stmt->fetch();
+        $stmt = $dbNotas->prepare('SELECT * FROM notas_clientes WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $nota['cliente_id']]);
+        $cliente = $stmt->fetch();
+        $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_itens WHERE nota_id = :nota_id ORDER BY id ASC');
+        $stmt->execute(['nota_id' => $notaId]);
+        $itens = $stmt->fetchAll();
+        $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
+        $stmt->execute(['nota_id' => $notaId]);
+        $nfse = $stmt->fetch() ?: null;
+        if (!$empresa || !$cliente || empty($itens)) {
+            $motivo = 'Empresa, cliente ou itens não encontrados.';
+            $dbNotas->prepare('UPDATE notas_fiscais SET status = \'rejeitada\', motivo_rejeicao = :motivo WHERE id = :id AND status = \'pendente_envio\'')->execute(['motivo' => $motivo, 'id' => $notaId]);
+            registrarLogNota($dbNotas, $notaId, $operadorId, 'rejeitada', $motivo);
+            return ['sucesso' => false, 'status' => 'rejeitada', 'motivo_rejeicao' => $motivo];
+        }
+
+        $tentativa = quantidadeTentativasNotaNfse($dbNotas, $notaId) + 1;
+        registrarLogNota($dbNotas, $notaId, $operadorId, 'tentativa_envio', 'Tentativa #' . $tentativa . ' iniciada com lock exclusivo.');
+        $dps = dpsAPartirDaNota($nota, $empresa, $cliente, $itens, $nfse);
+        $idDps = (string) ($dps['idDps'] ?? '');
+
+        try {
+            $reconciliada = reconciliarDpsNfse($empresa, $nota['ambiente'], $idDps);
+        } catch (Throwable $e) {
+            registrarLogNota($dbNotas, $notaId, $operadorId, 'reconciliacao_dps', mb_substr('Consulta inconclusiva: ' . $e->getMessage(), 0, 255));
+            return ['sucesso' => false, 'status' => 'pendente_envio', 'motivo_rejeicao' => 'Não foi seguro retransmitir: ' . $e->getMessage()];
+        }
+
+        if ($reconciliada !== null) {
+            $resultado = ['sucesso' => true, 'status' => 'autorizada', 'motivo_rejeicao' => null, 'chave_acesso' => $reconciliada['chave_acesso'], 'protocolo_autorizacao' => null, 'xml_gerado' => $reconciliada['xml']];
+            registrarLogNota($dbNotas, $notaId, $operadorId, 'reconciliacao_dps', 'DPS já existente reconciliada sem retransmissão.');
+        } else {
+            $resultado = enviarNfseNacional($dps, $nota['ambiente'], $empresa);
+            if (($resultado['sucesso'] ?? false) && empty($resultado['xml_gerado'])) {
+                try {
+                    $posEmissao = reconciliarDpsNfse($empresa, $nota['ambiente'], $idDps);
+                    if ($posEmissao !== null) {
+                        $resultado['chave_acesso'] = $posEmissao['chave_acesso'];
+                        $resultado['xml_gerado'] = $posEmissao['xml'];
+                    }
+                } catch (Throwable $e) {
+                    registrarLogNota($dbNotas, $notaId, $operadorId, 'xml_pendente', mb_substr($e->getMessage(), 0, 255));
+                }
+            }
+        }
+
+        if (($resultado['status'] ?? 'pendente_envio') === 'pendente_envio') {
+            registrarLogNota($dbNotas, $notaId, $operadorId, 'envio_adiado', mb_substr((string) ($resultado['motivo_rejeicao'] ?? ''), 0, 255));
+            return $resultado;
+        }
+
+        $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET status = :status, chave_acesso = :chave_acesso, protocolo_autorizacao = :protocolo_autorizacao, xml_gerado = :xml_gerado, motivo_rejeicao = :motivo_rejeicao WHERE id = :id AND status = \'pendente_envio\'');
+        $stmt->execute(['status' => $resultado['status'], 'chave_acesso' => $resultado['chave_acesso'], 'protocolo_autorizacao' => $resultado['protocolo_autorizacao'], 'xml_gerado' => $resultado['xml_gerado'], 'motivo_rejeicao' => $resultado['motivo_rejeicao'], 'id' => $notaId]);
+        if ($stmt->rowCount() !== 1) {
+            return ['sucesso' => false, 'status' => 'pendente_envio', 'motivo_rejeicao' => 'A nota mudou de estado durante o processamento; o retorno remoto não foi sobrescrito.'];
+        }
+        registrarLogNota($dbNotas, $notaId, $operadorId, $resultado['sucesso'] ? 'autorizada' : 'rejeitada', $resultado['sucesso'] ? ('Chave de acesso: ' . $resultado['chave_acesso']) : ('Rejeitada: ' . $resultado['motivo_rejeicao']));
+        return $resultado;
+    } catch (Throwable $e) {
+        registrarLogNota($dbNotas, $notaId, $operadorId, 'falha_processamento', mb_substr($e->getMessage(), 0, 255));
+        return ['sucesso' => false, 'status' => 'pendente_envio', 'motivo_rejeicao' => 'Falha recuperável no processamento: ' . $e->getMessage()];
+    } finally {
+        liberarLockNotaNfse($dbNotas, $notaId);
+    }
+}
 function registrarLogNota(PDO $db, int $notaId, int $funcionarioId, string $acao, string $detalhe = ''): void
 {
     $stmt = $db->prepare(
@@ -381,7 +425,7 @@ $csrf = h($_SESSION['csrf_processar_fila_nfse'] ?? '');
         <?php if (!$integracaoDisponivel): ?>
             <div class="notice warning">
                 <strong>Integração ainda não ativa neste servidor:</strong> <?php echo h($motivoIndisponivel); ?>
-                As notas continuam acumulando aqui como "pendente de envio" até o Composer e o certificado digital serem configurados (ver <code>config_certificado_nfse.example.php</code>).
+                As notas continuam acumulando aqui como "pendente de envio" até as dependências do Composer e o certificado digital A1 da empresa serem configurados.
             </div>
         <?php endif; ?>
 

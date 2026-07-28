@@ -15,10 +15,11 @@ Options -Indexes
     ExpiresByType text/css "access plus 1 month"
     ExpiresByType application/javascript "access plus 1 month"
     ExpiresByType application/pdf "access plus 1 month"
+    ExpiresByType application/json "access plus 1 month"
 </IfModule>
 
 <IfModule mod_headers.c>
-    <FilesMatch "\.(jpg|jpeg|png|webp|svg|css|js|pdf)$">
+    <FilesMatch "\.(jpg|jpeg|png|webp|svg|css|js|json|pdf)$">
         Header set Cache-Control "public, max-age=2592000"
     </FilesMatch>
 </IfModule>
@@ -52,6 +53,7 @@ Options -Indexes
     RewriteRule ^downloads/ - [F,L]
     RewriteRule ^uploads/ - [F,L]
     RewriteRule ^certificados-nfse/ - [F,L]
+    RewriteRule ^documentos-fiscais-privados/ - [F,L]
 
     RewriteCond %{DOCUMENT_ROOT}/$1.php -f
     RewriteRule ^([A-Za-z0-9_-]+)/?$ $1.php [L,QSA]

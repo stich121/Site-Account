@@ -26,6 +26,43 @@ function h(string $valor): string
     return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
 }
 
+function codigoMunicipioIbgeValido(string $codigo): bool
+{
+    static $codigos = null;
+    if ($codigos === null) {
+        $arquivo = __DIR__ . '/ibge-municipios.json';
+        $municipios = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
+        $codigos = [];
+        foreach (is_array($municipios) ? $municipios : [] as $municipio) {
+            $codigos[(string) ($municipio['codigo'] ?? '')] = true;
+        }
+    }
+
+    return isset($codigos[$codigo]);
+}
+
+function documentoNfseValido(string $documento): bool
+{
+    $numero = preg_replace('/\D+/', '', $documento);
+    if (!in_array(strlen($numero), [11, 14], true) || preg_match('/^(\d)\1+$/', $numero)) return false;
+    if (strlen($numero) === 11) {
+        for ($digitoPos = 9; $digitoPos <= 10; $digitoPos++) {
+            $soma = 0; $peso = $digitoPos + 1;
+            for ($i = 0; $i < $digitoPos; $i++) $soma += (int) $numero[$i] * ($peso--);
+            $digito = 11 - ($soma % 11); if ($digito >= 10) $digito = 0;
+            if ((int) $numero[$digitoPos] !== $digito) return false;
+        }
+        return true;
+    }
+    foreach ([12, 13] as $posicao) {
+        $soma = 0; $peso = $posicao === 12 ? 5 : 6;
+        for ($i = 0; $i < $posicao; $i++) { $soma += (int) $numero[$i] * $peso; $peso = $peso === 2 ? 9 : $peso - 1; }
+        $digito = $soma % 11 < 2 ? 0 : 11 - ($soma % 11);
+        if ((int) $numero[$posicao] !== $digito) return false;
+    }
+    return true;
+}
+
 function nomeExibicao(?string $usuario): string
 {
     return trim(str_replace('.', ' ', $usuario ?? ''));
@@ -72,6 +109,10 @@ function prepararTabelaEmpresasEmissorasNotas(PDO $db): void
             uf CHAR(2) NULL,
             crt TINYINT UNSIGNED NULL,
             ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+            nfse_opcao_simples_nacional TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            nfse_regime_apuracao_sn TINYINT UNSIGNED NULL,
+            nfse_tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
+            nfse_regime_especial_tributacao VARCHAR(60) NULL,
             certificado_arquivo VARCHAR(255) NULL,
             certificado_senha_cifrada VARCHAR(512) NULL,
             certificado_atualizado_em TIMESTAMP NULL,
@@ -150,6 +191,10 @@ function prepararTabelaNotasClientes(PDO $db): void
             bairro VARCHAR(120) NULL,
             cep VARCHAR(12) NULL,
             municipio VARCHAR(120) NULL,
+            codigo_ibge_municipio VARCHAR(7) NULL,
+            codigo_pais VARCHAR(4) NULL,
+            nif VARCHAR(40) NULL,
+            motivo_nao_nif VARCHAR(2) NULL,
             uf CHAR(2) NULL,
             indicador_consumidor_final TINYINT(1) NOT NULL DEFAULT 1,
             criado_por INT UNSIGNED NULL,
@@ -250,6 +295,19 @@ function prepararColunasFase2Notas(PDO $db): void
 
 function prepararColunasCertificadoEmpresa(PDO $db): void
 {
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfse_opcao_simples_nacional')) {
+        $db->exec("ALTER TABLE empresas_emissoras ADD COLUMN nfse_opcao_simples_nacional TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER ambiente_emissao");
+    }
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfse_regime_apuracao_sn')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfse_regime_apuracao_sn TINYINT UNSIGNED NULL AFTER nfse_opcao_simples_nacional');
+    }
+
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfse_tributacao_issqn')) {
+        $db->exec("ALTER TABLE empresas_emissoras ADD COLUMN nfse_tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel' AFTER nfse_regime_apuracao_sn");
+    }
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfse_regime_especial_tributacao')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfse_regime_especial_tributacao VARCHAR(60) NULL AFTER nfse_tributacao_issqn');
+    }
     if (!colunaExisteNotas($db, 'empresas_emissoras', 'certificado_arquivo')) {
         $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN certificado_arquivo VARCHAR(255) NULL AFTER ambiente_emissao');
     }
@@ -304,9 +362,12 @@ function prepararTabelaNotasFiscaisNfse(PDO $db): void
             tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
             regime_especial_tributacao VARCHAR(60) NULL,
             exigibilidade_issqn_suspensa ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            tipo_suspensao_issqn VARCHAR(2) NULL,
+            numero_processo_suspensao VARCHAR(60) NULL,
             issqn_retido ENUM('nao','sim') NOT NULL DEFAULT 'nao',
             issqn_retido_por ENUM('tomador','intermediario') NULL,
             beneficio_municipal ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+            codigo_beneficio_municipal VARCHAR(30) NULL,
             deducao_reducao_base_calculo DECIMAL(12,2) NULL,
             situacao_tributaria_pis_cofins VARCHAR(10) NULL,
             tipo_retencao_pis_cofins_csll VARCHAR(10) NULL,
@@ -320,6 +381,12 @@ function prepararTabelaNotasFiscaisNfse(PDO $db): void
             tributos_federal_valor DECIMAL(12,2) NULL,
             tributos_estadual_valor DECIMAL(12,2) NULL,
             tributos_municipal_valor DECIMAL(12,2) NULL,
+            ibscbs_finalidade VARCHAR(2) NOT NULL DEFAULT '0',
+            ibscbs_ind_final TINYINT(1) NULL,
+            ibscbs_codigo_indicador_operacao VARCHAR(10) NULL,
+            ibscbs_ind_destinatario VARCHAR(2) NULL,
+            ibscbs_cst VARCHAR(3) NULL,
+            ibscbs_classificacao_tributaria VARCHAR(10) NULL,
             PRIMARY KEY (nota_id),
             CONSTRAINT fk_notas_fiscais_nfse_nota
                 FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
@@ -341,6 +408,21 @@ function prepararColunasFase3bNotasFiscaisNfse(PDO $db): void
     if (!colunaExisteNotas($db, 'notas_fiscais_nfse', 'codigo_interno_contribuinte')) {
         $db->exec('ALTER TABLE notas_fiscais_nfse ADD COLUMN codigo_interno_contribuinte VARCHAR(60) NULL AFTER codigo_tributacao_municipal');
     }
+
+    $colunasIbsCbs = [
+        'tipo_suspensao_issqn' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN tipo_suspensao_issqn VARCHAR(2) NULL',
+        'numero_processo_suspensao' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN numero_processo_suspensao VARCHAR(60) NULL',
+        'codigo_beneficio_municipal' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN codigo_beneficio_municipal VARCHAR(30) NULL',
+        'ibscbs_finalidade' => "ALTER TABLE notas_fiscais_nfse ADD COLUMN ibscbs_finalidade VARCHAR(2) NOT NULL DEFAULT '0'",
+        'ibscbs_ind_final' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN ibscbs_ind_final TINYINT(1) NULL',
+        'ibscbs_codigo_indicador_operacao' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN ibscbs_codigo_indicador_operacao VARCHAR(10) NULL',
+        'ibscbs_ind_destinatario' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN ibscbs_ind_destinatario VARCHAR(2) NULL',
+        'ibscbs_cst' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN ibscbs_cst VARCHAR(3) NULL',
+        'ibscbs_classificacao_tributaria' => 'ALTER TABLE notas_fiscais_nfse ADD COLUMN ibscbs_classificacao_tributaria VARCHAR(10) NULL',
+    ];
+    foreach ($colunasIbsCbs as $coluna => $sql) {
+        if (!colunaExisteNotas($db, 'notas_fiscais_nfse', $coluna)) $db->exec($sql);
+    }
 }
 
 function prepararColunaInscricaoMunicipalClientes(PDO $db): void
@@ -349,6 +431,15 @@ function prepararColunaInscricaoMunicipalClientes(PDO $db): void
     // autopreencher o campo do tomador da próxima vez que ele for selecionado/buscado.
     if (!colunaExisteNotas($db, 'notas_clientes', 'inscricao_municipal')) {
         $db->exec('ALTER TABLE notas_clientes ADD COLUMN inscricao_municipal VARCHAR(20) NULL AFTER inscricao_estadual');
+    }
+    $camposEnderecoFiscal = [
+        'codigo_ibge_municipio' => 'ALTER TABLE notas_clientes ADD COLUMN codigo_ibge_municipio VARCHAR(7) NULL AFTER municipio',
+        'codigo_pais' => 'ALTER TABLE notas_clientes ADD COLUMN codigo_pais VARCHAR(4) NULL AFTER codigo_ibge_municipio',
+        'nif' => 'ALTER TABLE notas_clientes ADD COLUMN nif VARCHAR(40) NULL AFTER codigo_pais',
+        'motivo_nao_nif' => 'ALTER TABLE notas_clientes ADD COLUMN motivo_nao_nif VARCHAR(2) NULL AFTER nif',
+    ];
+    foreach ($camposEnderecoFiscal as $coluna => $sql) {
+        if (!colunaExisteNotas($db, 'notas_clientes', $coluna)) $db->exec($sql);
     }
 }
 
@@ -432,22 +523,39 @@ try {
             $bairro = trim($_POST['cliente_bairro'] ?? '');
             $cep = trim($_POST['cliente_cep'] ?? '');
             $municipio = trim($_POST['cliente_municipio'] ?? '');
+            $codigoIbgeCliente = trim($_POST['cliente_codigo_ibge_municipio'] ?? '');
+            $codigoPaisCliente = trim($_POST['cliente_codigo_pais'] ?? '1058');
+            $nifCliente = trim($_POST['cliente_nif'] ?? '');
+            $motivoNaoNifCliente = trim($_POST['cliente_motivo_nao_nif'] ?? '');
             $uf = strtoupper(trim($_POST['cliente_uf'] ?? ''));
             $consumidorFinal = isset($_POST['indicador_consumidor_final']) ? 1 : 0;
 
+            $documentoClienteCadastro = preg_replace('/\D+/', '', $cnpjCpf);
+            $tamanhoEsperado = $tipoPessoa === 'PF' ? 11 : 14;
+            $clienteExterior = $codigoPaisCliente !== '' && $codigoPaisCliente !== '1058';
             if ($nomeRazaoSocial === '') {
                 $erro = 'Informe o nome/razão social do cliente.';
+            } elseif (!$clienteExterior && (strlen($documentoClienteCadastro) !== $tamanhoEsperado || !documentoNfseValido($documentoClienteCadastro))) {
+                $erro = $tipoPessoa === 'PF' ? 'Informe um CPF válido.' : 'Informe um CNPJ válido.';
+            } elseif ($clienteExterior && $nifCliente === '' && $motivoNaoNifCliente === '') {
+                $erro = 'Cliente exterior exige NIF ou motivo oficial da ausência de NIF.';
+            } elseif ($logradouro === '' || $numero === '' || $bairro === '' || $municipio === '') {
+                $erro = 'Preencha o endereço do cliente.';
+            } elseif (!$clienteExterior && (!preg_match('/^[A-Z]{2}$/', $uf) || !preg_match('/^\d{7}$/', $codigoIbgeCliente))) {
+                $erro = 'Cliente nacional exige UF válida e código IBGE do município com 7 dígitos.';
+            } elseif ($cep !== '' && strlen(preg_replace('/\D+/', '', $cep)) !== 8) {
+                $erro = 'Informe um CEP válido, com 8 dígitos.';
             } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $erro = 'Informe um e-mail válido para o cliente ou deixe em branco.';
             } else {
                 $stmt = $dbNotas->prepare(
                     'INSERT INTO notas_clientes (
                         tipo_pessoa, nome_razao_social, cnpj_cpf, inscricao_estadual, email,
-                        logradouro, numero, complemento, bairro, cep, municipio, uf,
+                        logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, codigo_pais, nif, motivo_nao_nif, uf,
                         indicador_consumidor_final, criado_por
                      ) VALUES (
                         :tipo_pessoa, :nome_razao_social, :cnpj_cpf, :inscricao_estadual, :email,
-                        :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :uf,
+                        :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :codigo_ibge_municipio, :codigo_pais, :nif, :motivo_nao_nif, :uf,
                         :indicador_consumidor_final, :criado_por
                      )'
                 );
@@ -463,6 +571,10 @@ try {
                     'bairro' => $bairro !== '' ? $bairro : null,
                     'cep' => $cep !== '' ? $cep : null,
                     'municipio' => $municipio !== '' ? $municipio : null,
+                    'codigo_ibge_municipio' => $codigoIbgeCliente !== '' ? $codigoIbgeCliente : null,
+                    'codigo_pais' => $codigoPaisCliente !== '' ? $codigoPaisCliente : null,
+                    'nif' => $nifCliente !== '' ? $nifCliente : null,
+                    'motivo_nao_nif' => $motivoNaoNifCliente !== '' ? $motivoNaoNifCliente : null,
                     'uf' => $uf !== '' ? $uf : null,
                     'indicador_consumidor_final' => $consumidorFinal,
                     'criado_por' => $funcionarioId,
@@ -506,7 +618,8 @@ try {
                 $codigoTributacaoNacional = trim($_POST['nfse_codigo_tributacao_nacional'] ?? '');
                 $codigoTributacaoMunicipal = trim($_POST['nfse_codigo_tributacao_municipal'] ?? '');
                 $codigoInternoContribuinte = trim($_POST['nfse_codigo_interno_contribuinte'] ?? '');
-                $imuneExportacao = ($_POST['nfse_imune_exportacao'] ?? '') === 'sim' ? 'sim' : 'nao';
+                // A indicação será derivada da tributação municipal da empresa emissora.
+                $imuneExportacao = 'nao';
                 $itemNbs = trim($_POST['nfse_item_nbs'] ?? '');
                 $descricaoServico = trim($_POST['nfse_descricao_servico'] ?? '');
                 $documentoResponsabilidadeTecnica = trim($_POST['nfse_documento_responsabilidade_tecnica'] ?? '');
@@ -519,12 +632,16 @@ try {
                 $descontoIncondicionado = $numerico('nfse_desconto_incondicionado');
                 $descontoCondicionado = $numerico('nfse_desconto_condicionado');
 
-                $tributacaoIssqn = trim($_POST['nfse_tributacao_issqn'] ?? '') !== '' ? trim($_POST['nfse_tributacao_issqn']) : 'operacao_tributavel';
-                $regimeEspecialTributacao = trim($_POST['nfse_regime_especial_tributacao'] ?? '');
+                // Valores autoritativos serão carregados do cadastro da empresa emissora.
+                $tributacaoIssqn = 'operacao_tributavel';
+                $regimeEspecialTributacao = '';
                 $exigibilidadeSuspensa = ($_POST['nfse_exigibilidade_suspensa'] ?? '') === 'sim' ? 'sim' : 'nao';
+                $tipoSuspensaoIssqn = $exigibilidadeSuspensa === 'sim' ? trim($_POST['nfse_tipo_suspensao_issqn'] ?? '') : '';
+                $numeroProcessoSuspensao = $exigibilidadeSuspensa === 'sim' ? trim($_POST['nfse_numero_processo_suspensao'] ?? '') : '';
                 $issqnRetido = ($_POST['nfse_issqn_retido'] ?? '') === 'sim' ? 'sim' : 'nao';
                 $issqnRetidoPor = $issqnRetido === 'sim' ? (($_POST['nfse_issqn_retido_por'] ?? '') === 'intermediario' ? 'intermediario' : 'tomador') : null;
                 $beneficioMunicipal = ($_POST['nfse_beneficio_municipal'] ?? '') === 'sim' ? 'sim' : 'nao';
+                $codigoBeneficioMunicipal = $beneficioMunicipal === 'sim' ? trim($_POST['nfse_codigo_beneficio_municipal'] ?? '') : '';
                 $deducaoReducaoBase = $numerico('nfse_deducao_reducao_base');
 
                 $situacaoTributariaPisCofins = trim($_POST['nfse_situacao_pis_cofins'] ?? '');
@@ -540,6 +657,12 @@ try {
                 $tributosFederalValor = $numerico('nfse_tributos_federal_valor');
                 $tributosEstadualValor = $numerico('nfse_tributos_estadual_valor');
                 $tributosMunicipalValor = $numerico('nfse_tributos_municipal_valor');
+                $ibscbsFinalidade = trim($_POST['nfse_ibscbs_finalidade'] ?? '0');
+                $ibscbsIndFinal = trim((string) ($_POST['nfse_ibscbs_ind_final'] ?? ''));
+                $ibscbsCodigoIndicadorOperacao = trim($_POST['nfse_ibscbs_codigo_indicador_operacao'] ?? '');
+                $ibscbsIndDestinatario = trim($_POST['nfse_ibscbs_ind_destinatario'] ?? '');
+                $ibscbsCst = trim($_POST['nfse_ibscbs_cst'] ?? '');
+                $ibscbsClassificacaoTributaria = trim($_POST['nfse_ibscbs_classificacao_tributaria'] ?? '');
 
                 if ($descricaoServico !== '' && $valorServico > 0) {
                     $itensValidos[] = [
@@ -554,7 +677,7 @@ try {
                         'valor_unitario' => $valorServico,
                         'valor_total' => round($valorServico, 2),
                     ];
-                    $valorTotalNota = round($valorServico - (float) $descontoIncondicionado - (float) $descontoCondicionado, 2);
+                    $valorTotalNota = round($valorServico, 2);
                 }
 
                 $dadosNfse = [
@@ -586,9 +709,12 @@ try {
                     'tributacao_issqn' => $tributacaoIssqn,
                     'regime_especial_tributacao' => $regimeEspecialTributacao !== '' ? $regimeEspecialTributacao : null,
                     'exigibilidade_issqn_suspensa' => $exigibilidadeSuspensa,
+                    'tipo_suspensao_issqn' => $tipoSuspensaoIssqn !== '' ? $tipoSuspensaoIssqn : null,
+                    'numero_processo_suspensao' => $numeroProcessoSuspensao !== '' ? $numeroProcessoSuspensao : null,
                     'issqn_retido' => $issqnRetido,
                     'issqn_retido_por' => $issqnRetidoPor,
                     'beneficio_municipal' => $beneficioMunicipal,
+                    'codigo_beneficio_municipal' => $codigoBeneficioMunicipal !== '' ? $codigoBeneficioMunicipal : null,
                     'deducao_reducao_base_calculo' => $deducaoReducaoBase,
                     'situacao_tributaria_pis_cofins' => $situacaoTributariaPisCofins !== '' ? $situacaoTributariaPisCofins : null,
                     'tipo_retencao_pis_cofins_csll' => $tipoRetencaoPisCofinsCsll !== '' ? $tipoRetencaoPisCofinsCsll : null,
@@ -602,6 +728,12 @@ try {
                     'tributos_federal_valor' => $tributosFederalValor,
                     'tributos_estadual_valor' => $tributosEstadualValor,
                     'tributos_municipal_valor' => $tributosMunicipalValor,
+                    'ibscbs_finalidade' => $ibscbsFinalidade,
+                    'ibscbs_ind_final' => $ibscbsIndFinal !== '' ? (int) $ibscbsIndFinal : null,
+                    'ibscbs_codigo_indicador_operacao' => $ibscbsCodigoIndicadorOperacao !== '' ? $ibscbsCodigoIndicadorOperacao : null,
+                    'ibscbs_ind_destinatario' => $ibscbsIndDestinatario !== '' ? $ibscbsIndDestinatario : null,
+                    'ibscbs_cst' => $ibscbsCst !== '' ? $ibscbsCst : null,
+                    'ibscbs_classificacao_tributaria' => $ibscbsClassificacaoTributaria !== '' ? $ibscbsClassificacaoTributaria : null,
                 ];
             } else {
                 $descricoes = $_POST['item_descricao'] ?? [];
@@ -640,16 +772,65 @@ try {
                 }
             }
 
-            if ($empresaId <= 0) {
-                $erro = 'Selecione a empresa emissora.';
-            } elseif ($clienteId <= 0) {
-                $erro = 'Selecione o cliente destinatário.';
+            $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id AND ativo = 1 LIMIT 1');
+            $stmtEmpresa->execute(['id' => $empresaId]);
+            $empresaSelecionada = $stmtEmpresa->fetch() ?: null;
+            $stmtCliente = $dbNotas->prepare('SELECT * FROM notas_clientes WHERE id = :id LIMIT 1');
+            $stmtCliente->execute(['id' => $clienteId]);
+            $clienteSelecionado = $stmtCliente->fetch() ?: null;
+            $ambienteNota = ($empresaSelecionada['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'producao' : 'homologacao';
+            if ($tipoNota === 'nfse' && $dadosNfse !== null && $empresaSelecionada !== null) {
+                $dadosNfse['tributacao_issqn'] = (string) ($empresaSelecionada['nfse_tributacao_issqn'] ?? '');
+                $dadosNfse['regime_especial_tributacao'] = trim((string) ($empresaSelecionada['nfse_regime_especial_tributacao'] ?? '')) ?: null;
+                $dadosNfse['imune_exportacao_nao_incidencia'] = in_array($dadosNfse['tributacao_issqn'], ['imune', 'exportacao', 'nao_incidencia'], true) ? 'sim' : 'nao';
+            }
+            $documentoCliente = preg_replace('/\D+/', '', (string) ($clienteSelecionado['cnpj_cpf'] ?? ''));
+            $camposIbsCbs = $dadosNfse ? [$dadosNfse['ibscbs_ind_final'], $dadosNfse['ibscbs_codigo_indicador_operacao'], $dadosNfse['ibscbs_ind_destinatario'], $dadosNfse['ibscbs_cst'], $dadosNfse['ibscbs_classificacao_tributaria']] : [];
+            $algumIbsCbsInformado = count(array_filter($camposIbsCbs, static fn($valor) => $valor !== null && $valor !== '')) > 0;
+            $ibscbsCompleto = $dadosNfse && in_array($dadosNfse['ibscbs_ind_final'], [0, 1], true) && $dadosNfse['ibscbs_codigo_indicador_operacao'] !== null && $dadosNfse['ibscbs_ind_destinatario'] !== null && $dadosNfse['ibscbs_cst'] !== null && $dadosNfse['ibscbs_classificacao_tributaria'] !== null;
+            $ibscbsObrigatorio = $tipoNota === 'nfse' && (int) ($empresaSelecionada['nfse_opcao_simples_nacional'] ?? 0) === 1 && ($dadosNfse['data_competencia'] ?? '') >= '2026-08-03';
+
+            if ($empresaId <= 0 || $empresaSelecionada === null) {
+                $erro = 'Selecione uma empresa emissora ativa.';
+            } elseif ($tipoNota === 'nfse' && (!documentoNfseValido((string) ($empresaSelecionada['cnpj'] ?? '')) || !preg_match('/^\d{7}$/', (string) ($empresaSelecionada['codigo_ibge_municipio'] ?? '')) || empty($empresaSelecionada['inscricao_municipal']) || empty($empresaSelecionada['logradouro']) || empty($empresaSelecionada['numero']) || empty($empresaSelecionada['bairro']) || empty($empresaSelecionada['cep']))) {
+                $erro = 'Complete CNPJ, Inscrição Municipal, endereço e código IBGE da empresa emissora antes de emitir NFS-e.';
+            } elseif ($tipoNota === 'nfse' && !in_array((int) ($empresaSelecionada['nfse_opcao_simples_nacional'] ?? 0), [1, 2, 3, 4], true)) {
+                $erro = 'Configure a opção pelo Simples Nacional da empresa emissora.';
+            } elseif ($tipoNota === 'nfse' && (int) $empresaSelecionada['nfse_opcao_simples_nacional'] === 3 && !in_array((int) ($empresaSelecionada['nfse_regime_apuracao_sn'] ?? 0), [1, 2, 3], true)) {
+                $erro = 'Configure o regime de apuração do Simples para a empresa ME/EPP.';
+            } elseif ($tipoNota === 'nfse' && !in_array((string) ($empresaSelecionada['nfse_tributacao_issqn'] ?? ''), ['operacao_tributavel', 'imune', 'exportacao', 'nao_incidencia'], true)) {
+                $erro = 'Configure a tributação municipal padrão da empresa emissora.';
+            } elseif ($tipoNota === 'nfse' && !in_array((string) ($empresaSelecionada['nfse_regime_especial_tributacao'] ?? ''), ['', 'cooperativa', 'estimativa', 'microempresa_municipal', 'notario_registrador', 'profissional_autonomo', 'sociedade_profissionais'], true)) {
+                $erro = 'Configure o regime especial de tributação da empresa emissora.';
+            } elseif ($tipoNota === 'nfse' && in_array((int) ($empresaSelecionada['nfse_opcao_simples_nacional'] ?? 0), [2, 3], true) && !empty($empresaSelecionada['nfse_regime_especial_tributacao'])) {
+                $erro = 'Remova o regime especial da empresa: o Simples Nacional prevalece para MEI e ME/EPP.';
+            } elseif ($clienteId <= 0 || $clienteSelecionado === null) {
+                $erro = 'Selecione um cliente destinatário válido.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['tomador_local'] !== 'exterior' && !documentoNfseValido($documentoCliente)) {
+                $erro = 'O tomador brasileiro precisa ter CPF ou CNPJ válido no cadastro.';
+            } elseif ($tipoNota === 'nfse' && ($clienteSelecionado['nome_razao_social'] ?? '') === '') {
+                $erro = 'O tomador precisa ter nome ou razão social.';
             } elseif ($naturezaOperacao === '') {
                 $erro = 'Informe a natureza da operação.';
             } elseif ($tipoNota === 'nfse' && ($dadosNfse === null || $dadosNfse['municipio_prestacao'] === null || $dadosNfse['codigo_tributacao_nacional'] === null || $dadosNfse['codigo_interno_contribuinte'] === null)) {
                 $erro = 'Informe o município da prestação, o código de tributação nacional e o código interno do contribuinte do serviço.';
-            } elseif ($tipoNota === 'nfse' && $dadosNfse['tomador_local'] === 'brasil' && $dadosNfse['tomador_inscricao_municipal'] === null) {
-                $erro = 'Informe a Inscrição Municipal do tomador (obrigatória quando o tomador é do Brasil).';
+
+            } elseif ($tipoNota === 'nfse' && !codigoMunicipioIbgeValido((string) $dadosNfse['municipio_prestacao'])) {
+                $erro = 'Selecione um município válido na lista oficial do IBGE.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['intermediario_incluido'] && (!documentoNfseValido((string) $dadosNfse['intermediario_cpf_cnpj']) || $dadosNfse['intermediario_nome'] === null)) {
+                $erro = 'Intermediário informado exige CPF/CNPJ válido e nome/razão social.';
+            } elseif ($tipoNota === 'nfse' && ((float) ($dadosNfse['desconto_incondicionado'] ?? 0) + (float) ($dadosNfse['desconto_condicionado'] ?? 0) > $valorTotalNota)) {
+                $erro = 'A soma dos descontos não pode superar o valor bruto do serviço.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['tomador_local'] === 'brasil' && !preg_match('/^\d{7}$/', (string) ($clienteSelecionado['codigo_ibge_municipio'] ?? ''))) {
+                $erro = 'Informe o código IBGE do município no cadastro do tomador brasileiro.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['tomador_local'] === 'exterior' && (empty($clienteSelecionado['codigo_pais']) || (empty($clienteSelecionado['nif']) && empty($clienteSelecionado['motivo_nao_nif'])))) {
+                $erro = 'Tomador exterior exige código do país e NIF ou motivo oficial da ausência de NIF.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['exigibilidade_issqn_suspensa'] === 'sim' && ($dadosNfse['tipo_suspensao_issqn'] === null || $dadosNfse['numero_processo_suspensao'] === null)) {
+                $erro = 'Exigibilidade suspensa exige tipo e número do processo de suspensão.';
+            } elseif ($tipoNota === 'nfse' && $dadosNfse['beneficio_municipal'] === 'sim' && $dadosNfse['codigo_beneficio_municipal'] === null) {
+                $erro = 'Benefício municipal exige o código oficial do benefício.';
+            } elseif ($tipoNota === 'nfse' && ($ibscbsObrigatorio || $algumIbsCbsInformado) && !$ibscbsCompleto) {
+                $erro = 'Preencha o conjunto completo IBS/CBS da NT 004; os códigos fiscais não são inferidos automaticamente.';
             } elseif (empty($itensValidos)) {
                 $erro = $tipoNota === 'nfse'
                     ? 'Informe a descrição do serviço e um valor do serviço maior que zero.'
@@ -671,7 +852,7 @@ try {
                             valor_total, informacoes_frete
                          ) VALUES (
                             :empresa_id, :cliente_id, :funcionario_id, :tipo_nota, :natureza_operacao,
-                            :numero_interno, \'rascunho\', \'homologacao\', :forma_pagamento, :data_emissao, :data_saida_entrada,
+                            :numero_interno, \'rascunho\', :ambiente, :forma_pagamento, :data_emissao, :data_saida_entrada,
                             :valor_total, :informacoes_frete
                          )'
                     );
@@ -682,6 +863,7 @@ try {
                         'tipo_nota' => $tipoNota,
                         'natureza_operacao' => $naturezaOperacao,
                         'numero_interno' => $numeroInterno,
+                        'ambiente' => $ambienteNota,
                         'forma_pagamento' => $formaPagamento !== '' ? $formaPagamento : null,
                         'data_emissao' => $dataEmissao,
                         'data_saida_entrada' => $dataSaidaEntrada !== '' ? $dataSaidaEntrada : null,
@@ -724,10 +906,12 @@ try {
                                 imune_exportacao_nao_incidencia, item_nbs, descricao_servico, documento_responsabilidade_tecnica,
                                 documento_referencia, informacoes_complementares, numero_pedido_b2b, valor_recebido_intermediario,
                                 desconto_incondicionado, desconto_condicionado, tributacao_issqn, regime_especial_tributacao,
-                                exigibilidade_issqn_suspensa, issqn_retido, issqn_retido_por, beneficio_municipal, deducao_reducao_base_calculo,
+                                exigibilidade_issqn_suspensa, tipo_suspensao_issqn, numero_processo_suspensao, issqn_retido, issqn_retido_por, beneficio_municipal, codigo_beneficio_municipal, deducao_reducao_base_calculo,
                                 situacao_tributaria_pis_cofins, tipo_retencao_pis_cofins_csll, irrf, contribuicoes_sociais_retidas,
                                 contribuicao_previdenciaria_retida, tributos_modo, tributos_federal_percentual, tributos_estadual_percentual,
-                                tributos_municipal_percentual, tributos_federal_valor, tributos_estadual_valor, tributos_municipal_valor
+                                tributos_municipal_percentual, tributos_federal_valor, tributos_estadual_valor, tributos_municipal_valor,
+                                ibscbs_finalidade, ibscbs_ind_final, ibscbs_codigo_indicador_operacao, ibscbs_ind_destinatario,
+                                ibscbs_cst, ibscbs_classificacao_tributaria
                              ) VALUES (
                                 :nota_id, :data_competencia, :serie_dps, :numero_dps, :tomador_local, :tomador_inscricao_municipal, :tomador_telefone,
                                 :intermediario_incluido, :intermediario_local, :intermediario_cpf_cnpj, :intermediario_nome,
@@ -735,10 +919,12 @@ try {
                                 :imune_exportacao_nao_incidencia, :item_nbs, :descricao_servico, :documento_responsabilidade_tecnica,
                                 :documento_referencia, :informacoes_complementares, :numero_pedido_b2b, :valor_recebido_intermediario,
                                 :desconto_incondicionado, :desconto_condicionado, :tributacao_issqn, :regime_especial_tributacao,
-                                :exigibilidade_issqn_suspensa, :issqn_retido, :issqn_retido_por, :beneficio_municipal, :deducao_reducao_base_calculo,
+                                :exigibilidade_issqn_suspensa, :tipo_suspensao_issqn, :numero_processo_suspensao, :issqn_retido, :issqn_retido_por, :beneficio_municipal, :codigo_beneficio_municipal, :deducao_reducao_base_calculo,
                                 :situacao_tributaria_pis_cofins, :tipo_retencao_pis_cofins_csll, :irrf, :contribuicoes_sociais_retidas,
                                 :contribuicao_previdenciaria_retida, :tributos_modo, :tributos_federal_percentual, :tributos_estadual_percentual,
-                                :tributos_municipal_percentual, :tributos_federal_valor, :tributos_estadual_valor, :tributos_municipal_valor
+                                :tributos_municipal_percentual, :tributos_federal_valor, :tributos_estadual_valor, :tributos_municipal_valor,
+                                :ibscbs_finalidade, :ibscbs_ind_final, :ibscbs_codigo_indicador_operacao, :ibscbs_ind_destinatario,
+                                :ibscbs_cst, :ibscbs_classificacao_tributaria
                              )'
                         );
                         $stmtNfse->execute(array_merge(['nota_id' => $notaId], $dadosNfse));
@@ -764,10 +950,10 @@ try {
         }
     }
 
-    $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
+    $stmt = $dbNotas->query('SELECT id, razao_social, codigo_ibge_municipio, ambiente_emissao FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
     $empresasAtivas = $stmt->fetchAll();
 
-    $stmt = $dbNotas->query('SELECT id, nome_razao_social, cnpj_cpf, municipio, uf, inscricao_municipal FROM notas_clientes ORDER BY nome_razao_social ASC');
+    $stmt = $dbNotas->query('SELECT id, nome_razao_social, cnpj_cpf, municipio, codigo_ibge_municipio, codigo_pais, nif, motivo_nao_nif, uf, inscricao_municipal FROM notas_clientes ORDER BY nome_razao_social ASC');
     $clientes = $stmt->fetchAll();
 
     $stmt = $dbNotas->query(
@@ -932,6 +1118,35 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
         }
 
         .field textarea { resize: vertical; min-height: 4.5rem; }
+        .municipio-autocomplete { position: relative; }
+        .municipio-sugestoes {
+            position: absolute;
+            z-index: 30;
+            top: calc(100% - 1.2rem);
+            left: 0;
+            right: 0;
+            display: none;
+            max-height: 18rem;
+            overflow-y: auto;
+            padding: 0.35rem;
+            border: 1px solid var(--border);
+            border-radius: 0.65rem;
+            background: #111;
+            box-shadow: 0 16px 35px rgba(0, 0, 0, 0.38);
+        }
+        .municipio-sugestoes.aberto { display: grid; }
+        .municipio-opcao {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 0;
+            border-radius: 0.45rem;
+            color: var(--text);
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+        }
+        .municipio-opcao:hover,
+        .municipio-opcao:focus { background: rgba(201, 162, 39, 0.16); outline: none; }
 
         .check-row {
             display: flex;
@@ -1052,7 +1267,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                         <div class="field">
                             <label for="cnpj_cpf">CNPJ / CPF</label>
                             <div class="row-actions">
-                                <input id="cnpj_cpf" name="cnpj_cpf" type="text" style="flex: 1;">
+                                <input id="cnpj_cpf" name="cnpj_cpf" type="text" maxlength="18" style="flex: 1;">
                                 <button class="btn btn-outline btn-small" type="button" id="btnBuscarCnpjCliente"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
                             </div>
                             <span class="muted" id="statusBuscaCnpjCliente" style="font-size: 0.78rem;"></span>
@@ -1090,6 +1305,22 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                             <input id="cliente_municipio" name="cliente_municipio" type="text">
                         </div>
                         <div class="field">
+                            <label for="cliente_codigo_ibge_municipio">Código IBGE do município</label>
+                            <input id="cliente_codigo_ibge_municipio" name="cliente_codigo_ibge_municipio" type="text" inputmode="numeric" pattern="\d{7}" maxlength="7">
+                        </div>
+                        <div class="field">
+                            <label for="cliente_codigo_pais">Código do país</label>
+                            <input id="cliente_codigo_pais" name="cliente_codigo_pais" type="text" inputmode="numeric" maxlength="4" value="1058">
+                        </div>
+                        <div class="field">
+                            <label for="cliente_nif">NIF (destinatário exterior)</label>
+                            <input id="cliente_nif" name="cliente_nif" type="text" maxlength="40">
+                        </div>
+                        <div class="field">
+                            <label for="cliente_motivo_nao_nif">Motivo da ausência de NIF</label>
+                            <input id="cliente_motivo_nao_nif" name="cliente_motivo_nao_nif" type="text" maxlength="2" placeholder="Código oficial">
+                        </div>
+                        <div class="field">
                             <label for="cliente_uf">UF</label>
                             <input id="cliente_uf" name="cliente_uf" type="text" maxlength="2">
                         </div>
@@ -1116,7 +1347,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                             <select id="empresa_emissora_id" name="empresa_emissora_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($empresasAtivas as $empresa): ?>
-                                    <option value="<?php echo h((string) $empresa['id']); ?>"><?php echo h($empresa['razao_social']); ?></option>
+                                    <option value="<?php echo h((string) $empresa['id']); ?>" data-ibge="<?php echo h($empresa['codigo_ibge_municipio'] ?? ''); ?>" data-ambiente="<?php echo h($empresa['ambiente_emissao'] ?? 'homologacao'); ?>"><?php echo h($empresa['razao_social']); ?> (<?php echo h(($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)</option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -1261,9 +1492,12 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                                 <label for="nfse_pais_prestacao">País</label>
                                 <input id="nfse_pais_prestacao" name="nfse_pais_prestacao" type="text" value="Brasil">
                             </div>
-                            <div class="field">
-                                <label for="nfse_municipio_prestacao">Município</label>
-                                <input id="nfse_municipio_prestacao" name="nfse_municipio_prestacao" type="text" placeholder="Ex.: Belo Horizonte/MG">
+                            <div class="field municipio-autocomplete">
+                                <label for="nfse_municipio_prestacao_busca">Município</label>
+                                <input id="nfse_municipio_prestacao_busca" type="search" placeholder="Digite o início do município" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_municipio_prestacao_opcoes" aria-expanded="false">
+                                <input id="nfse_municipio_prestacao" name="nfse_municipio_prestacao" type="hidden">
+                                <div id="nfse_municipio_prestacao_opcoes" class="municipio-sugestoes" role="listbox"></div>
+                                <span class="muted" id="nfse_municipio_prestacao_status" style="font-size: 0.78rem;">Pesquise pelo início do nome e selecione o município.</span>
                             </div>
                         </div>
 
@@ -1279,20 +1513,13 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                                 </datalist>
                             </div>
                             <div class="field">
-                                <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
-                                <select id="nfse_codigo_tributacao_municipal_opcoes" style="display:none; margin-bottom: 0.5rem;"></select>
-                                <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="text">
-                                <span class="muted" style="font-size: 0.78rem;" id="ajudaCodigoComplementarMunicipal">Preenchido automaticamente como "&lt;código&gt;.001" (padrão da maioria dos municípios quando não há especialização própria). Ajuste se o seu município tiver um código diferente.</span>
+                                <label for="nfse_codigo_tributacao_municipal_opcoes">Código Complementar Municipal</label>
+                                <select id="nfse_codigo_tributacao_municipal_opcoes" style="display:none;"></select>
+                                <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="hidden">
                             </div>
+
                             <div class="field">
-                                <label for="nfse_imune_exportacao">Imunidade, exportação ou não incidência do ISSQN?</label>
-                                <select id="nfse_imune_exportacao" name="nfse_imune_exportacao">
-                                    <option value="nao" selected>Não</option>
-                                    <option value="sim">Sim</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="nfse_item_nbs">Item da NBS correspondente (opcional)</label>
+                                <label for="nfse_item_nbs">Item da NBS (cNBS, quando aplicável)</label>
                                 <input id="nfse_item_nbs" name="nfse_item_nbs" type="text">
                             </div>
                             <div class="field">
@@ -1303,6 +1530,17 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                                 <label for="nfse_descricao_servico">Descrição do serviço</label>
                                 <textarea id="nfse_descricao_servico" name="nfse_descricao_servico" maxlength="2000" placeholder="Descreva o serviço prestado"></textarea>
                             </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem;">IBS/CBS — Reforma Tributária (NT 004)</h3>
+                        <p class="muted">Informe os códigos conforme o enquadramento fiscal da operação. O sistema não presume CST nem classificação tributária.</p>
+                        <div class="form-grid">
+                            <div class="field"><label for="nfse_ibscbs_finalidade">Finalidade</label><select id="nfse_ibscbs_finalidade" name="nfse_ibscbs_finalidade"><option value="0" selected>0 - NFS-e regular</option><option value="1">1 - Crédito</option><option value="2">2 - Débito</option></select></div>
+                            <div class="field"><label for="nfse_ibscbs_ind_final">Operação com consumidor final?</label><select id="nfse_ibscbs_ind_final" name="nfse_ibscbs_ind_final"><option value="">Selecione</option><option value="0">0 - Não</option><option value="1">1 - Sim</option></select></div>
+                            <div class="field"><label for="nfse_ibscbs_codigo_indicador_operacao">Código do indicador da operação</label><input id="nfse_ibscbs_codigo_indicador_operacao" name="nfse_ibscbs_codigo_indicador_operacao" type="text" maxlength="10" placeholder="Conforme tabela oficial"></div>
+                            <div class="field"><label for="nfse_ibscbs_ind_destinatario">Indicador do destinatário</label><input id="nfse_ibscbs_ind_destinatario" name="nfse_ibscbs_ind_destinatario" type="text" maxlength="2" placeholder="Conforme NT 004"></div>
+                            <div class="field"><label for="nfse_ibscbs_cst">CST IBS/CBS</label><input id="nfse_ibscbs_cst" name="nfse_ibscbs_cst" type="text" inputmode="numeric" pattern="\d{3}" maxlength="3" placeholder="000"></div>
+                            <div class="field"><label for="nfse_ibscbs_classificacao_tributaria">Classificação tributária</label><input id="nfse_ibscbs_classificacao_tributaria" name="nfse_ibscbs_classificacao_tributaria" type="text" inputmode="numeric" maxlength="10" placeholder="Código cClassTrib"></div>
                         </div>
 
                         <h3 style="margin-top: 1.5rem;">Informações complementares</h3>
@@ -1347,27 +1585,8 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
 
                         <h3 style="margin-top: 1.5rem;">Tributação municipal</h3>
                         <div class="form-grid">
-                            <div class="field">
-                                <label for="nfse_tributacao_issqn">Tributação do ISSQN sobre o serviço prestado</label>
-                                <select id="nfse_tributacao_issqn" name="nfse_tributacao_issqn">
-                                    <option value="operacao_tributavel" selected>Operação tributável</option>
-                                    <option value="isenta">Isenta</option>
-                                    <option value="imune">Imune</option>
-                                    <option value="exportacao">Exportação de serviço</option>
-                                    <option value="nao_incidencia">Não incidência</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="nfse_regime_especial_tributacao">Regime Especial de Tributação</label>
-                                <select id="nfse_regime_especial_tributacao" name="nfse_regime_especial_tributacao">
-                                    <option value="">Nenhum</option>
-                                    <option value="me_epp_simples_nacional">ME/EPP Simples Nacional</option>
-                                    <option value="mei">Microempreendedor Individual (MEI)</option>
-                                    <option value="cooperativa">Cooperativa</option>
-                                    <option value="estimativa">Estimativa</option>
-                                    <option value="sociedade_profissionais">Sociedade de profissionais</option>
-                                </select>
-                            </div>
+
+
                             <div class="field">
                                 <label for="nfse_exigibilidade_suspensa">A exigibilidade do ISSQN está suspensa?</label>
                                 <select id="nfse_exigibilidade_suspensa" name="nfse_exigibilidade_suspensa">
@@ -1375,6 +1594,8 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                                     <option value="sim">Sim</option>
                                 </select>
                             </div>
+                            <div class="field"><label for="nfse_tipo_suspensao_issqn">Tipo de suspensão (se suspensa)</label><input id="nfse_tipo_suspensao_issqn" name="nfse_tipo_suspensao_issqn" type="text" maxlength="2" placeholder="Código oficial"></div>
+                            <div class="field"><label for="nfse_numero_processo_suspensao">Número do processo de suspensão</label><input id="nfse_numero_processo_suspensao" name="nfse_numero_processo_suspensao" type="text" maxlength="60"></div>
                             <div class="field">
                                 <label for="nfse_issqn_retido">Há retenção do ISSQN pelo Tomador ou Intermediário?</label>
                                 <select id="nfse_issqn_retido" name="nfse_issqn_retido">
@@ -1396,6 +1617,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                                     <option value="sim">Sim</option>
                                 </select>
                             </div>
+                            <div class="field"><label for="nfse_codigo_beneficio_municipal">Código do benefício municipal (se amparado)</label><input id="nfse_codigo_beneficio_municipal" name="nfse_codigo_beneficio_municipal" type="text" maxlength="30"></div>
                             <div class="field">
                                 <label for="nfse_deducao_reducao_base">Dedução/redução da base de cálculo do ISSQN (opcional)</label>
                                 <input id="nfse_deducao_reducao_base" name="nfse_deducao_reducao_base" type="text">
@@ -1565,6 +1787,7 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                         document.getElementById('cliente_bairro').value = dados.bairro || '';
                         document.getElementById('cliente_cep').value = formatarCepCliente(dados.cep || '');
                         document.getElementById('cliente_municipio').value = dados.municipio || '';
+                        document.getElementById('cliente_codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
                         document.getElementById('cliente_uf').value = dados.uf || '';
 
                         statusEl.style.color = 'var(--primary)';
@@ -1679,38 +1902,28 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
         const campoDescricaoServico = document.getElementById('nfse_descricao_servico');
         const campoCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal');
         const selectCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal_opcoes');
-        const ajudaCodigoComplementarMunicipal = document.getElementById('ajudaCodigoComplementarMunicipal');
-        let ultimoCodigoComplementarAutomatico = '';
-
         function preencherVariacoesComplementarBH(codigo) {
             if (!selectCodigoTributacaoMunicipal) return;
-
             const partes = codigo.split('.');
             const subitem = partes.length >= 2 ? partes[0] + '.' + partes[1] : null;
             const variacoes = subitem ? variacoesComplementarBH[subitem] : null;
-
+            selectCodigoTributacaoMunicipal.innerHTML = '';
+            if (campoCodigoTributacaoMunicipal) campoCodigoTributacaoMunicipal.value = '';
             if (!variacoes || variacoes.length === 0) {
                 selectCodigoTributacaoMunicipal.style.display = 'none';
-                selectCodigoTributacaoMunicipal.innerHTML = '';
-                if (ajudaCodigoComplementarMunicipal) {
-                    ajudaCodigoComplementarMunicipal.textContent = 'Preenchido automaticamente como "<código>.001" (padrão da maioria dos municípios quando não há especialização própria). Ajuste se o seu município tiver um código diferente.';
-                }
                 return;
             }
-
-            let opcoes = '';
-            variacoes.forEach(function (descricao, indice) {
-                const sufixo = String(indice + 1).padStart(3, '0');
-                const valor = codigo + '.' + sufixo;
-                opcoes += '<option value="' + valor + '">' + valor + ' - ' + descricao + '</option>';
+            const inicial = document.createElement('option');
+            inicial.value = '';
+            inicial.textContent = 'Catálogo BH: escolha uma descrição para preencher o serviço';
+            selectCodigoTributacaoMunicipal.appendChild(inicial);
+            variacoes.forEach(function (descricao) {
+                const opcao = document.createElement('option');
+                opcao.value = descricao;
+                opcao.textContent = descricao;
+                selectCodigoTributacaoMunicipal.appendChild(opcao);
             });
-            selectCodigoTributacaoMunicipal.innerHTML = opcoes;
             selectCodigoTributacaoMunicipal.style.display = '';
-            if (ajudaCodigoComplementarMunicipal) {
-                ajudaCodigoComplementarMunicipal.textContent = variacoes.length > 1
-                    ? ('Encontradas ' + variacoes.length + ' variações para Belo Horizonte (BHISS). Escolha a que corresponde ao seu serviço, ou ajuste manualmente para outro município.')
-                    : 'Variação encontrada para Belo Horizonte (BHISS). Ajuste manualmente se o seu município tiver um código diferente.';
-            }
         }
 
         if (campoCodigoTributacaoNacional && campoDescricaoServico) {
@@ -1722,32 +1935,25 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                     campoDescricaoServico.value = descricaoPadrao;
                 }
 
-                if (campoCodigoTributacaoMunicipal) {
-                    const valorAtual = campoCodigoTributacaoMunicipal.value.trim();
-                    const eraAutomatico = valorAtual === '' || valorAtual === ultimoCodigoComplementarAutomatico;
-                    if (descricaoPadrao && eraAutomatico) {
-                        ultimoCodigoComplementarAutomatico = codigo + '.001';
-                        campoCodigoTributacaoMunicipal.value = ultimoCodigoComplementarAutomatico;
-                    } else if (!descricaoPadrao && eraAutomatico) {
-                        ultimoCodigoComplementarAutomatico = '';
-                        campoCodigoTributacaoMunicipal.value = '';
-                    }
-                }
-
                 if (descricaoPadrao) {
                     preencherVariacoesComplementarBH(codigo);
                 } else if (selectCodigoTributacaoMunicipal) {
                     selectCodigoTributacaoMunicipal.style.display = 'none';
                     selectCodigoTributacaoMunicipal.innerHTML = '';
+            if (campoCodigoTributacaoMunicipal) campoCodigoTributacaoMunicipal.value = '';
                 }
             });
         }
 
-        if (selectCodigoTributacaoMunicipal && campoCodigoTributacaoMunicipal) {
+        if (selectCodigoTributacaoMunicipal && campoDescricaoServico) {
             selectCodigoTributacaoMunicipal.addEventListener('change', function () {
-                if (selectCodigoTributacaoMunicipal.value) {
-                    ultimoCodigoComplementarAutomatico = selectCodigoTributacaoMunicipal.value;
-                    campoCodigoTributacaoMunicipal.value = selectCodigoTributacaoMunicipal.value;
+                const selecao = selectCodigoTributacaoMunicipal.value;
+                const codigoSelecionado = selecao.match(/^([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3})(?:\s*-|$)/);
+                if (campoCodigoTributacaoMunicipal) {
+                    campoCodigoTributacaoMunicipal.value = codigoSelecionado ? codigoSelecionado[1] : '';
+                }
+                if (selecao && campoDescricaoServico.value.trim() === '') {
+                    campoDescricaoServico.value = selecao.replace(/^[0-9.]+\s*-\s*/, '');
                 }
             });
         }
@@ -1837,6 +2043,8 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                 corpoItens.querySelectorAll('.item-catalogo').forEach(function (select) {
                     select.innerHTML = montarOpcoesCatalogo(empresaSelect.value);
                 });
+                const opcao = empresaSelect.options[empresaSelect.selectedIndex];
+                if (opcao && opcao.dataset.ibge) selecionarMunicipioPorCodigo(opcao.dataset.ibge);
             });
         }
 
@@ -1865,12 +2073,17 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
 
             const descricaoServico = document.getElementById('nfse_descricao_servico');
             const valorServico = document.getElementById('nfse_valor_servico');
-            const municipioPrestacao = document.getElementById('nfse_municipio_prestacao');
+            const municipioPrestacao = document.getElementById('nfse_municipio_prestacao_busca');
             const codigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
             const codigoInternoContribuinte = document.getElementById('nfse_codigo_interno_contribuinte');
             [descricaoServico, valorServico, municipioPrestacao, codigoTributacaoNacional, codigoInternoContribuinte].forEach(function (campo) {
                 if (campo) campo.required = ehNfse;
             });
+            if (municipioPrestacao) {
+                const codigoMunicipioPrestacao = document.getElementById('nfse_municipio_prestacao');
+                const selecaoInvalida = ehNfse && municipioPrestacao.value.trim() !== '' && (!codigoMunicipioPrestacao || codigoMunicipioPrestacao.value === '');
+                municipioPrestacao.setCustomValidity(selecaoInvalida ? 'Selecione um município da lista.' : '');
+            }
 
             atualizarObrigatoriedadeTomador();
         }
@@ -1884,6 +2097,122 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             selectTomadorLocal.addEventListener('change', atualizarObrigatoriedadeTomador);
         }
 
+        const municipioCodigo = document.getElementById('nfse_municipio_prestacao');
+        const municipioBusca = document.getElementById('nfse_municipio_prestacao_busca');
+        const municipioOpcoes = document.getElementById('nfse_municipio_prestacao_opcoes');
+        const municipioStatus = document.getElementById('nfse_municipio_prestacao_status');
+        let municipiosIbge = [];
+
+        function normalizarMunicipio(valor) {
+            return String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+        }
+
+        function rotuloMunicipio(municipio) {
+            return municipio.nome + '/' + municipio.uf;
+        }
+
+        function fecharMunicipios() {
+            if (!municipioOpcoes || !municipioBusca) return;
+            municipioOpcoes.classList.remove('aberto');
+            municipioBusca.setAttribute('aria-expanded', 'false');
+        }
+
+        function escolherMunicipio(municipio) {
+            if (!municipioCodigo || !municipioBusca || !municipioStatus) return;
+            municipioCodigo.value = municipio.codigo;
+            municipioBusca.value = rotuloMunicipio(municipio);
+            municipioStatus.textContent = 'Código IBGE: ' + municipio.codigo;
+            municipioBusca.setCustomValidity('');
+            fecharMunicipios();
+        }
+
+        function selecionarMunicipioPorCodigo(codigo) {
+            if (!municipioCodigo) return;
+            municipioCodigo.value = String(codigo || '');
+            const municipio = municipiosIbge.find(function (item) {
+                return String(item.codigo) === String(codigo);
+            });
+            if (municipio) {
+                escolherMunicipio(municipio);
+            } else if (municipioBusca && municipioStatus) {
+                municipioBusca.value = '';
+                municipioBusca.setCustomValidity('');
+                municipioStatus.textContent = 'Pesquise pelo início do nome e selecione o município.';
+            }
+        }
+
+        function renderizarMunicipios() {
+            if (!municipioBusca || !municipioOpcoes || !municipioCodigo || !municipioStatus) return;
+            const termo = normalizarMunicipio(municipioBusca.value);
+            municipioCodigo.value = '';
+            municipioStatus.textContent = 'Selecione um município da lista.';
+            municipioBusca.setCustomValidity('Selecione um município da lista.');
+            municipioOpcoes.innerHTML = '';
+            if (termo === '') {
+                fecharMunicipios();
+                return;
+            }
+
+            const encontrados = municipiosIbge.filter(function (municipio) {
+                return normalizarMunicipio(municipio.nome).startsWith(termo);
+            }).slice(0, 40);
+
+            encontrados.forEach(function (municipio) {
+                const botao = document.createElement('button');
+                botao.type = 'button';
+                botao.className = 'municipio-opcao';
+                botao.setAttribute('role', 'option');
+                botao.textContent = rotuloMunicipio(municipio);
+                botao.addEventListener('click', function () {
+                    escolherMunicipio(municipio);
+                });
+                municipioOpcoes.appendChild(botao);
+            });
+
+            if (encontrados.length === 0) {
+                const vazio = document.createElement('span');
+                vazio.className = 'muted';
+                vazio.style.padding = '0.65rem 0.75rem';
+                vazio.textContent = 'Nenhum município encontrado.';
+                municipioOpcoes.appendChild(vazio);
+            }
+            municipioOpcoes.classList.add('aberto');
+            municipioBusca.setAttribute('aria-expanded', 'true');
+        }
+
+        if (municipioBusca && municipioCodigo && municipioOpcoes) {
+            fetch('ibge-municipios.json', { cache: 'force-cache' })
+                .then(function (resposta) {
+                    if (!resposta.ok) throw new Error('Catálogo de municípios indisponível.');
+                    return resposta.json();
+                })
+                .then(function (municipios) {
+                    municipiosIbge = Array.isArray(municipios) ? municipios : [];
+                    const opcaoEmpresa = empresaSelect ? empresaSelect.options[empresaSelect.selectedIndex] : null;
+                    if (opcaoEmpresa && opcaoEmpresa.dataset.ibge) selecionarMunicipioPorCodigo(opcaoEmpresa.dataset.ibge);
+                })
+                .catch(function () {
+                    municipioStatus.textContent = 'Não foi possível carregar o catálogo de municípios.';
+                });
+
+            municipioBusca.addEventListener('input', renderizarMunicipios);
+            municipioBusca.addEventListener('focus', function () {
+                if (!municipioCodigo.value) renderizarMunicipios();
+            });
+            municipioBusca.addEventListener('keydown', function (evento) {
+                if (evento.key === 'Escape') fecharMunicipios();
+                if (evento.key === 'Enter') {
+                    const primeiraOpcao = municipioOpcoes.querySelector('.municipio-opcao');
+                    if (primeiraOpcao) {
+                        evento.preventDefault();
+                        primeiraOpcao.click();
+                    }
+                }
+            });
+            document.addEventListener('click', function (evento) {
+                if (!evento.target.closest('.municipio-autocomplete')) fecharMunicipios();
+            });
+        }
         const checkboxInformarDps = document.getElementById('nfse_informar_dps');
         const camposDpsManual = document.getElementById('camposDpsManual');
         if (checkboxInformarDps && camposDpsManual) {

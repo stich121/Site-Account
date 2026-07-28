@@ -10,6 +10,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
+require_once __DIR__ . '/nfse-operacoes.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -451,6 +452,25 @@ function rotuloStatusNota(string $status): string
     ][$status] ?? $status;
 }
 
+function obterLockAcaoNota(PDO $db, int $notaId): bool
+{
+    $stmt = $db->prepare('SELECT GET_LOCK(:nome, 0)');
+    $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
+    return (int) $stmt->fetchColumn() === 1;
+}
+
+function liberarLockAcaoNota(PDO $db, int $notaId): void
+{
+    $stmt = $db->prepare('SELECT RELEASE_LOCK(:nome)');
+    $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
+}
+
+function buscarNotaFiscalCompleta(PDO $db, int $notaId): ?array
+{
+    $stmt = $db->prepare('SELECT n.*, e.razao_social AS empresa_razao_social, e.cnpj AS empresa_cnpj, e.inscricao_estadual AS empresa_ie, e.municipio AS empresa_municipio, e.uf AS empresa_uf, e.certificado_arquivo, e.certificado_senha_cifrada, c.nome_razao_social AS cliente_nome, c.cnpj_cpf AS cliente_documento, c.municipio AS cliente_municipio, c.uf AS cliente_uf FROM notas_fiscais n INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id INNER JOIN notas_clientes c ON c.id = n.cliente_id WHERE n.id = :id LIMIT 1');
+    $stmt->execute(['id' => $notaId]);
+    return $stmt->fetch() ?: null;
+}
 try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
@@ -479,6 +499,51 @@ try {
         exit;
     }
 
+    // Documentos fiscais: somente notas autorizadas e dentro do escopo do usuário.
+    if (isset($_GET['xml']) || isset($_GET['danfse'])) {
+        $notaId = (int) ($_GET['xml'] ?? $_GET['danfse']);
+        $notaDocumento = buscarNotaFiscalCompleta($dbNotas, $notaId);
+        if (!$notaDocumento || (!$podeAdministrar && (int) $notaDocumento['funcionario_id'] !== $funcionarioId)) {
+            http_response_code(404);
+            echo 'Nota não encontrada.';
+            exit;
+        }
+        if ($notaDocumento['tipo_nota'] !== 'nfse' || $notaDocumento['status'] !== 'autorizada' || empty($notaDocumento['chave_acesso'])) {
+            http_response_code(409);
+            echo 'Documento fiscal disponível somente para NFS-e autorizada.';
+            exit;
+        }
+
+        try {
+            if (isset($_GET['xml'])) {
+                $xml = trim((string) ($notaDocumento['xml_gerado'] ?? ''));
+                if ($xml === '') {
+                    $consulta = consultarNfseRemota($notaDocumento, $notaDocumento['ambiente'], $notaDocumento['chave_acesso']);
+                    $xml = $consulta['xml'];
+                    $dbNotas->prepare('UPDATE notas_fiscais SET xml_gerado = :xml WHERE id = :id AND status = \'autorizada\'')->execute(['xml' => $xml, 'id' => $notaId]);
+                }
+                header('Content-Type: application/xml; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="nfse-' . preg_replace('/\D/', '', $notaDocumento['chave_acesso']) . '.xml"');
+                header('X-Content-Type-Options: nosniff');
+                echo $xml;
+                exit;
+            }
+
+            $pdf = baixarDanfseRemoto($notaDocumento, $notaDocumento['ambiente'], $notaDocumento['chave_acesso'], $notaDocumento['xml_gerado'] ?? null);
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="danfse-' . preg_replace('/\D/', '', $notaDocumento['chave_acesso']) . '.pdf"');
+            header('X-Content-Type-Options: nosniff');
+            echo $pdf;
+            exit;
+        } catch (Throwable $e) {
+            http_response_code(502);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo isset($_GET['danfse'])
+                ? 'DANFSe indisponível: o endpoint oficial foi descontinuado em 01/07/2026 e este projeto ainda não possui renderizador local NT 008. Baixe o XML fiscal. Detalhe: ' . $e->getMessage()
+                : 'Não foi possível obter o XML fiscal: ' . $e->getMessage();
+            exit;
+        }
+    }
     // Exportação de PDF de conferência (rascunho) via GET, antes de qualquer output HTML.
     if (isset($_GET['pdf'])) {
         $notaId = (int) $_GET['pdf'];
@@ -581,30 +646,58 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
+        $acao = (string) ($_POST['acao'] ?? '');
+        $notaId = (int) ($_POST['nota_id'] ?? 0);
         if (!hash_equals($_SESSION['csrf_notas_fiscais'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
-        } elseif (in_array($_POST['acao'] ?? '', ['marcar_pendente', 'cancelar'], true)) {
-            $notaId = (int) ($_POST['nota_id'] ?? 0);
-            $stmt = $dbNotas->prepare('SELECT funcionario_id, status FROM notas_fiscais WHERE id = :id LIMIT 1');
-            $stmt->execute(['id' => $notaId]);
-            $notaAtual = $stmt->fetch();
-
-            if (!$notaAtual || (!$podeAdministrar && (int) $notaAtual['funcionario_id'] !== $funcionarioId)) {
-                $erro = 'Nota não encontrada.';
-            } elseif ($_POST['acao'] === 'marcar_pendente' && $notaAtual['status'] === 'rascunho') {
-                $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\' WHERE id = :id')->execute(['id' => $notaId]);
-                registrarLogNota($dbNotas, $notaId, $funcionarioId, 'pendente_envio', 'Marcada como pronta para envio (envio automático ainda não configurado).');
-                $sucesso = 'Nota marcada como pendente de envio. A transmissão automática para SEFAZ/Portal Nacional NFS-e ainda será configurada em uma próxima etapa.';
-            } elseif ($_POST['acao'] === 'cancelar' && in_array($notaAtual['status'], ['rascunho', 'pendente_envio'], true)) {
-                $dbNotas->prepare('UPDATE notas_fiscais SET status = \'cancelada\' WHERE id = :id')->execute(['id' => $notaId]);
-                registrarLogNota($dbNotas, $notaId, $funcionarioId, 'cancelada');
-                $sucesso = 'Nota cancelada.';
-            } else {
-                $erro = 'Ação não permitida para o status atual da nota.';
+        } elseif (!in_array($acao, ['marcar_pendente', 'descartar', 'reprocessar', 'consultar', 'cancelar_nfse'], true)) {
+            $erro = 'Ação inválida.';
+        } elseif (!obterLockAcaoNota($dbNotas, $notaId)) {
+            $erro = 'A nota está sendo processada. Aguarde e tente novamente.';
+        } else {
+            try {
+                $notaAtual = buscarNotaFiscalCompleta($dbNotas, $notaId);
+                if (!$notaAtual || (!$podeAdministrar && (int) $notaAtual['funcionario_id'] !== $funcionarioId)) {
+                    $erro = 'Nota não encontrada.';
+                } elseif ($acao === 'marcar_pendente' && $notaAtual['status'] === 'rascunho') {
+                    $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\', motivo_rejeicao = NULL WHERE id = :id AND status = \'rascunho\'')->execute(['id' => $notaId]);
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'pendente_envio', 'Marcada como pronta para processamento.');
+                    $sucesso = 'Nota colocada na fila de envio.';
+                } elseif ($acao === 'descartar' && in_array($notaAtual['status'], ['rascunho', 'pendente_envio'], true)) {
+                    $dbNotas->prepare('UPDATE notas_fiscais SET status = \'cancelada\' WHERE id = :id AND status IN (\'rascunho\', \'pendente_envio\')')->execute(['id' => $notaId]);
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'descartada', 'Documento local descartado antes da autorização; não é cancelamento fiscal.');
+                    $sucesso = 'Documento local descartado. Nenhum evento fiscal de cancelamento foi enviado.';
+                } elseif ($acao === 'reprocessar' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'rejeitada') {
+                    $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\', motivo_rejeicao = NULL WHERE id = :id AND status = \'rejeitada\'')->execute(['id' => $notaId]);
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'reprocessamento_solicitado', 'Nova tentativa solicitada; a fila reconciliará o ID da DPS antes de retransmitir.');
+                    $sucesso = 'NFS-e recolocada na fila com reconciliação obrigatória da DPS.';
+                } elseif ($acao === 'consultar' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'autorizada') {
+                    $consulta = consultarNfseRemota($notaAtual, $notaAtual['ambiente'], (string) $notaAtual['chave_acesso']);
+                    $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET chave_acesso = :chave, xml_gerado = :xml, motivo_rejeicao = NULL WHERE id = :id AND status = \'autorizada\'');
+                    $stmt->execute(['chave' => $consulta['chave_acesso'], 'xml' => $consulta['xml'], 'id' => $notaId]);
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'consultada', 'XML fiscal atualizado a partir do Portal Nacional.');
+                    $sucesso = 'NFS-e consultada e XML fiscal atualizado.';
+                } elseif ($acao === 'cancelar_nfse' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'autorizada') {
+                    $motivo = trim((string) ($_POST['motivo_cancelamento'] ?? ''));
+                    $evento = cancelarNfseRemota($notaAtual, $notaAtual['ambiente'], (string) $notaAtual['chave_acesso'], $motivo, 1);
+                    $arquivoEvento = salvarDocumentoFiscalPrivado($notaId, 'cancelamento-101101', $evento['xml_evento'], 'xml');
+                    $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET status = \'cancelada\', motivo_rejeicao = NULL WHERE id = :id AND status = \'autorizada\'');
+                    $stmt->execute(['id' => $notaId]);
+                    if ($stmt->rowCount() !== 1) {
+                        throw new RuntimeException('O evento foi aceito, mas o estado local mudou; consulte a nota antes de repetir qualquer ação.');
+                    }
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'cancelamento_fiscal', mb_substr('Evento 101101 confirmado. Arquivo privado: ' . $arquivoEvento . '. Motivo: ' . $motivo, 0, 255));
+                    $sucesso = 'Cancelamento fiscal confirmado pelo Portal Nacional.';
+                } else {
+                    $erro = 'Ação não permitida para o tipo ou status atual da nota.';
+                }
+            } catch (Throwable $e) {
+                $erro = 'A operação fiscal não foi concluída: ' . $e->getMessage();
+            } finally {
+                liberarLockAcaoNota($dbNotas, $notaId);
             }
         }
     }
-
     $filtroStatus = trim($_GET['status'] ?? '');
     $where = [];
     $bind = [];
@@ -842,7 +935,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
 
         <section class="panel">
             <h1>Notas Fiscais</h1>
-            <p class="muted">Olá, <?php echo $usuario; ?>. Monte notas de produto (NF-e) ou serviço (NFS-e) para outras empresas. As notas ficam como rascunho até a integração com a SEFAZ e o Portal Nacional da NFS-e ser habilitada.</p>
+            <p class="muted">Olá, <?php echo $usuario; ?>. Acompanhe rascunhos e NFS-e transmitidas, consulte o Portal Nacional e baixe os documentos fiscais.</p>
         </section>
 
         <?php if ($erro !== ''): ?>
@@ -854,7 +947,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
         <?php endif; ?>
 
         <div class="notice warning">
-            <strong>Fase 1 — sem envio automático:</strong> notas criadas aqui ficam em rascunho/pendente de envio. Não há transmissão para a SEFAZ (NF-e) nem para o Portal Nacional da NFS-e ainda. O PDF gerado é só para conferência interna.
+            <strong>Documentos:</strong> “Conferência” gera apenas relatório interno. Para NFS-e autorizada, use “XML fiscal”. O endpoint governamental do DANFSe foi descontinuado em 01/07/2026 e o botão pode ficar indisponível até a implantação do renderizador local NT 008.
         </div>
 
         <section class="panel">
@@ -907,22 +1000,21 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                 </td>
                                 <td>
                                     <div class="row-actions">
-                                        <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> PDF</a>
+                                        <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Conferência</a>
+                                        <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada'): ?>
+                                            <a class="btn btn-outline btn-small" href="notas-fiscais?xml=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-code"></i> XML fiscal</a>
+                                            <a class="btn btn-outline btn-small" href="notas-fiscais?danfse=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFSe</a>
+                                            <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="consultar"><button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-rotate"></i> Consultar</button></form>
+                                            <form method="post" onsubmit="return prepararCancelamentoFiscal(this);"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="cancelar_nfse"><input type="hidden" name="motivo_cancelamento" value=""><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar NFS-e</button></form>
+                                        <?php endif; ?>
                                         <?php if ($nota['status'] === 'rascunho'): ?>
-                                            <form method="post">
-                                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                                <input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>">
-                                                <input type="hidden" name="acao" value="marcar_pendente">
-                                                <button class="btn btn-small" type="submit"><i class="fa-solid fa-paper-plane"></i> Pronta p/ envio</button>
-                                            </form>
+                                            <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="marcar_pendente"><button class="btn btn-small" type="submit"><i class="fa-solid fa-paper-plane"></i> Pronta p/ envio</button></form>
+                                        <?php endif; ?>
+                                        <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada'): ?>
+                                            <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="reprocessar"><button class="btn btn-small" type="submit"><i class="fa-solid fa-rotate-right"></i> Reprocessar</button></form>
                                         <?php endif; ?>
                                         <?php if (in_array($nota['status'], ['rascunho', 'pendente_envio'], true)): ?>
-                                            <form method="post">
-                                                <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                                <input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>">
-                                                <input type="hidden" name="acao" value="cancelar">
-                                                <button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar</button>
-                                            </form>
+                                            <form method="post" onsubmit="return confirm('Descartar este documento local? Nenhum cancelamento fiscal será enviado.');"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="descartar"><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-trash"></i> Descartar</button></form>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -961,6 +1053,18 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 });
         }
 
+        function prepararCancelamentoFiscal(formulario) {
+            const motivo = window.prompt('Motivo fiscal do cancelamento (15 a 255 caracteres):');
+            if (motivo === null) return false;
+            const motivoLimpo = motivo.trim();
+            if (motivoLimpo.length < 15 || motivoLimpo.length > 255) {
+                window.alert('Informe um motivo entre 15 e 255 caracteres.');
+                return false;
+            }
+            if (!window.confirm('Confirmar o envio do evento fiscal de cancelamento ao Portal Nacional?')) return false;
+            formulario.querySelector('[name="motivo_cancelamento"]').value = motivoLimpo;
+            return true;
+        }
         function sair() {
             sessionStorage.removeItem('accountFuncionarioSessao');
             fetch('login?logout=1')

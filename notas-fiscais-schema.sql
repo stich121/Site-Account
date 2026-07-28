@@ -1,12 +1,6 @@
 -- ============================================================
--- BANCO PRINCIPAL (u654041352_Clientes) — rode isso lá
--- ============================================================
-
-ALTER TABLE funcionarios
-    ADD COLUMN IF NOT EXISTS permite_notas_fiscais TINYINT(1) NOT NULL DEFAULT 1 AFTER permite_ponto;
-
--- ============================================================
 -- BANCO DE NOTAS FISCAIS (u654041352_NFSe) — rode isso lá
+-- Este arquivo deve ser importado somente nesse banco.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS empresas_emissoras (
@@ -25,6 +19,10 @@ CREATE TABLE IF NOT EXISTS empresas_emissoras (
     codigo_ibge_municipio VARCHAR(10) NULL,
     uf CHAR(2) NULL,
     crt TINYINT UNSIGNED NULL,
+    nfse_opcao_simples_nacional TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    nfse_regime_apuracao_sn TINYINT UNSIGNED NULL,
+    nfse_tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
+    nfse_regime_especial_tributacao VARCHAR(60) NULL,
     ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
     certificado_arquivo VARCHAR(255) NULL,
     certificado_senha_cifrada VARCHAR(512) NULL,
@@ -88,6 +86,10 @@ CREATE TABLE IF NOT EXISTS notas_clientes (
     cep VARCHAR(12) NULL,
     municipio VARCHAR(120) NULL,
     uf CHAR(2) NULL,
+    codigo_ibge_municipio VARCHAR(7) NULL,
+    codigo_pais VARCHAR(4) NULL,
+    nif VARCHAR(40) NULL,
+    motivo_nao_nif VARCHAR(2) NULL,
     indicador_consumidor_final TINYINT(1) NOT NULL DEFAULT 1,
     criado_por INT UNSIGNED NULL,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -220,9 +222,12 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
     tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
     regime_especial_tributacao VARCHAR(60) NULL,
     exigibilidade_issqn_suspensa ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+    tipo_suspensao_issqn VARCHAR(2) NULL,
+    numero_processo_suspensao VARCHAR(60) NULL,
     issqn_retido ENUM('nao','sim') NOT NULL DEFAULT 'nao',
     issqn_retido_por ENUM('tomador','intermediario') NULL,
     beneficio_municipal ENUM('nao','sim') NOT NULL DEFAULT 'nao',
+    codigo_beneficio_municipal VARCHAR(30) NULL,
     deducao_reducao_base_calculo DECIMAL(12,2) NULL,
     situacao_tributaria_pis_cofins VARCHAR(10) NULL,
     tipo_retencao_pis_cofins_csll VARCHAR(10) NULL,
@@ -236,6 +241,12 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
     tributos_federal_valor DECIMAL(12,2) NULL,
     tributos_estadual_valor DECIMAL(12,2) NULL,
     tributos_municipal_valor DECIMAL(12,2) NULL,
+    ibscbs_finalidade VARCHAR(2) NOT NULL DEFAULT '0',
+    ibscbs_ind_final TINYINT(1) NULL,
+    ibscbs_codigo_indicador_operacao VARCHAR(10) NULL,
+    ibscbs_ind_destinatario VARCHAR(2) NULL,
+    ibscbs_cst VARCHAR(3) NULL,
+    ibscbs_classificacao_tributaria VARCHAR(10) NULL,
     PRIMARY KEY (nota_id),
     CONSTRAINT fk_notas_fiscais_nfse_nota
         FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
@@ -252,7 +263,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais_nfse (
 -- ============================================================
 
 ALTER TABLE notas_fiscais_nfse
-    CHANGE COLUMN tomador_indicador_municipal tomador_inscricao_municipal VARCHAR(20) NULL;
+    CHANGE COLUMN IF EXISTS tomador_indicador_municipal tomador_inscricao_municipal VARCHAR(20) NULL;
 
 ALTER TABLE notas_fiscais_nfse
     ADD COLUMN IF NOT EXISTS codigo_interno_contribuinte VARCHAR(60) NULL AFTER codigo_tributacao_municipal;
@@ -264,3 +275,31 @@ ALTER TABLE notas_fiscais_nfse
 
 ALTER TABLE notas_clientes
     ADD COLUMN IF NOT EXISTS inscricao_municipal VARCHAR(20) NULL AFTER inscricao_estadual;
+
+-- ============================================================
+-- FASE 4 — campos fiscais obrigatorios para emissão nacional completa
+-- Todos os ALTERs são idempotentes para instalações já existentes.
+-- ============================================================
+
+ALTER TABLE empresas_emissoras
+    ADD COLUMN IF NOT EXISTS nfse_opcao_simples_nacional TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER crt,
+    ADD COLUMN IF NOT EXISTS nfse_regime_apuracao_sn TINYINT UNSIGNED NULL AFTER nfse_opcao_simples_nacional,
+    ADD COLUMN IF NOT EXISTS nfse_tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel' AFTER nfse_regime_apuracao_sn,
+    ADD COLUMN IF NOT EXISTS nfse_regime_especial_tributacao VARCHAR(60) NULL AFTER nfse_tributacao_issqn;
+
+ALTER TABLE notas_clientes
+    ADD COLUMN IF NOT EXISTS codigo_ibge_municipio VARCHAR(7) NULL AFTER uf,
+    ADD COLUMN IF NOT EXISTS codigo_pais VARCHAR(4) NULL AFTER codigo_ibge_municipio,
+    ADD COLUMN IF NOT EXISTS nif VARCHAR(40) NULL AFTER codigo_pais,
+    ADD COLUMN IF NOT EXISTS motivo_nao_nif VARCHAR(2) NULL AFTER nif;
+
+ALTER TABLE notas_fiscais_nfse
+    ADD COLUMN IF NOT EXISTS tipo_suspensao_issqn VARCHAR(2) NULL AFTER exigibilidade_issqn_suspensa,
+    ADD COLUMN IF NOT EXISTS numero_processo_suspensao VARCHAR(60) NULL AFTER tipo_suspensao_issqn,
+    ADD COLUMN IF NOT EXISTS codigo_beneficio_municipal VARCHAR(30) NULL AFTER beneficio_municipal,
+    ADD COLUMN IF NOT EXISTS ibscbs_finalidade VARCHAR(2) NOT NULL DEFAULT '0' AFTER tributos_municipal_valor,
+    ADD COLUMN IF NOT EXISTS ibscbs_ind_final TINYINT(1) NULL AFTER ibscbs_finalidade,
+    ADD COLUMN IF NOT EXISTS ibscbs_codigo_indicador_operacao VARCHAR(10) NULL AFTER ibscbs_ind_final,
+    ADD COLUMN IF NOT EXISTS ibscbs_ind_destinatario VARCHAR(2) NULL AFTER ibscbs_codigo_indicador_operacao,
+    ADD COLUMN IF NOT EXISTS ibscbs_cst VARCHAR(3) NULL AFTER ibscbs_ind_destinatario,
+    ADD COLUMN IF NOT EXISTS ibscbs_classificacao_tributaria VARCHAR(10) NULL AFTER ibscbs_cst;

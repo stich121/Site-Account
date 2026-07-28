@@ -26,6 +26,19 @@ function h(string $valor): string
     return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
 }
 
+function cnpjEmpresaValido(string $documento): bool
+{
+    $numero = preg_replace('/\D+/', '', $documento);
+    if (strlen($numero) !== 14 || preg_match('/^(\d)\1+$/', $numero)) return false;
+    foreach ([12, 13] as $posicao) {
+        $soma = 0; $peso = $posicao === 12 ? 5 : 6;
+        for ($i = 0; $i < $posicao; $i++) { $soma += (int) $numero[$i] * $peso; $peso = $peso === 2 ? 9 : $peso - 1; }
+        $digito = $soma % 11 < 2 ? 0 : 11 - ($soma % 11);
+        if ((int) $numero[$posicao] !== $digito) return false;
+    }
+    return true;
+}
+
 function prepararTabelaEmpresasEmissoras(PDO $db): void
 {
     $db->exec(
@@ -46,6 +59,10 @@ function prepararTabelaEmpresasEmissoras(PDO $db): void
             uf CHAR(2) NULL,
             crt TINYINT UNSIGNED NULL,
             ambiente_emissao ENUM('homologacao','producao') NOT NULL DEFAULT 'homologacao',
+            nfse_opcao_simples_nacional TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            nfse_regime_apuracao_sn TINYINT UNSIGNED NULL,
+            nfse_tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel',
+            nfse_regime_especial_tributacao VARCHAR(60) NULL,
             certificado_arquivo VARCHAR(255) NULL,
             certificado_senha_cifrada VARCHAR(512) NULL,
             certificado_atualizado_em TIMESTAMP NULL,
@@ -77,7 +94,11 @@ function colunaExisteEmpresasEmissoras(PDO $db, string $coluna): bool
 function prepararColunasCertificadoEmpresaEmissoras(PDO $db): void
 {
     $campos = [
-        'certificado_arquivo' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_arquivo VARCHAR(255) NULL AFTER ambiente_emissao",
+        'nfse_opcao_simples_nacional' => "ALTER TABLE empresas_emissoras ADD COLUMN nfse_opcao_simples_nacional TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER ambiente_emissao",
+        'nfse_regime_apuracao_sn' => "ALTER TABLE empresas_emissoras ADD COLUMN nfse_regime_apuracao_sn TINYINT UNSIGNED NULL AFTER nfse_opcao_simples_nacional",
+        'nfse_tributacao_issqn' => "ALTER TABLE empresas_emissoras ADD COLUMN nfse_tributacao_issqn VARCHAR(40) NOT NULL DEFAULT 'operacao_tributavel' AFTER nfse_regime_apuracao_sn",
+        'nfse_regime_especial_tributacao' => "ALTER TABLE empresas_emissoras ADD COLUMN nfse_regime_especial_tributacao VARCHAR(60) NULL AFTER nfse_tributacao_issqn",
+        'certificado_arquivo' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_arquivo VARCHAR(255) NULL AFTER nfse_regime_apuracao_sn",
         'certificado_senha_cifrada' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_senha_cifrada VARCHAR(512) NULL AFTER certificado_arquivo",
         'certificado_atualizado_em' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada",
         'certificado_atualizado_por' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em",
@@ -142,9 +163,37 @@ try {
             $uf = strtoupper(trim($_POST['uf'] ?? ''));
             $crt = $_POST['crt'] !== '' ? (int) $_POST['crt'] : null;
             $ambiente = ($_POST['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'producao' : 'homologacao';
+            $opcaoSimplesNacional = (int) ($_POST['nfse_opcao_simples_nacional'] ?? 0);
+            $regimeApuracaoSn = trim((string) ($_POST['nfse_regime_apuracao_sn'] ?? '')) !== '' ? (int) $_POST['nfse_regime_apuracao_sn'] : null;
+            $tributacaoIssqn = trim((string) ($_POST['nfse_tributacao_issqn'] ?? ''));
+            $regimeEspecialTributacao = trim((string) ($_POST['nfse_regime_especial_tributacao'] ?? ''));
 
+            $cnpjNumeros = preg_replace('/\D+/', '', $cnpj);
+            $cepNumeros = preg_replace('/\D+/', '', $cep);
             if ($razaoSocial === '') {
                 $erro = 'Informe a razão social da empresa.';
+            } elseif (!cnpjEmpresaValido($cnpjNumeros)) {
+                $erro = 'Informe um CNPJ válido para a empresa emissora.';
+            } elseif ($inscricaoMunicipal === '') {
+                $erro = 'Informe a Inscrição Municipal da empresa emissora.';
+            } elseif ($logradouro === '' || $numero === '' || $bairro === '' || $municipio === '') {
+                $erro = 'Preencha o endereço fiscal completo da empresa.';
+            } elseif (strlen($cepNumeros) !== 8 || !preg_match('/^\d{7}$/', $codigoIbge) || !preg_match('/^[A-Z]{2}$/', $uf)) {
+                $erro = 'Confira CEP (8 dígitos), código IBGE (7 dígitos) e UF.';
+            } elseif (!in_array($crt, [1, 2, 3, 4], true)) {
+                $erro = 'Selecione o CRT da empresa.';
+            } elseif (!in_array($opcaoSimplesNacional, [1, 2, 3], true)) {
+                $erro = 'Informe a opção da empresa pelo Simples Nacional para a NFS-e.';
+            } elseif ($opcaoSimplesNacional === 3 && !in_array($regimeApuracaoSn, [1, 2, 3], true)) {
+                $erro = 'Para ME/EPP do Simples, informe o regime de apuração da NFS-e.';
+            } elseif ($opcaoSimplesNacional !== 3 && $regimeApuracaoSn !== null) {
+                $erro = 'O regime de apuração do Simples só se aplica à opção ME/EPP.';
+            } elseif (!in_array($tributacaoIssqn, ['operacao_tributavel', 'imune', 'exportacao', 'nao_incidencia'], true)) {
+                $erro = 'Selecione a tributação municipal padrão da NFS-e.';
+            } elseif (!in_array($regimeEspecialTributacao, ['', 'cooperativa', 'estimativa', 'microempresa_municipal', 'notario_registrador', 'profissional_autonomo', 'sociedade_profissionais'], true)) {
+                $erro = 'Selecione um regime especial de tributação válido.';
+            } elseif (in_array($opcaoSimplesNacional, [2, 3], true) && $regimeEspecialTributacao !== '') {
+                $erro = 'MEI e ME/EPP do Simples não podem acumular outro regime especial na NFS-e.';
             } elseif ($empresaIdEdicao > 0) {
                 $stmt = $db->prepare(
                     'UPDATE empresas_emissoras SET
@@ -162,7 +211,11 @@ try {
                         codigo_ibge_municipio = :codigo_ibge_municipio,
                         uf = :uf,
                         crt = :crt,
-                        ambiente_emissao = :ambiente_emissao
+                        ambiente_emissao = :ambiente_emissao,
+                        nfse_opcao_simples_nacional = :nfse_opcao_simples_nacional,
+                        nfse_regime_apuracao_sn = :nfse_regime_apuracao_sn,
+                        nfse_tributacao_issqn = :nfse_tributacao_issqn,
+                        nfse_regime_especial_tributacao = :nfse_regime_especial_tributacao
                      WHERE id = :id'
                 );
                 try {
@@ -182,6 +235,10 @@ try {
                         'uf' => $uf !== '' ? $uf : null,
                         'crt' => $crt,
                         'ambiente_emissao' => $ambiente,
+                        'nfse_opcao_simples_nacional' => $opcaoSimplesNacional,
+                        'nfse_regime_apuracao_sn' => $regimeApuracaoSn,
+                        'nfse_tributacao_issqn' => $tributacaoIssqn,
+                        'nfse_regime_especial_tributacao' => $regimeEspecialTributacao !== '' ? $regimeEspecialTributacao : null,
                         'id' => $empresaIdEdicao,
                     ]);
                     $sucesso = 'Empresa emissora atualizada com sucesso.';
@@ -195,11 +252,11 @@ try {
                     'INSERT INTO empresas_emissoras (
                         razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
                         logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
-                        crt, ambiente_emissao, ativo
+                        crt, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
                      ) VALUES (
                         :razao_social, :nome_fantasia, :cnpj, :inscricao_estadual, :inscricao_municipal,
                         :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :codigo_ibge_municipio, :uf,
-                        :crt, :ambiente_emissao, 1
+                        :crt, :ambiente_emissao, :nfse_opcao_simples_nacional, :nfse_regime_apuracao_sn, :nfse_tributacao_issqn, :nfse_regime_especial_tributacao, 1
                      )
                      ON DUPLICATE KEY UPDATE
                         nome_fantasia = VALUES(nome_fantasia),
@@ -216,6 +273,10 @@ try {
                         uf = VALUES(uf),
                         crt = VALUES(crt),
                         ambiente_emissao = VALUES(ambiente_emissao),
+                        nfse_opcao_simples_nacional = VALUES(nfse_opcao_simples_nacional),
+                        nfse_regime_apuracao_sn = VALUES(nfse_regime_apuracao_sn),
+                        nfse_tributacao_issqn = VALUES(nfse_tributacao_issqn),
+                        nfse_regime_especial_tributacao = VALUES(nfse_regime_especial_tributacao),
                         ativo = 1'
                 );
                 $stmt->execute([
@@ -234,6 +295,10 @@ try {
                     'uf' => $uf !== '' ? $uf : null,
                     'crt' => $crt,
                     'ambiente_emissao' => $ambiente,
+                    'nfse_opcao_simples_nacional' => $opcaoSimplesNacional,
+                    'nfse_regime_apuracao_sn' => $regimeApuracaoSn,
+                    'nfse_tributacao_issqn' => $tributacaoIssqn,
+                    'nfse_regime_especial_tributacao' => $regimeEspecialTributacao !== '' ? $regimeEspecialTributacao : null,
                 ]);
 
                 $sucesso = 'Empresa emissora salva com sucesso.';
@@ -295,7 +360,7 @@ try {
     $stmt = $db->query(
         'SELECT id, razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
                 logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
-                crt, ambiente_emissao, ativo
+                crt, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
          FROM empresas_emissoras
          ORDER BY ativo DESC, razao_social ASC'
     );
@@ -590,7 +655,7 @@ function rotuloCrt(?int $crt): string
                     <div class="field">
                         <label for="cnpj">CNPJ</label>
                         <div class="row-actions">
-                            <input id="cnpj" name="cnpj" type="text" placeholder="00.000.000/0000-00" value="<?php echo h($empresaEmEdicao['cnpj'] ?? ''); ?>" style="flex: 1;">
+                            <input id="cnpj" name="cnpj" type="text" maxlength="18" required placeholder="00.000.000/0000-00" value="<?php echo h($empresaEmEdicao['cnpj'] ?? ''); ?>" style="flex: 1;">
                             <button class="btn btn-outline btn-small" type="button" id="btnBuscarCnpj"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
                         </div>
                         <span class="muted" id="statusBuscaCnpj" style="font-size: 0.78rem;"></span>
@@ -601,7 +666,7 @@ function rotuloCrt(?int $crt): string
                     </div>
                     <div class="field">
                         <label for="inscricao_municipal">Inscrição Municipal</label>
-                        <input id="inscricao_municipal" name="inscricao_municipal" type="text" value="<?php echo h($empresaEmEdicao['inscricao_municipal'] ?? ''); ?>">
+                        <input id="inscricao_municipal" name="inscricao_municipal" type="text" maxlength="30" required value="<?php echo h($empresaEmEdicao['inscricao_municipal'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="crt">Regime tributário (CRT)</label>
@@ -611,6 +676,51 @@ function rotuloCrt(?int $crt): string
                             <option value="1" <?php echo $crtAtual === 1 ? 'selected' : ''; ?>>1 - Simples Nacional</option>
                             <option value="2" <?php echo $crtAtual === 2 ? 'selected' : ''; ?>>2 - Simples Nacional (excesso)</option>
                             <option value="3" <?php echo $crtAtual === 3 ? 'selected' : ''; ?>>3 - Regime Normal</option>
+                            <option value="4" <?php echo $crtAtual === 4 ? 'selected' : ''; ?>>4 - MEI</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="nfse_opcao_simples_nacional">Opção pelo Simples na NFS-e</label>
+                        <?php $opSnAtual = (int) ($empresaEmEdicao['nfse_opcao_simples_nacional'] ?? 1); ?>
+                        <select id="nfse_opcao_simples_nacional" name="nfse_opcao_simples_nacional" required>
+                            <option value="1" <?php echo $opSnAtual === 1 ? 'selected' : ''; ?>>1 - Não optante</option>
+                            <option value="2" <?php echo $opSnAtual === 2 ? 'selected' : ''; ?>>2 - MEI</option>
+                            <option value="3" <?php echo $opSnAtual === 3 ? 'selected' : ''; ?>>3 - ME/EPP optante</option>
+                        </select>
+                        <span class="muted">Classificação específica da NFS-e; não é inferida pelo CRT.</span>
+                    </div>
+                    <div class="field">
+                        <label for="nfse_regime_apuracao_sn">Regime de apuração do Simples</label>
+                        <?php $regSnAtual = $empresaEmEdicao['nfse_regime_apuracao_sn'] ?? null; ?>
+                        <select id="nfse_regime_apuracao_sn" name="nfse_regime_apuracao_sn">
+                            <option value="">Não se aplica</option>
+                            <option value="1" <?php echo (int) $regSnAtual === 1 ? 'selected' : ''; ?>>1 - Tributos federais e ISSQN pelo Simples</option>
+                            <option value="2" <?php echo (int) $regSnAtual === 2 ? 'selected' : ''; ?>>2 - Federais pelo Simples e ISSQN pelo regime normal</option>
+                            <option value="3" <?php echo (int) $regSnAtual === 3 ? 'selected' : ''; ?>>3 - Apuração dos tributos pelo Simples (MEI)</option>
+                        </select>
+                        <span class="muted">Obrigatório somente para ME/EPP optante (opção 3).</span>
+                    </div>
+                    <div class="field">
+                        <label for="nfse_tributacao_issqn">Tributação municipal padrão</label>
+                        <?php $tributacaoIssqnAtual = $empresaEmEdicao['nfse_tributacao_issqn'] ?? 'operacao_tributavel'; ?>
+                        <select id="nfse_tributacao_issqn" name="nfse_tributacao_issqn" required>
+                            <option value="operacao_tributavel" <?php echo $tributacaoIssqnAtual === 'operacao_tributavel' ? 'selected' : ''; ?>>Operação tributável</option>
+                            <option value="imune" <?php echo $tributacaoIssqnAtual === 'imune' ? 'selected' : ''; ?>>Imunidade</option>
+                            <option value="exportacao" <?php echo $tributacaoIssqnAtual === 'exportacao' ? 'selected' : ''; ?>>Exportação de serviço</option>
+                            <option value="nao_incidencia" <?php echo $tributacaoIssqnAtual === 'nao_incidencia' ? 'selected' : ''; ?>>Não incidência</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="nfse_regime_especial_tributacao">Regime especial de tributação</label>
+                        <?php $regimeEspecialAtual = $empresaEmEdicao['nfse_regime_especial_tributacao'] ?? ''; ?>
+                        <select id="nfse_regime_especial_tributacao" name="nfse_regime_especial_tributacao">
+                            <option value="">Nenhum</option>
+                            <option value="cooperativa" <?php echo $regimeEspecialAtual === 'cooperativa' ? 'selected' : ''; ?>>Cooperativa</option>
+                            <option value="estimativa" <?php echo $regimeEspecialAtual === 'estimativa' ? 'selected' : ''; ?>>Estimativa</option>
+                            <option value="microempresa_municipal" <?php echo $regimeEspecialAtual === 'microempresa_municipal' ? 'selected' : ''; ?>>Microempresa municipal</option>
+                            <option value="notario_registrador" <?php echo $regimeEspecialAtual === 'notario_registrador' ? 'selected' : ''; ?>>Notário ou registrador</option>
+                            <option value="profissional_autonomo" <?php echo $regimeEspecialAtual === 'profissional_autonomo' ? 'selected' : ''; ?>>Profissional autônomo</option>
+                            <option value="sociedade_profissionais" <?php echo $regimeEspecialAtual === 'sociedade_profissionais' ? 'selected' : ''; ?>>Sociedade de profissionais</option>
                         </select>
                     </div>
                     <div class="field">
@@ -639,7 +749,7 @@ function rotuloCrt(?int $crt): string
                     </div>
                     <div class="field">
                         <label for="codigo_ibge_municipio">Código IBGE do município</label>
-                        <input id="codigo_ibge_municipio" name="codigo_ibge_municipio" type="text" placeholder="3106200" value="<?php echo h($empresaEmEdicao['codigo_ibge_municipio'] ?? ''); ?>">
+                        <input id="codigo_ibge_municipio" name="codigo_ibge_municipio" type="text" inputmode="numeric" pattern="\d{7}" maxlength="7" required placeholder="3106200" value="<?php echo h($empresaEmEdicao['codigo_ibge_municipio'] ?? ''); ?>">
                     </div>
                     <div class="field">
                         <label for="uf">UF</label>
@@ -850,6 +960,18 @@ function rotuloCrt(?int $crt): string
             });
         }
 
+        const opcaoSimplesNfse = document.getElementById('nfse_opcao_simples_nacional');
+        const regimeEspecialNfse = document.getElementById('nfse_regime_especial_tributacao');
+        function atualizarRegimeEspecialNfse() {
+            if (!opcaoSimplesNfse || !regimeEspecialNfse) return;
+            const simplesPrevalece = opcaoSimplesNfse.value === '2' || opcaoSimplesNfse.value === '3';
+            if (simplesPrevalece) regimeEspecialNfse.value = '';
+            regimeEspecialNfse.disabled = simplesPrevalece;
+        }
+        if (opcaoSimplesNfse) {
+            opcaoSimplesNfse.addEventListener('change', atualizarRegimeEspecialNfse);
+            atualizarRegimeEspecialNfse();
+        }
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
                 .finally(() => {

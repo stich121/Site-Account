@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/nfse-dps-fiscal.php';
 // Integração com o Portal Nacional da NFS-e (SEFIN Nacional / ADN), via
 // nfse-nacional/nfse-php (https://github.com/nfse-nacional/nfse-php).
 //
@@ -12,12 +13,7 @@
 // 2) certificadoEmpresaDisponivel($empresa): a empresa específica tem certificado configurado.
 // Se qualquer uma falhar, as funções retornam um erro claro e recuperável, sem fatal error.
 //
-// O mapeamento de campos da DPS abaixo foi conferido contra o exemplo oficial da lib
-// (examples/contribuinte/emitir.php no repositório). Um ponto que PRECISA de revisão
-// de um contador antes de produção: o campo regTrib.opSimpNac (enquadramento no Simples
-// Nacional) está sendo inferido a partir do CRT que cadastramos em empresas_emissoras,
-// mas são tabelas de código diferentes (CRT é da SEFAZ/NF-e; opSimpNac é do padrão
-// nacional de NFS-e) — a inferência abaixo é uma aproximação razoável, não uma certeza.
+// O mapeamento fiscal da DPS é centralizado em nfse-dps-fiscal.php e validado pelo SDK antes da transmissão.
 
 function integracaoNfseDisponivel(): array
 {
@@ -45,156 +41,36 @@ function integracaoNfseDisponivel(): array
 function certificadoEmpresaDisponivel(array $empresa): array
 {
     if (empty($empresa['certificado_arquivo']) || empty($empresa['certificado_senha_cifrada'])) {
-        return [false, 'Empresa "' . ($empresa['razao_social'] ?? '') . '" ainda não tem certificado digital cadastrado (cadastre em Certificado digital).'];
+        return [false, 'Empresa sem certificado digital A1 cadastrado.'];
     }
-
     $caminho = __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']);
     if (!is_file($caminho)) {
-        return [false, 'Certificado cadastrado para "' . ($empresa['razao_social'] ?? '') . '" não foi encontrado no servidor (recadastre em Certificado digital).'];
+        return [false, 'O certificado A1 cadastrado não foi encontrado no servidor.'];
     }
-
+    try {
+        $conteudo = file_get_contents($caminho);
+        $certs = [];
+        if ($conteudo === false || !openssl_pkcs12_read($conteudo, $certs, descriptografarSegredo((string) $empresa['certificado_senha_cifrada'])) || empty($certs['cert'])) {
+            return [false, 'Não foi possível abrir o certificado A1; confira arquivo e senha.'];
+        }
+        $info = openssl_x509_parse($certs['cert']);
+        if ($info === false || empty($info['validTo_time_t'])) return [false, 'Não foi possível verificar a validade do certificado A1.'];
+        if ((int) $info['validTo_time_t'] < time()) return [false, 'O certificado A1 expirou em ' . date('d/m/Y', (int) $info['validTo_time_t']) . '.'];
+        if (!empty($info['validFrom_time_t']) && (int) $info['validFrom_time_t'] > time()) return [false, 'O certificado A1 ainda não está válido.'];
+    } catch (Throwable $e) {
+        return [false, 'Falha ao validar certificado A1: ' . $e->getMessage()];
+    }
     return [true, ''];
 }
-
-function opSimpNacAPartirDoCrt(?int $crt): int
+function normalizarChaveAcessoNfse(?string $valor): ?string
 {
-    // opSimpNac (padrão NFS-e Nacional): 1 = Não optante, 2 = Optante MEI, 3 = Optante ME/EPP.
-    // crt (nosso cadastro, herdado do padrão NF-e/SEFAZ): 1/2 = Simples Nacional, 3 = Regime Normal.
-    return match ($crt) {
-        1, 2 => 3,
-        default => 1,
-    };
+    $valor = trim((string) $valor);
+    if ($valor === '') return null;
+    return str_starts_with($valor, 'NFS') ? substr($valor, 3) : $valor;
 }
-
-function tribIssqnAPartirDaTributacao(?string $tributacao): int
-{
-    // tribISSQN (padrão NFS-e Nacional): 1 = Operação tributável, 2 = Isenção, 3 = Imune,
-    // 4 = Exportação de serviço, 5 = Não incidência, 6 = Imunidade/isenção parcial.
-    return match ($tributacao) {
-        'isenta' => 2,
-        'imune' => 3,
-        'exportacao' => 4,
-        'nao_incidencia' => 5,
-        default => 1,
-    };
-}
-
 function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $itens, ?array $nfse = null): array
 {
-    $cnpjPrestador = preg_replace('/\D/', '', (string) ($empresa['cnpj'] ?? ''));
-    $codigoMunicipio = (string) ($empresa['codigo_ibge_municipio'] ?? '');
-    $serie = ($nfse['serie_dps'] ?? '') !== '' ? (string) $nfse['serie_dps'] : '1';
-    $numero = ($nfse['numero_dps'] ?? '') !== '' ? (string) $nfse['numero_dps'] : (string) $nota['numero_interno'];
-    $dataCompetencia = $nfse['data_competencia'] ?? $nota['data_emissao'];
-
-    $idDps = \Nfse\Support\IdGenerator::generateDpsId(
-        cpfCnpj: $cnpjPrestador,
-        codIbge: $codigoMunicipio,
-        serieDps: $serie,
-        numDps: $numero
-    );
-
-    $servicoDescricao = $nfse['descricao_servico'] ?? implode('; ', array_map(
-        static fn (array $item): string => $item['descricao'],
-        $itens
-    ));
-    $codigoServicoNacional = $nfse['codigo_tributacao_nacional'] ?? ($itens[0]['codigo_servico_municipal'] ?? null);
-    $codigoServicoMunicipal = $nfse['codigo_tributacao_municipal'] ?? null;
-
-    $chaveDocumentoTomador = $cliente['tipo_pessoa'] === 'PF' ? 'CPF' : 'CNPJ';
-    $documentoTomador = preg_replace('/\D/', '', (string) ($cliente['cnpj_cpf'] ?? ''));
-
-    $issqnRetido = ($nfse['issqn_retido'] ?? 'nao') === 'sim';
-    // tpRetISSQN (padrão NFS-e Nacional): 1 = Não retido, 2 = Retido pelo tomador, 3 = Retido pelo intermediário.
-    $tpRetIssqn = 1;
-    if ($issqnRetido) {
-        $tpRetIssqn = ($nfse['issqn_retido_por'] ?? 'tomador') === 'intermediario' ? 3 : 2;
-    }
-
-    return [
-        'idDps' => $idDps,
-        'dados' => [
-            '@attributes' => [
-                'versao' => '1.01',
-            ],
-            'infDPS' => [
-                '@attributes' => [
-                    'Id' => $idDps,
-                ],
-                'tpAmb' => $nota['ambiente'] === 'producao' ? 1 : 2,
-                'dhEmi' => (new DateTimeImmutable($nota['data_emissao']))->format('c'),
-                'verAplic' => 'AccountContabilidade-1.0',
-                'serie' => $serie,
-                'nDPS' => $numero,
-                'dCompet' => $dataCompetencia,
-                'tpEmit' => 1, // 1 = Prestador emite a própria DPS.
-                'cLocEmi' => $codigoMunicipio,
-                'prest' => [
-                    'CNPJ' => $cnpjPrestador,
-                    'xNome' => $empresa['razao_social'],
-                    'end' => [
-                        'endNac' => [
-                            'cMun' => $codigoMunicipio,
-                            'CEP' => preg_replace('/\D/', '', (string) ($empresa['cep'] ?? '')),
-                        ],
-                        'xLgr' => $empresa['logradouro'] ?? '',
-                        'nro' => $empresa['numero'] ?? '',
-                        'xCpl' => $empresa['complemento'] ?? '',
-                        'xBairro' => $empresa['bairro'] ?? '',
-                    ],
-                    'email' => null,
-                    'regTrib' => [
-                        'opSimpNac' => opSimpNacAPartirDoCrt($empresa['crt'] !== null ? (int) $empresa['crt'] : null),
-                        'regApTribSN' => null,
-                        'regEspTrib' => 0, // 0 = Nenhum regime especial de tributação.
-                    ],
-                ],
-                'toma' => [
-                    $chaveDocumentoTomador => $documentoTomador,
-                    'IM' => ($nfse['tomador_local'] ?? null) === 'brasil' ? ($nfse['tomador_inscricao_municipal'] ?? null) : null,
-                    'xNome' => $cliente['nome_razao_social'],
-                    'email' => $cliente['email'] ?? null,
-                    'fone' => $nfse['tomador_telefone'] ?? null,
-                ],
-                'serv' => [
-                    'locPrest' => [
-                        'cLocPrestacao' => $nfse['municipio_prestacao'] ?? $codigoMunicipio,
-                    ],
-                    'cServ' => [
-                        'cTribNac' => $codigoServicoNacional,
-                        'cTribMun' => $codigoServicoMunicipal,
-                        'xDescServ' => $servicoDescricao,
-                        'cIntContrib' => $nfse['codigo_interno_contribuinte'] ?? null,
-                    ],
-                ],
-                'valores' => [
-                    'vServPrest' => [
-                        'vServ' => round((float) $nota['valor_total'], 2),
-                    ],
-                    'vDescCondIncond' => [
-                        'vDescIncond' => $nfse['desconto_incondicionado'] ?? null,
-                        'vDescCond' => $nfse['desconto_condicionado'] ?? null,
-                    ],
-                    // Confirmar com o contador antes de produção: CST do PIS/COFINS e indTotTrib
-                    // ainda usam um valor de partida quando o campo não é preenchido no formulário.
-                    'trib' => [
-                        'tribMun' => [
-                            'tribISSQN' => tribIssqnAPartirDaTributacao($nfse['tributacao_issqn'] ?? null),
-                            'tpRetISSQN' => $tpRetIssqn,
-                        ],
-                        'tribFed' => [
-                            'piscofins' => [
-                                'CST' => ($nfse['situacao_tributaria_pis_cofins'] ?? '') !== '' ? $nfse['situacao_tributaria_pis_cofins'] : '08',
-                            ],
-                        ],
-                        'totTrib' => [
-                            'indTotTrib' => 0,
-                        ],
-                    ],
-                ],
-            ],
-        ],
-    ];
+    return nfseMontarDps($nota, $empresa, $cliente, $itens, $nfse);
 }
 
 function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa): array
@@ -208,6 +84,14 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa)
             'chave_acesso' => null,
             'protocolo_autorizacao' => null,
             'xml_gerado' => null,
+        ];
+    }
+
+    if (!empty($dpsMontada['erros_validacao'])) {
+        return [
+            'sucesso' => false, 'status' => 'rejeitada',
+            'motivo_rejeicao' => 'DPS não transmitida: ' . implode(' ', $dpsMontada['erros_validacao']),
+            'chave_acesso' => null, 'protocolo_autorizacao' => null, 'xml_gerado' => null,
         ];
     }
 
@@ -232,15 +116,21 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa)
 
         $nfse = new \Nfse\Nfse($context);
         $dps = new \Nfse\Dto\Nfse\DpsData($dpsMontada['dados']);
+        if (class_exists(\Nfse\Validator\DpsValidator::class)) {
+            $validacao = (new \Nfse\Validator\DpsValidator())->validate($dps);
+            if (!$validacao->isValid) {
+                return ['sucesso' => false, 'status' => 'rejeitada', 'motivo_rejeicao' => 'DPS inválida: ' . implode(' ', $validacao->errors), 'chave_acesso' => null, 'protocolo_autorizacao' => null, 'xml_gerado' => null];
+            }
+        }
         $nfseData = $nfse->contribuinte()->emitir($dps);
 
         return [
             'sucesso' => true,
             'status' => 'autorizada',
             'motivo_rejeicao' => null,
-            'chave_acesso' => $nfseData->infNfse->id ?? null,
-            'protocolo_autorizacao' => null,
-            'xml_gerado' => null,
+            'chave_acesso' => normalizarChaveAcessoNfse($nfseData->infNfse->id ?? null),
+            'protocolo_autorizacao' => $nfseData->infNfse->numeroDfse ?? null,
+            'xml_gerado' => property_exists($nfseData, 'nfseXml') && is_string($nfseData->nfseXml) ? $nfseData->nfseXml : null,
         ];
     } catch (Throwable $e) {
         return [
