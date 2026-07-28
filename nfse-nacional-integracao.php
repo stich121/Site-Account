@@ -1,4 +1,8 @@
 <?php
+$autoloadNfse = __DIR__ . '/vendor/autoload.php';
+if (is_file($autoloadNfse)) {
+    require_once $autoloadNfse;
+}
 require_once __DIR__ . '/nfse-dps-fiscal.php';
 // Integração com o Portal Nacional da NFS-e (SEFIN Nacional / ADN), via
 // nfse-nacional/nfse-php (https://github.com/nfse-nacional/nfse-php).
@@ -67,6 +71,10 @@ function normalizarChaveAcessoNfse(?string $valor): ?string
     $valor = trim((string) $valor);
     if ($valor === '') return null;
     return str_starts_with($valor, 'NFS') ? substr($valor, 3) : $valor;
+}
+function nfseIdDpsValido(string $idDps): bool
+{
+    return preg_match('/^DPS[0-9]{42}$/D', $idDps) === 1;
 }
 function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $itens, ?array $nfse = null): array
 {

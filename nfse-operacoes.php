@@ -51,6 +51,9 @@ function reconciliarDpsNfse(array $empresa, string $ambiente, string $idDps): ?a
     if ($idDps === '') {
         return null;
     }
+    if (!nfseIdDpsValido($idDps)) {
+        throw new InvalidArgumentException('O identificador da DPS é inválido e não será consultado no Portal Nacional.');
+    }
 
     $servico = servicoContribuinteNfse($empresa, $ambiente);
     if (!$servico->verificarDps($idDps)) {

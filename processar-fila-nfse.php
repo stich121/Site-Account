@@ -99,6 +99,26 @@ function processarNotaNfse(PDO $dbNotas, array $notaResumo, int $operadorId): ar
         $dps = dpsAPartirDaNota($nota, $empresa, $cliente, $itens, $nfse);
         $idDps = (string) ($dps['idDps'] ?? '');
 
+        if (!empty($dps['erros_validacao']) || !nfseIdDpsValido($idDps)) {
+            $errosDps = array_values(array_unique(array_filter(array_map('strval', $dps['erros_validacao'] ?? []))));
+            if (!nfseIdDpsValido($idDps)) {
+                $errosDps[] = 'Identificador da DPS inválido.';
+            }
+            $motivo = 'DPS não transmitida: ' . implode(' ', array_unique($errosDps));
+            $resultado = [
+                'sucesso' => false,
+                'status' => 'rejeitada',
+                'motivo_rejeicao' => $motivo,
+                'chave_acesso' => null,
+                'protocolo_autorizacao' => null,
+                'xml_gerado' => null,
+            ];
+            $stmt = $dbNotas->prepare("UPDATE notas_fiscais SET status = 'rejeitada', motivo_rejeicao = :motivo WHERE id = :id AND status = 'pendente_envio'");
+            $stmt->execute(['motivo' => $motivo, 'id' => $notaId]);
+            registrarLogNota($dbNotas, $notaId, $operadorId, 'rejeitada', mb_substr($motivo, 0, 255));
+            return $resultado;
+        }
+
         try {
             $reconciliada = reconciliarDpsNfse($empresa, $nota['ambiente'], $idDps);
         } catch (Throwable $e) {
