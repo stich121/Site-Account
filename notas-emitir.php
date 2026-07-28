@@ -56,6 +56,29 @@ function catalogoIbsCbsNfse(): array
     return $catalogo;
 }
 
+function catalogoCorrelacaoNbsNfse(): array
+{
+    static $catalogo = null;
+    if ($catalogo === null) {
+        $arquivo = __DIR__ . '/nfse-nbs-correlacao.json';
+        $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
+        $catalogo = is_array($conteudo) ? $conteudo : [];
+    }
+
+    return $catalogo;
+}
+
+function opcoesNbsPorCodigoTributacao(string $codigoTributacao): array
+{
+    $partes = explode('.', trim($codigoTributacao));
+    $itemLc116 = count($partes) >= 2
+        ? str_pad((string) ((int) $partes[0]), 2, '0', STR_PAD_LEFT) . '.' . str_pad((string) ((int) $partes[1]), 2, '0', STR_PAD_LEFT)
+        : '';
+    $opcoes = catalogoCorrelacaoNbsNfse()['itens'][$itemLc116]['nbs'] ?? [];
+
+    return is_array($opcoes) ? $opcoes : [];
+}
+
 function itemCatalogoIbsCbs(string $grupo, string $codigo): ?array
 {
     foreach (catalogoIbsCbsNfse()[$grupo] ?? [] as $item) {
@@ -693,7 +716,11 @@ try {
                 $codigoInternoContribuinte = trim($_POST['nfse_codigo_interno_contribuinte'] ?? '');
                 // A indicação será derivada da tributação municipal da empresa emissora.
                 $imuneExportacao = 'nao';
-                $itemNbs = trim($_POST['nfse_item_nbs'] ?? '');
+                $opcoesNbsServico = opcoesNbsPorCodigoTributacao($codigoTributacaoNacional);
+                $itemNbs = preg_replace('/\D+/', '', trim($_POST['nfse_item_nbs'] ?? ''));
+                if (count($opcoesNbsServico) === 1) {
+                    $itemNbs = (string) ($opcoesNbsServico[0]['codigo'] ?? '');
+                }
                 $descricaoServico = trim($_POST['nfse_descricao_servico'] ?? '');
                 $documentoResponsabilidadeTecnica = trim($_POST['nfse_documento_responsabilidade_tecnica'] ?? '');
                 $documentoReferencia = trim($_POST['nfse_documento_referencia'] ?? '');
@@ -864,6 +891,8 @@ try {
             $ibscbsObrigatorio = $tipoNota === 'nfse' && (int) ($empresaSelecionada['nfse_opcao_simples_nacional'] ?? 0) === 1 && ($dadosNfse['data_competencia'] ?? '') >= '2026-08-03';
             $cindopOficial = $dadosNfse && $dadosNfse['ibscbs_codigo_indicador_operacao'] !== null ? itemCatalogoIbsCbs('cindop', (string) $dadosNfse['ibscbs_codigo_indicador_operacao']) : null;
             $cclassOficial = $dadosNfse && $dadosNfse['ibscbs_classificacao_tributaria'] !== null ? itemCatalogoIbsCbs('cclass', (string) $dadosNfse['ibscbs_classificacao_tributaria']) : null;
+            $opcoesNbsOficiais = $dadosNfse ? opcoesNbsPorCodigoTributacao((string) ($dadosNfse['codigo_tributacao_nacional'] ?? '')) : [];
+            $codigosNbsPermitidos = array_column($opcoesNbsOficiais, 'codigo');
 
             if ($empresaId <= 0 || $empresaSelecionada === null) {
                 $erro = 'Selecione uma empresa emissora ativa.';
@@ -892,6 +921,10 @@ try {
 
             } elseif ($tipoNota === 'nfse' && !codigoMunicipioIbgeValido((string) $dadosNfse['municipio_prestacao'])) {
                 $erro = 'Selecione um município válido na lista oficial do IBGE.';
+            } elseif ($tipoNota === 'nfse' && $opcoesNbsOficiais !== [] && $dadosNfse['item_nbs'] === null) {
+                $erro = 'Selecione a NBS oficial correspondente ao serviço prestado.';
+            } elseif ($tipoNota === 'nfse' && $opcoesNbsOficiais !== [] && !in_array((string) $dadosNfse['item_nbs'], $codigosNbsPermitidos, true)) {
+                $erro = 'A NBS informada não corresponde ao serviço na correlação oficial da NFS-e.';
             } elseif ($tipoNota === 'nfse' && $dadosNfse['intermediario_incluido'] && (!documentoNfseValido((string) $dadosNfse['intermediario_cpf_cnpj']) || $dadosNfse['intermediario_nome'] === null)) {
                 $erro = 'Intermediário informado exige CPF/CNPJ válido e nome/razão social.';
             } elseif ($tipoNota === 'nfse' && ((float) ($dadosNfse['desconto_incondicionado'] ?? 0) + (float) ($dadosNfse['desconto_condicionado'] ?? 0) > $valorTotalNota)) {
@@ -1100,6 +1133,7 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
 $edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"itens":[]}';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
+$correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -1656,8 +1690,11 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                             </div>
 
                             <div class="field">
-                                <label for="nfse_item_nbs">Item da NBS (cNBS, quando aplicável)</label>
-                                <input id="nfse_item_nbs" name="nfse_item_nbs" type="text">
+                                <label for="nfse_item_nbs">NBS do serviço (cNBS)</label>
+                                <select id="nfse_item_nbs" name="nfse_item_nbs" disabled>
+                                    <option value="">Escolha primeiro o serviço prestado</option>
+                                </select>
+                                <span class="muted" id="nfse_item_nbs_status" style="font-size: 0.78rem;">A NBS será definida conforme a correlação oficial da NFS-e.</span>
                             </div>
                             <div class="field">
                                 <label for="nfse_codigo_interno_contribuinte">Código interno do contribuinte</label>
@@ -2094,11 +2131,55 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
             mapaCodigosTributacaoNacional[item.codigo] = item.descricao;
         });
         const variacoesComplementarBH = <?php echo json_encode($variacoesComplementarBH, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+        const correlacaoNbsPorItemLc116 = <?php echo json_encode($correlacaoNbsNfse['itens'] ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
         const campoCodigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
         const campoDescricaoServico = document.getElementById('nfse_descricao_servico');
         const campoCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal');
         const selectCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal_opcoes');
+        const campoNbs = document.getElementById('nfse_item_nbs');
+        const statusNbs = document.getElementById('nfse_item_nbs_status');
+        const nbsSalvaEdicao = dadosEdicaoNota && dadosEdicaoNota.nfse ? String(dadosEdicaoNota.nfse.item_nbs || '').replace(/\D/g, '') : '';
+        function atualizarNbsPorServico() {
+            if (!campoNbs || !campoCodigoTributacaoNacional) return;
+            const partes = campoCodigoTributacaoNacional.value.trim().split('.');
+            const itemLc116 = partes.length >= 2 ? partes[0].padStart(2, '0') + '.' + partes[1].padStart(2, '0') : '';
+            const correlacao = correlacaoNbsPorItemLc116[itemLc116] || null;
+            const opcoes = correlacao && Array.isArray(correlacao.nbs) ? correlacao.nbs : [];
+            const valorAnterior = String(campoNbs.value || nbsSalvaEdicao).replace(/\D/g, '');
+
+            campoNbs.innerHTML = '';
+            campoNbs.disabled = opcoes.length === 0;
+            campoNbs.required = opcoes.length > 0;
+
+            const inicial = document.createElement('option');
+            inicial.value = '';
+            inicial.textContent = opcoes.length === 0
+                ? 'Sem NBS aplicável na correlação oficial'
+                : (opcoes.length === 1 ? 'NBS definida automaticamente' : 'Selecione a NBS específica do serviço');
+            campoNbs.appendChild(inicial);
+
+            opcoes.forEach(function (item) {
+                const opcao = document.createElement('option');
+                opcao.value = item.codigo;
+                opcao.textContent = item.codigo_formatado + ' - ' + item.descricao;
+                campoNbs.appendChild(opcao);
+            });
+
+            const valorPermitido = opcoes.some(function (item) { return item.codigo === valorAnterior; });
+            if (opcoes.length === 1) {
+                campoNbs.value = opcoes[0].codigo;
+                if (statusNbs) statusNbs.textContent = 'Preenchida automaticamente pela correlação oficial para ' + itemLc116 + '.';
+            } else if (valorPermitido) {
+                campoNbs.value = valorAnterior;
+                if (statusNbs) statusNbs.textContent = 'NBS salva e compatível com o serviço selecionado.';
+            } else if (opcoes.length > 1) {
+                campoNbs.value = '';
+                if (statusNbs) statusNbs.textContent = opcoes.length + ' NBS oficiais são possíveis. Escolha a descrição exata do serviço.';
+            } else if (statusNbs) {
+                statusNbs.textContent = 'Este item não possui NBS aplicável no Anexo VIII oficial.';
+            }
+        }
         function preencherVariacoesComplementarBH(codigo) {
             if (!selectCodigoTributacaoMunicipal) return;
             const partes = codigo.split('.');
@@ -2139,7 +2220,9 @@ $variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
                     selectCodigoTributacaoMunicipal.innerHTML = '';
             if (campoCodigoTributacaoMunicipal) campoCodigoTributacaoMunicipal.value = '';
                 }
+                atualizarNbsPorServico();
             });
+            atualizarNbsPorServico();
         }
 
         if (selectCodigoTributacaoMunicipal && campoDescricaoServico) {
