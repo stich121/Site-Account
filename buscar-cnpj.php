@@ -28,19 +28,25 @@ if (strlen($cnpj) !== 14) {
 }
 
 try {
+    if (!function_exists('curl_init')) {
+        throw new RuntimeException('Extensão curl do PHP não está habilitada neste servidor.');
+    }
+
     $ch = curl_init('https://brasilapi.com.br/api/cnpj/v1/' . $cnpj);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 10,
         CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_USERAGENT => 'AccountContabilidade-Site/1.0',
     ]);
     $resposta = curl_exec($ch);
     $statusHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $erroCurl = curl_error($ch);
+    $erroCurlNum = curl_errno($ch);
     curl_close($ch);
 
     if ($resposta === false) {
-        throw new RuntimeException('Não foi possível consultar o CNPJ agora: ' . $erroCurl);
+        throw new RuntimeException("Não foi possível consultar o CNPJ agora (curl #{$erroCurlNum}: {$erroCurl}).");
     }
 
     if ($statusHttp === 404) {
@@ -51,7 +57,7 @@ try {
 
     if ($statusHttp !== 200) {
         http_response_code(502);
-        echo json_encode(['erro' => 'Serviço de consulta de CNPJ indisponível no momento (tente novamente em instantes).']);
+        echo json_encode(['erro' => "Serviço de consulta de CNPJ retornou status HTTP {$statusHttp}. Resposta: " . substr((string) $resposta, 0, 300)]);
         exit;
     }
 
