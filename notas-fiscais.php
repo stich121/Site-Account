@@ -1021,7 +1021,11 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
                         </div>
                         <div class="field">
                             <label for="cnpj_cpf">CNPJ / CPF</label>
-                            <input id="cnpj_cpf" name="cnpj_cpf" type="text">
+                            <div class="row-actions">
+                                <input id="cnpj_cpf" name="cnpj_cpf" type="text" style="flex: 1;">
+                                <button class="btn btn-outline btn-small" type="button" id="btnBuscarCnpjCliente"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+                            </div>
+                            <span class="muted" id="statusBuscaCnpjCliente" style="font-size: 0.78rem;"></span>
                         </div>
                         <div class="field">
                             <label for="cliente_inscricao_estadual">Inscrição Estadual (ou "ISENTO")</label>
@@ -1230,6 +1234,98 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
     </div>
 
     <script>
+        function formatarCnpjOuCpf(valor, tipoPessoa) {
+            const digitos = (valor || '').replace(/\D/g, '');
+            if (tipoPessoa === 'PF') {
+                const d = digitos.slice(0, 11);
+                if (d.length > 9) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2})$/, '$1.$2.$3-$4').replace(/-$/, '');
+                if (d.length > 6) return d.replace(/^(\d{3})(\d{3})(\d{0,3})$/, '$1.$2.$3');
+                if (d.length > 3) return d.replace(/^(\d{3})(\d{0,3})$/, '$1.$2');
+                return d;
+            }
+            const d = digitos.slice(0, 14);
+            if (d.length > 12) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})$/, '$1.$2.$3/$4-$5').replace(/-$/, '');
+            if (d.length > 8) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4})$/, '$1.$2.$3/$4');
+            if (d.length > 5) return d.replace(/^(\d{2})(\d{3})(\d{0,3})$/, '$1.$2.$3');
+            if (d.length > 2) return d.replace(/^(\d{2})(\d{0,3})$/, '$1.$2');
+            return d;
+        }
+
+        function formatarCepCliente(valor) {
+            const d = (valor || '').replace(/\D/g, '').slice(0, 8);
+            return d.length > 5 ? d.replace(/^(\d{5})(\d{0,3})$/, '$1-$2') : d;
+        }
+
+        const campoCnpjCpf = document.getElementById('cnpj_cpf');
+        const campoTipoPessoa = document.getElementById('tipo_pessoa');
+        const campoCepCliente = document.getElementById('cliente_cep');
+        const btnBuscarCnpjCliente = document.getElementById('btnBuscarCnpjCliente');
+
+        if (campoCnpjCpf && campoTipoPessoa) {
+            campoCnpjCpf.addEventListener('input', function () {
+                campoCnpjCpf.value = formatarCnpjOuCpf(campoCnpjCpf.value, campoTipoPessoa.value);
+            });
+            campoTipoPessoa.addEventListener('change', function () {
+                campoCnpjCpf.value = formatarCnpjOuCpf(campoCnpjCpf.value, campoTipoPessoa.value);
+                if (btnBuscarCnpjCliente) {
+                    btnBuscarCnpjCliente.style.display = campoTipoPessoa.value === 'PF' ? 'none' : '';
+                }
+            });
+        }
+
+        if (campoCepCliente) {
+            campoCepCliente.addEventListener('input', function () {
+                campoCepCliente.value = formatarCepCliente(campoCepCliente.value);
+            });
+        }
+
+        if (btnBuscarCnpjCliente) {
+            btnBuscarCnpjCliente.addEventListener('click', function () {
+                const statusEl = document.getElementById('statusBuscaCnpjCliente');
+                const digitos = (campoCnpjCpf.value || '').replace(/\D/g, '');
+
+                if (digitos.length !== 14) {
+                    statusEl.textContent = 'Informe um CNPJ com 14 dígitos antes de buscar.';
+                    statusEl.style.color = '#FFD1CE';
+                    return;
+                }
+
+                statusEl.textContent = 'Buscando...';
+                statusEl.style.color = '';
+                btnBuscarCnpjCliente.disabled = true;
+
+                fetch('buscar-cnpj?cnpj=' + digitos)
+                    .then(function (resposta) { return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; }); })
+                    .then(function (resultado) {
+                        if (!resultado.ok) {
+                            statusEl.textContent = resultado.dados.erro || 'Não foi possível buscar o CNPJ.';
+                            statusEl.style.color = '#FFD1CE';
+                            return;
+                        }
+
+                        const dados = resultado.dados;
+                        document.getElementById('nome_razao_social').value = dados.razao_social || '';
+                        document.getElementById('cliente_logradouro').value = dados.logradouro || '';
+                        document.getElementById('cliente_numero').value = dados.numero || '';
+                        document.getElementById('cliente_complemento').value = dados.complemento || '';
+                        document.getElementById('cliente_bairro').value = dados.bairro || '';
+                        document.getElementById('cliente_cep').value = formatarCepCliente(dados.cep || '');
+                        document.getElementById('cliente_municipio').value = dados.municipio || '';
+                        document.getElementById('cliente_uf').value = dados.uf || '';
+
+                        statusEl.style.color = 'var(--primary)';
+                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de cadastrar.';
+                    })
+                    .catch(function () {
+                        statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
+                        statusEl.style.color = '#FFD1CE';
+                    })
+                    .finally(function () {
+                        btnBuscarCnpjCliente.disabled = false;
+                    });
+            });
+        }
+
         const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
         const menuDropdown = document.getElementById('menuDropdown');
         if (btnMenuHamburguer && menuDropdown) {

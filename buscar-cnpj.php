@@ -3,6 +3,7 @@
 // chave dos dados da Receita Federal), pra preencher o formulário de empresa emissora
 // sem precisar digitar tudo na mão.
 require_once __DIR__ . '/seguranca.php';
+require_once __DIR__ . '/config_db.php';
 iniciarSessaoSegura(true);
 
 header('Content-Type: application/json; charset=utf-8');
@@ -13,10 +14,18 @@ if (!isset($_SESSION['funcionario_id'])) {
     exit;
 }
 
-$nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
-if ($nivelAcesso < 3) {
-    http_response_code(403);
-    echo json_encode(['erro' => 'Sem permissão para consultar CNPJ.']);
+try {
+    $db = obterConexao();
+    $stmt = $db->prepare('SELECT permite_notas_fiscais FROM funcionarios WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => (int) $_SESSION['funcionario_id']]);
+    if ((int) ($stmt->fetchColumn() ?: 0) !== 1) {
+        http_response_code(403);
+        echo json_encode(['erro' => 'Sem permissão para consultar CNPJ.']);
+        exit;
+    }
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['erro' => 'Erro ao checar permissão: ' . $e->getMessage()]);
     exit;
 }
 
