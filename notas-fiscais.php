@@ -145,6 +145,11 @@ function prepararTabelaEmpresasEmissorasNotas(PDO $db): void
 
 function semearEmpresasEmissorasNotas(PDO $db): void
 {
+    // So semeia se a tabela estiver vazia (ver comentario equivalente em notas-empresas-emissoras.php).
+    if ((int) $db->query('SELECT COUNT(*) FROM empresas_emissoras')->fetchColumn() > 0) {
+        return;
+    }
+
     $stmt = $db->prepare(
         'INSERT INTO empresas_emissoras (razao_social, ambiente_emissao, ativo)
          VALUES (:razao_social, \'homologacao\', 1)

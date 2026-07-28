@@ -91,6 +91,13 @@ function prepararColunasCertificadoEmpresaEmissoras(PDO $db): void
 
 function semearEmpresasEmissoras(PDO $db): void
 {
+    // So semeia se a tabela estiver vazia: rodar isso em toda carga de pagina, casando por
+    // razao_social, recriava uma empresa "padrao" em branco sempre que alguem renomeava
+    // (ex.: editar "Smarky" para o nome fantasia completo fazia surgir um "Smarky" novo vazio).
+    if ((int) $db->query('SELECT COUNT(*) FROM empresas_emissoras')->fetchColumn() > 0) {
+        return;
+    }
+
     $stmt = $db->prepare(
         'INSERT INTO empresas_emissoras (razao_social, ambiente_emissao, ativo)
          VALUES (:razao_social, \'homologacao\', 1)
