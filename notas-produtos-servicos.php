@@ -184,6 +184,56 @@ try {
 
                 $sucesso = 'Item cadastrado no catálogo.';
             }
+        } elseif (($_POST['acao'] ?? '') === 'atualizar') {
+            $itemId = (int) ($_POST['item_id_edicao'] ?? 0);
+            $tipo = ($_POST['tipo'] ?? 'produto') === 'servico' ? 'servico' : 'produto';
+            $descricao = trim($_POST['descricao'] ?? '');
+            $codigoInterno = trim($_POST['codigo_interno'] ?? '');
+            $ncm = trim($_POST['ncm'] ?? '');
+            $cfop = trim($_POST['cfop'] ?? '');
+            $cstCsosn = trim($_POST['cst_csosn'] ?? '');
+            $codigoServicoMunicipal = trim($_POST['codigo_servico_municipal'] ?? '');
+            $unidade = trim($_POST['unidade'] ?? 'UN');
+            $valorUnitario = (float) str_replace(',', '.', (string) ($_POST['valor_unitario_padrao'] ?? '0'));
+            $aliquotaIcms = trim((string) ($_POST['aliquota_icms'] ?? ''));
+            $aliquotaPis = trim((string) ($_POST['aliquota_pis'] ?? ''));
+            $aliquotaCofins = trim((string) ($_POST['aliquota_cofins'] ?? ''));
+            $ipiCst = trim((string) ($_POST['ipi_cst'] ?? ''));
+            $aliquotaIpi = trim((string) ($_POST['aliquota_ipi'] ?? ''));
+            $cean = trim((string) ($_POST['cean'] ?? ''));
+
+            if ($itemId <= 0 || $descricao === '') {
+                $erro = 'Item inválido ou descrição em branco.';
+            } else {
+                $stmt = $db->prepare(
+                    'UPDATE notas_produtos_servicos SET
+                        tipo = :tipo, descricao = :descricao, codigo_interno = :codigo_interno, ncm = :ncm, cfop = :cfop,
+                        cst_csosn = :cst_csosn, codigo_servico_municipal = :codigo_servico_municipal, unidade = :unidade,
+                        valor_unitario_padrao = :valor_unitario_padrao, aliquota_icms = :aliquota_icms, aliquota_pis = :aliquota_pis,
+                        aliquota_cofins = :aliquota_cofins, ipi_cst = :ipi_cst, aliquota_ipi = :aliquota_ipi, cean = :cean
+                     WHERE id = :id'
+                );
+                $stmt->execute([
+                    'tipo' => $tipo,
+                    'descricao' => $descricao,
+                    'codigo_interno' => $codigoInterno !== '' ? $codigoInterno : null,
+                    'ncm' => $ncm !== '' ? $ncm : null,
+                    'cfop' => $cfop !== '' ? $cfop : null,
+                    'cst_csosn' => $cstCsosn !== '' ? $cstCsosn : null,
+                    'codigo_servico_municipal' => $codigoServicoMunicipal !== '' ? $codigoServicoMunicipal : null,
+                    'unidade' => $unidade !== '' ? $unidade : 'UN',
+                    'valor_unitario_padrao' => $valorUnitario,
+                    'aliquota_icms' => $aliquotaIcms !== '' ? $aliquotaIcms : null,
+                    'aliquota_pis' => $aliquotaPis !== '' ? $aliquotaPis : null,
+                    'aliquota_cofins' => $aliquotaCofins !== '' ? $aliquotaCofins : null,
+                    'ipi_cst' => $ipiCst !== '' ? $ipiCst : null,
+                    'aliquota_ipi' => $aliquotaIpi !== '' ? $aliquotaIpi : null,
+                    'cean' => $cean !== '' ? $cean : null,
+                    'id' => $itemId,
+                ]);
+
+                $sucesso = 'Item atualizado.';
+            }
         } elseif (($_POST['acao'] ?? '') === 'desativar') {
             $id = (int) ($_POST['item_id'] ?? 0);
             if ($id > 0) {
@@ -214,10 +264,22 @@ try {
          ORDER BY e.razao_social ASC, ps.ativo DESC, ps.descricao ASC'
     );
     $itens = $stmt->fetchAll();
+
+    $itemEmEdicao = null;
+    $idEdicao = (int) ($_GET['editar'] ?? 0);
+    if ($idEdicao > 0) {
+        foreach ($itens as $itemLista) {
+            if ((int) $itemLista['id'] === $idEdicao) {
+                $itemEmEdicao = $itemLista;
+                break;
+            }
+        }
+    }
 } catch (PDOException $e) {
     $erro = 'Erro ao carregar catálogo: ' . $e->getMessage();
     $empresasAtivas = [];
     $itens = [];
+    $itemEmEdicao = null;
 }
 
 $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
@@ -255,86 +317,99 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
             <div class="notice error">Cadastre pelo menos uma <a href="notas-empresas-emissoras" style="text-decoration: underline;">empresa emissora</a> antes de adicionar itens ao catálogo.</div>
         <?php else: ?>
             <section class="panel">
-                <h2>Adicionar item</h2>
+                <h2><?php echo $itemEmEdicao ? 'Editar item' : 'Adicionar item'; ?></h2>
                 <form method="post">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="adicionar">
+                    <input type="hidden" name="acao" value="<?php echo $itemEmEdicao ? 'atualizar' : 'adicionar'; ?>">
+                    <?php if ($itemEmEdicao): ?>
+                        <input type="hidden" name="item_id_edicao" value="<?php echo h((string) $itemEmEdicao['id']); ?>">
+                    <?php endif; ?>
                     <div class="form-grid">
                         <div class="field">
                             <label for="empresa_emissora_id">Empresa emissora</label>
-                            <select id="empresa_emissora_id" name="empresa_emissora_id" required>
-                                <option value="">Selecione</option>
-                                <?php foreach ($empresasAtivas as $empresa): ?>
-                                    <option value="<?php echo h((string) $empresa['id']); ?>"><?php echo h($empresa['razao_social']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <?php if ($itemEmEdicao): ?>
+                                <div class="campo-fixo"><?php echo h($itemEmEdicao['empresa_razao_social']); ?></div>
+                                <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">A empresa emissora não pode ser alterada nesta edição.</p>
+                            <?php else: ?>
+                                <select id="empresa_emissora_id" name="empresa_emissora_id" required>
+                                    <option value="">Selecione</option>
+                                    <?php foreach ($empresasAtivas as $empresa): ?>
+                                        <option value="<?php echo h((string) $empresa['id']); ?>"><?php echo h($empresa['razao_social']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
                         </div>
                         <div class="field">
                             <label for="tipo">Tipo</label>
                             <select id="tipo" name="tipo">
-                                <option value="produto">Produto (NF-e)</option>
-                                <option value="servico">Serviço (NFS-e)</option>
+                                <option value="produto" <?php echo ($itemEmEdicao['tipo'] ?? '') === 'produto' ? 'selected' : ''; ?>>Produto (NF-e)</option>
+                                <option value="servico" <?php echo ($itemEmEdicao['tipo'] ?? '') === 'servico' ? 'selected' : ''; ?>>Serviço (NFS-e)</option>
                             </select>
                         </div>
                         <div class="field">
                             <label for="descricao">Descrição</label>
-                            <input id="descricao" name="descricao" type="text" required>
+                            <input id="descricao" name="descricao" type="text" required value="<?php echo h($itemEmEdicao['descricao'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="codigo_interno">Código interno</label>
-                            <input id="codigo_interno" name="codigo_interno" type="text">
+                            <input id="codigo_interno" name="codigo_interno" type="text" value="<?php echo h($itemEmEdicao['codigo_interno'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="ncm">NCM</label>
-                            <input id="ncm" name="ncm" type="text" placeholder="Só para produto">
+                            <input id="ncm" name="ncm" type="text" placeholder="Só para produto" value="<?php echo h($itemEmEdicao['ncm'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="cfop">CFOP</label>
-                            <input id="cfop" name="cfop" type="text" placeholder="Só para produto">
+                            <input id="cfop" name="cfop" type="text" placeholder="Só para produto" value="<?php echo h($itemEmEdicao['cfop'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="cst_csosn">CST/CSOSN</label>
-                            <input id="cst_csosn" name="cst_csosn" type="text" placeholder="Só para produto">
+                            <input id="cst_csosn" name="cst_csosn" type="text" placeholder="Só para produto" value="<?php echo h($itemEmEdicao['cst_csosn'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="codigo_servico_municipal">Código de serviço (LC 116)</label>
-                            <input id="codigo_servico_municipal" name="codigo_servico_municipal" type="text" placeholder="Só para serviço">
+                            <input id="codigo_servico_municipal" name="codigo_servico_municipal" type="text" placeholder="Só para serviço" value="<?php echo h($itemEmEdicao['codigo_servico_municipal'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="unidade">Unidade</label>
-                            <input id="unidade" name="unidade" type="text" value="UN">
+                            <input id="unidade" name="unidade" type="text" value="<?php echo h($itemEmEdicao['unidade'] ?? 'UN'); ?>">
                         </div>
                         <div class="field">
                             <label for="valor_unitario_padrao">Valor unitário padrão</label>
-                            <input id="valor_unitario_padrao" name="valor_unitario_padrao" type="text" placeholder="0,00">
+                            <input id="valor_unitario_padrao" name="valor_unitario_padrao" type="text" placeholder="0,00" value="<?php echo $itemEmEdicao ? h(number_format((float) $itemEmEdicao['valor_unitario_padrao'], 2, ',', '')) : ''; ?>">
                         </div>
                         <div class="field">
                             <label for="aliquota_icms">Alíquota ICMS (%)</label>
-                            <input id="aliquota_icms" name="aliquota_icms" type="text">
+                            <input id="aliquota_icms" name="aliquota_icms" type="text" value="<?php echo h((string) ($itemEmEdicao['aliquota_icms'] ?? '')); ?>">
                         </div>
                         <div class="field">
                             <label for="aliquota_pis">Alíquota PIS (%)</label>
-                            <input id="aliquota_pis" name="aliquota_pis" type="text">
+                            <input id="aliquota_pis" name="aliquota_pis" type="text" value="<?php echo h((string) ($itemEmEdicao['aliquota_pis'] ?? '')); ?>">
                         </div>
                         <div class="field">
                             <label for="aliquota_cofins">Alíquota COFINS (%)</label>
-                            <input id="aliquota_cofins" name="aliquota_cofins" type="text">
+                            <input id="aliquota_cofins" name="aliquota_cofins" type="text" value="<?php echo h((string) ($itemEmEdicao['aliquota_cofins'] ?? '')); ?>">
                         </div>
                         <div class="field">
                             <label for="ipi_cst">IPI - CST</label>
-                            <input id="ipi_cst" name="ipi_cst" type="text" placeholder="Ex.: 50, 99">
+                            <input id="ipi_cst" name="ipi_cst" type="text" placeholder="Ex.: 50, 99" value="<?php echo h($itemEmEdicao['ipi_cst'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="aliquota_ipi">Alíquota IPI (%)</label>
-                            <input id="aliquota_ipi" name="aliquota_ipi" type="text">
+                            <input id="aliquota_ipi" name="aliquota_ipi" type="text" value="<?php echo h((string) ($itemEmEdicao['aliquota_ipi'] ?? '')); ?>">
                         </div>
                         <div class="field">
                             <label for="cean">cEAN (código de barras)</label>
-                            <input id="cean" name="cean" type="text" placeholder="Opcional">
+                            <input id="cean" name="cean" type="text" placeholder="Opcional" value="<?php echo h($itemEmEdicao['cean'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label>&nbsp;</label>
-                            <button class="btn" type="submit"><i class="fa-solid fa-plus"></i> Adicionar ao catálogo</button>
+                            <div class="row-actions">
+                                <button class="btn" type="submit"><i class="fa-solid <?php echo $itemEmEdicao ? 'fa-floppy-disk' : 'fa-plus'; ?>"></i> <?php echo $itemEmEdicao ? 'Salvar alterações' : 'Adicionar ao catálogo'; ?></button>
+                                <?php if ($itemEmEdicao): ?>
+                                    <a class="btn btn-outline" href="notas-produtos-servicos">Cancelar edição</a>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -376,17 +451,20 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <form method="post" class="row-actions">
-                                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                                        <input type="hidden" name="item_id" value="<?php echo h((string) $item['id']); ?>">
-                                        <?php if ((int) $item['ativo'] === 1): ?>
-                                            <input type="hidden" name="acao" value="desativar">
-                                            <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
-                                        <?php else: ?>
-                                            <input type="hidden" name="acao" value="reativar">
-                                            <button class="btn btn-outline" type="submit"><i class="fa-solid fa-rotate-left"></i> Reativar</button>
-                                        <?php endif; ?>
-                                    </form>
+                                    <div class="row-actions">
+                                        <a class="btn btn-outline" href="notas-produtos-servicos?editar=<?php echo h((string) $item['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                                        <form method="post">
+                                            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                            <input type="hidden" name="item_id" value="<?php echo h((string) $item['id']); ?>">
+                                            <?php if ((int) $item['ativo'] === 1): ?>
+                                                <input type="hidden" name="acao" value="desativar">
+                                                <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
+                                            <?php else: ?>
+                                                <input type="hidden" name="acao" value="reativar">
+                                                <button class="btn btn-outline" type="submit"><i class="fa-solid fa-rotate-left"></i> Reativar</button>
+                                            <?php endif; ?>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
