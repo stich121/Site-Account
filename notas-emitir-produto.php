@@ -305,6 +305,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     <option value="<?php echo h($cfopItem['codigo']); ?>"><?php echo h($cfopItem['codigo'] . ' - ' . $cfopItem['descricao']); ?></option>
                                 <?php endforeach; ?>
                             </datalist>
+                            <datalist id="datalistItensDescricao"></datalist>
 
                             <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
                         </div>
@@ -529,6 +530,41 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             return opcoes;
         }
 
+        const datalistItensDescricao = document.getElementById('datalistItensDescricao');
+        function montarDatalistDescricao() {
+            if (!datalistItensDescricao) return;
+            const empresaId = empresaSelect ? empresaSelect.value : '';
+            const vistos = new Set();
+            let opcoes = '';
+            catalogo.filter(function (item) {
+                return String(item.empresa_emissora_id) === String(empresaId);
+            }).forEach(function (item) {
+                if (vistos.has(item.descricao)) return;
+                vistos.add(item.descricao);
+                const descricaoEscapada = String(item.descricao).replace(/"/g, '&quot;');
+                opcoes += '<option value="' + descricaoEscapada + '"></option>';
+            });
+            datalistItensDescricao.innerHTML = opcoes;
+        }
+        montarDatalistDescricao();
+
+        function aplicarItemCatalogoNaLinha(linha, item) {
+            linha.querySelector('.item-descricao').value = item.descricao || '';
+            linha.querySelector('.item-ncm').value = item.ncm || '';
+            linha.querySelector('.item-cfop').value = item.cfop || '';
+            linha.querySelector('.item-cst').value = item.cst_csosn || '';
+            linha.querySelector('.item-unidade').value = item.unidade || 'UN';
+            linha.querySelector('.item-valor').value = Number(item.valor_unitario_padrao || 0).toFixed(2).replace('.', ',');
+            linha.querySelector('.item-produto-id').value = item.id;
+            linha.querySelector('.item-catalogo').value = item.id;
+            linha.querySelector('.item-cean').value = item.cean || '';
+            linha.querySelector('.item-icms-aliquota').value = item.aliquota_icms != null ? item.aliquota_icms : '0';
+            linha.querySelector('.item-ipi-cst').value = item.ipi_cst || '';
+            linha.querySelector('.item-ipi-aliquota').value = item.aliquota_ipi != null ? item.aliquota_ipi : '0';
+            linha.querySelector('.item-pis-aliquota').value = item.aliquota_pis != null ? item.aliquota_pis : '0';
+            linha.querySelector('.item-cofins-aliquota').value = item.aliquota_cofins != null ? item.aliquota_cofins : '0';
+        }
+
         function preencherLinhaItem(linha, item) {
             const mapa = {
                 '.item-descricao': item.descricao,
@@ -557,7 +593,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             const linha = document.createElement('tr');
             linha.innerHTML =
                 '<td><select class="item-catalogo">' + montarOpcoesCatalogo(empresaId) + '</select></td>' +
-                '<td><input type="text" name="item_descricao[]" class="item-descricao" required></td>' +
+                '<td><input type="text" name="item_descricao[]" class="item-descricao" list="datalistItensDescricao" autocomplete="off" required></td>' +
                 '<td><input type="text" name="item_ncm[]" class="item-ncm" maxlength="8" placeholder="8 dígitos"></td>' +
                 '<td><input type="text" name="item_cfop[]" class="item-cfop" list="datalistCfop" autocomplete="off" placeholder="Ex.: 5102"></td>' +
                 '<td><input type="text" name="item_cst[]" class="item-cst" placeholder="102 ou 00"></td>' +
@@ -592,23 +628,23 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     return String(candidato.id) === selectCatalogo.value;
                 });
                 if (item) {
-                    linha.querySelector('.item-descricao').value = item.descricao || '';
-                    linha.querySelector('.item-ncm').value = item.ncm || '';
-                    linha.querySelector('.item-cfop').value = item.cfop || '';
-                    linha.querySelector('.item-cst').value = item.cst_csosn || '';
-                    linha.querySelector('.item-unidade').value = item.unidade || 'UN';
-                    linha.querySelector('.item-valor').value = Number(item.valor_unitario_padrao || 0).toFixed(2).replace('.', ',');
-                    linha.querySelector('.item-produto-id').value = item.id;
-                    linha.querySelector('.item-cean').value = item.cean || '';
-                    linha.querySelector('.item-icms-aliquota').value = item.aliquota_icms != null ? item.aliquota_icms : '0';
-                    linha.querySelector('.item-ipi-cst').value = item.ipi_cst || '';
-                    linha.querySelector('.item-ipi-aliquota').value = item.aliquota_ipi != null ? item.aliquota_ipi : '0';
-                    linha.querySelector('.item-pis-aliquota').value = item.aliquota_pis != null ? item.aliquota_pis : '0';
-                    linha.querySelector('.item-cofins-aliquota').value = item.aliquota_cofins != null ? item.aliquota_cofins : '0';
+                    aplicarItemCatalogoNaLinha(linha, item);
                 } else {
                     linha.querySelector('.item-produto-id').value = 0;
                 }
                 recalcularTotal();
+            });
+
+            const campoDescricao = linha.querySelector('.item-descricao');
+            campoDescricao.addEventListener('input', function () {
+                const empresaIdAtual = empresaSelect ? empresaSelect.value : '';
+                const item = catalogo.find(function (candidato) {
+                    return candidato.descricao === campoDescricao.value && String(candidato.empresa_emissora_id) === String(empresaIdAtual);
+                });
+                if (item) {
+                    aplicarItemCatalogoNaLinha(linha, item);
+                    recalcularTotal();
+                }
             });
 
             linha.querySelector('.item-quantidade').addEventListener('input', recalcularTotal);
