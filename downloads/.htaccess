@@ -1,0 +1,9 @@
+Require all denied
+
+<Files "programa-fiscal-verificador-zip.zip">
+    Require all granted
+</Files>
+
+<Files "programa-contabil-ofx2excel.zip">
+    Require all granted
+</Files>

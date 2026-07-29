@@ -4,8 +4,10 @@ config_app_key.php
 google_drive_config.php
 vendor/
 .security/
-uploads/
-downloads/
+uploads/*
+!uploads/.htaccess
+downloads/*
+!downloads/.htaccess
 certificados-nfse/*
 !certificados-nfse/.htaccess
 Planilhas/

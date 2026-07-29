@@ -16,7 +16,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 }
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
-$nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
+$nivelAcesso = atualizarNivelAcessoSessao(obterConexao(), $funcionarioId);
 $podeAdministrar = $nivelAcesso >= 3;
 
 // Parâmetros

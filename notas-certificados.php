@@ -13,7 +13,7 @@ require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/config_app_key.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
-$podeAdministrar = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1) >= 3;
+$podeAdministrar = atualizarNivelAcessoSessao(obterConexao(), $funcionarioId) >= 3;
 
 function h(string $valor): string
 {

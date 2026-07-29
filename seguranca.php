@@ -84,3 +84,21 @@ function iniciarSessaoSegura(bool $privado = true): void
 
     aplicarCabecalhosSeguros($privado);
 }
+
+/**
+ * Reconsulta o nível de acesso do funcionário logado no banco (a sessão pode
+ * estar desatualizada se um administrador alterou a permissão em outra aba).
+ */
+function atualizarNivelAcessoSessao(PDO $db, int $funcionarioId): int
+{
+    $nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
+    $stmt = $db->prepare('SELECT nivel_acesso FROM funcionarios WHERE id = :id AND ativo = 1 LIMIT 1');
+    $stmt->execute(['id' => $funcionarioId]);
+    $linha = $stmt->fetch();
+    if ($linha) {
+        $nivelAcesso = (int) ($linha['nivel_acesso'] ?? $nivelAcesso);
+        $_SESSION['funcionario_nivel_acesso'] = $nivelAcesso;
+    }
+
+    return $nivelAcesso;
+}

@@ -8,8 +8,11 @@ if (!isset($_SESSION['funcionario_id'])) {
     exit;
 }
 
+require_once __DIR__ . '/config_db.php';
+
+$funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
-$nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
+$nivelAcesso = atualizarNivelAcessoSessao(obterConexao(), $funcionarioId);
 $podeAdministrar = $nivelAcesso >= 3;
 
 function h(string $valor): string

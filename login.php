@@ -72,69 +72,96 @@ function chaveTentativaLogin(string $usuario): string
     return hash('sha256', strtolower(trim($usuario)) . '|' . $ip);
 }
 
-function obterEstadoLogin(string $chave): array
+function garantirTabelaAntiBruteforceLogin(PDO $db): void
 {
-    if (!isset($_SESSION['anti_bruteforce_login'][$chave]) || !is_array($_SESSION['anti_bruteforce_login'][$chave])) {
-        $_SESSION['anti_bruteforce_login'][$chave] = [
-            'tentativas' => 0,
-            'bloqueado_ate' => 0,
-            'desafio' => null,
-        ];
-    }
-
-    return $_SESSION['anti_bruteforce_login'][$chave];
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS login_tentativas (
+            chave CHAR(64) NOT NULL,
+            tentativas INT UNSIGNED NOT NULL DEFAULT 0,
+            bloqueado_ate INT UNSIGNED NOT NULL DEFAULT 0,
+            desafio_pergunta VARCHAR(60) NULL,
+            desafio_resposta VARCHAR(20) NULL,
+            atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (chave)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
 }
 
-function gerarDesafioLogin(string $chave): array
+function obterEstadoLogin(PDO $db, string $chave): array
+{
+    $stmt = $db->prepare('SELECT tentativas, bloqueado_ate, desafio_pergunta, desafio_resposta FROM login_tentativas WHERE chave = :chave LIMIT 1');
+    $stmt->execute(['chave' => $chave]);
+    $linha = $stmt->fetch();
+    if (!$linha) {
+        return ['tentativas' => 0, 'bloqueado_ate' => 0, 'desafio_pergunta' => null, 'desafio_resposta' => null];
+    }
+
+    return [
+        'tentativas' => (int) $linha['tentativas'],
+        'bloqueado_ate' => (int) $linha['bloqueado_ate'],
+        'desafio_pergunta' => $linha['desafio_pergunta'],
+        'desafio_resposta' => $linha['desafio_resposta'],
+    ];
+}
+
+function gerarDesafioLogin(PDO $db, string $chave): array
 {
     $a = random_int(2, 9);
     $b = random_int(2, 9);
-    $_SESSION['anti_bruteforce_login'][$chave]['desafio'] = [
-        'pergunta' => "Quanto é {$a} + {$b}?",
-        'resposta' => (string) ($a + $b),
-    ];
+    $pergunta = "Quanto é {$a} + {$b}?";
+    $resposta = (string) ($a + $b);
 
-    return $_SESSION['anti_bruteforce_login'][$chave]['desafio'];
+    $stmt = $db->prepare(
+        'INSERT INTO login_tentativas (chave, desafio_pergunta, desafio_resposta)
+         VALUES (:chave, :pergunta, :resposta)
+         ON DUPLICATE KEY UPDATE desafio_pergunta = VALUES(desafio_pergunta), desafio_resposta = VALUES(desafio_resposta)'
+    );
+    $stmt->execute(['chave' => $chave, 'pergunta' => $pergunta, 'resposta' => $resposta]);
+
+    return ['pergunta' => $pergunta, 'resposta' => $resposta];
 }
 
-function desafioAtualLogin(string $chave): array
+function desafioAtualLogin(PDO $db, string $chave): array
 {
-    $estado = obterEstadoLogin($chave);
-    if (empty($estado['desafio']['pergunta']) || empty($estado['desafio']['resposta'])) {
-        return gerarDesafioLogin($chave);
+    $estado = obterEstadoLogin($db, $chave);
+    if (empty($estado['desafio_pergunta']) || empty($estado['desafio_resposta'])) {
+        return gerarDesafioLogin($db, $chave);
     }
 
-    return $estado['desafio'];
+    return ['pergunta' => $estado['desafio_pergunta'], 'resposta' => $estado['desafio_resposta']];
 }
 
-function respostaDesafioValida(string $chave, string $resposta): bool
+function respostaDesafioValida(PDO $db, string $chave, string $resposta): bool
 {
-    $estado = obterEstadoLogin($chave);
-    $esperado = trim((string) ($estado['desafio']['resposta'] ?? ''));
+    $estado = obterEstadoLogin($db, $chave);
+    $esperado = trim((string) ($estado['desafio_resposta'] ?? ''));
 
     return $esperado !== '' && hash_equals($esperado, trim($resposta));
 }
 
-function registrarFalhaLogin(string $chave): array
+function registrarFalhaLogin(PDO $db, string $chave): array
 {
-    $estado = obterEstadoLogin($chave);
-    $tentativas = (int) ($estado['tentativas'] ?? 0) + 1;
-    $_SESSION['anti_bruteforce_login'][$chave]['tentativas'] = $tentativas;
+    $estado = obterEstadoLogin($db, $chave);
+    $tentativas = $estado['tentativas'] + 1;
+    $bloqueadoAte = $tentativas >= 8 ? time() + 900 : (int) $estado['bloqueado_ate'];
 
-    if ($tentativas >= 8) {
-        $_SESSION['anti_bruteforce_login'][$chave]['bloqueado_ate'] = time() + 900;
-    }
+    $stmt = $db->prepare(
+        'INSERT INTO login_tentativas (chave, tentativas, bloqueado_ate)
+         VALUES (:chave, :tentativas, :bloqueado_ate)
+         ON DUPLICATE KEY UPDATE tentativas = VALUES(tentativas), bloqueado_ate = VALUES(bloqueado_ate)'
+    );
+    $stmt->execute(['chave' => $chave, 'tentativas' => $tentativas, 'bloqueado_ate' => $bloqueadoAte]);
 
     if ($tentativas >= 3) {
-        gerarDesafioLogin($chave);
+        gerarDesafioLogin($db, $chave);
     }
 
-    return $_SESSION['anti_bruteforce_login'][$chave];
+    return obterEstadoLogin($db, $chave);
 }
 
-function limparFalhasLogin(string $chave): void
+function limparFalhasLogin(PDO $db, string $chave): void
 {
-    unset($_SESSION['anti_bruteforce_login'][$chave]);
+    $db->prepare('DELETE FROM login_tentativas WHERE chave = :chave')->execute(['chave' => $chave]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['check'])) {
@@ -178,28 +205,6 @@ if ($usuario === '' || $senha === '') {
 }
 
 $chaveLogin = chaveTentativaLogin($usuario);
-$estadoLogin = obterEstadoLogin($chaveLogin);
-$bloqueadoAte = (int) ($estadoLogin['bloqueado_ate'] ?? 0);
-if ($bloqueadoAte > time()) {
-    $minutos = max(1, (int) ceil(($bloqueadoAte - time()) / 60));
-    responderJson([
-        'status' => 'error',
-        'message' => 'Muitas tentativas incorretas. Tente novamente em aproximadamente ' . $minutos . ' minuto(s).',
-        'locked' => true,
-    ]);
-}
-
-if ((int) ($estadoLogin['tentativas'] ?? 0) >= 3) {
-    $desafio = desafioAtualLogin($chaveLogin);
-    if (!respostaDesafioValida($chaveLogin, $respostaAntiBruteforce)) {
-        responderJson([
-            'status' => 'error',
-            'message' => 'Confirme o desafio de segurança para continuar: ' . $desafio['pergunta'],
-            'requires_challenge' => true,
-            'challenge_question' => $desafio['pergunta'],
-        ]);
-    }
-}
 
 try {
     require_once __DIR__ . '/config_db.php';
@@ -212,6 +217,31 @@ try {
     set_time_limit(10);
     $db = obterConexao();
     error_log('[login.php] Conexao bem-sucedida');
+    garantirTabelaAntiBruteforceLogin($db);
+
+    $estadoLogin = obterEstadoLogin($db, $chaveLogin);
+    $bloqueadoAte = $estadoLogin['bloqueado_ate'];
+    if ($bloqueadoAte > time()) {
+        $minutos = max(1, (int) ceil(($bloqueadoAte - time()) / 60));
+        responderJson([
+            'status' => 'error',
+            'message' => 'Muitas tentativas incorretas. Tente novamente em aproximadamente ' . $minutos . ' minuto(s).',
+            'locked' => true,
+        ]);
+    }
+
+    if ($estadoLogin['tentativas'] >= 3) {
+        $desafio = desafioAtualLogin($db, $chaveLogin);
+        if (!respostaDesafioValida($db, $chaveLogin, $respostaAntiBruteforce)) {
+            responderJson([
+                'status' => 'error',
+                'message' => 'Confirme o desafio de segurança para continuar: ' . $desafio['pergunta'],
+                'requires_challenge' => true,
+                'challenge_question' => $desafio['pergunta'],
+            ]);
+        }
+    }
+
     garantirCamposFuncionarios($db);
     garantirTabelaAfastamentos($db);
 
@@ -228,10 +258,10 @@ try {
     $funcionario = $stmt->fetch();
 
     if (!$funcionario) {
-        $estadoFalha = registrarFalhaLogin($chaveLogin);
+        $estadoFalha = registrarFalhaLogin($db, $chaveLogin);
         $resposta = ['status' => 'error', 'message' => 'Login ou senha incorretos.'];
         if ((int) ($estadoFalha['tentativas'] ?? 0) >= 3) {
-            $desafio = desafioAtualLogin($chaveLogin);
+            $desafio = desafioAtualLogin($db, $chaveLogin);
             $resposta['requires_challenge'] = true;
             $resposta['challenge_question'] = $desafio['pergunta'];
             $resposta['message'] .= ' Desafio de segurança: ' . $desafio['pergunta'];
@@ -249,10 +279,10 @@ try {
     }
 
     if (!$senhaCorreta) {
-        $estadoFalha = registrarFalhaLogin($chaveLogin);
+        $estadoFalha = registrarFalhaLogin($db, $chaveLogin);
         $resposta = ['status' => 'error', 'message' => 'Login ou senha incorretos.'];
         if ((int) ($estadoFalha['tentativas'] ?? 0) >= 3) {
-            $desafio = desafioAtualLogin($chaveLogin);
+            $desafio = desafioAtualLogin($db, $chaveLogin);
             $resposta['requires_challenge'] = true;
             $resposta['challenge_question'] = $desafio['pergunta'];
             $resposta['message'] .= ' Desafio de segurança: ' . $desafio['pergunta'];
@@ -290,7 +320,7 @@ try {
         ]);
     }
 
-    limparFalhasLogin($chaveLogin);
+    limparFalhasLogin($db, $chaveLogin);
     session_regenerate_id(true);
     $_SESSION['funcionario_id'] = (int) $funcionario['id'];
     $_SESSION['funcionario_usuario'] = $funcionario['usuario'];

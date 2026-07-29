@@ -73,3 +73,9 @@ Options -Indexes
 <FilesMatch "\.(pfx|p12)$">
     Require all denied
 </FilesMatch>
+
+<FilesMatch "^\.(git|env|gitignore|gitattributes)">
+    Require all denied
+</FilesMatch>
+
+RedirectMatch 404 ^/\.git(/|$)

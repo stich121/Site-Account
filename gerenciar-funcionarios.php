@@ -11,7 +11,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 require_once __DIR__ . '/config_db.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
-$nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
+$nivelAcesso = atualizarNivelAcessoSessao(obterConexao(), $funcionarioId);
 
 if ($nivelAcesso < 3) {
     header('Location: painel');
