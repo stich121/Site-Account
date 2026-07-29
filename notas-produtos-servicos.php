@@ -27,6 +27,16 @@ function h(string $valor): string
     return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
 }
 
+function formatarNcmExibicao(?string $ncm): string
+{
+    $digitos = preg_replace('/\D+/', '', (string) $ncm);
+    if (strlen($digitos) !== 8) {
+        return (string) $ncm;
+    }
+
+    return substr($digitos, 0, 4) . '.' . substr($digitos, 4, 2) . '.' . substr($digitos, 6, 2);
+}
+
 function prepararTabelaEmpresasEmissorasCatalogo(PDO $db): void
 {
     $db->exec(
@@ -141,7 +151,7 @@ try {
             $tipo = ($_POST['tipo'] ?? 'produto') === 'servico' ? 'servico' : 'produto';
             $descricao = trim($_POST['descricao'] ?? '');
             $codigoInterno = trim($_POST['codigo_interno'] ?? '');
-            $ncm = trim($_POST['ncm'] ?? '');
+            $ncm = preg_replace('/\D+/', '', (string) ($_POST['ncm'] ?? ''));
             $cfop = trim($_POST['cfop'] ?? '');
             $cstCsosn = trim($_POST['cst_csosn'] ?? '');
             $codigoServicoMunicipal = trim($_POST['codigo_servico_municipal'] ?? '');
@@ -206,7 +216,7 @@ try {
             $tipo = ($_POST['tipo'] ?? 'produto') === 'servico' ? 'servico' : 'produto';
             $descricao = trim($_POST['descricao'] ?? '');
             $codigoInterno = trim($_POST['codigo_interno'] ?? '');
-            $ncm = trim($_POST['ncm'] ?? '');
+            $ncm = preg_replace('/\D+/', '', (string) ($_POST['ncm'] ?? ''));
             $cfop = trim($_POST['cfop'] ?? '');
             $cstCsosn = trim($_POST['cst_csosn'] ?? '');
             $codigoServicoMunicipal = trim($_POST['codigo_servico_municipal'] ?? '');
@@ -395,7 +405,7 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                     <div class="form-grid">
                         <div class="field">
                             <label for="ncm">NCM</label>
-                            <input id="ncm" name="ncm" type="text" value="<?php echo h($itemEmEdicao['ncm'] ?? ''); ?>">
+                            <input id="ncm" name="ncm" type="text" maxlength="10" placeholder="0000.00.00" inputmode="numeric" value="<?php echo h(formatarNcmExibicao($itemEmEdicao['ncm'] ?? '')); ?>">
                         </div>
                         <div class="field">
                             <label for="cfop">CFOP</label>
@@ -552,6 +562,17 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
     </div>
 
     <script>
+        const campoNcmCatalogo = document.getElementById('ncm');
+        if (campoNcmCatalogo) {
+            campoNcmCatalogo.addEventListener('input', function () {
+                const d = campoNcmCatalogo.value.replace(/\D/g, '').slice(0, 8);
+                let formatado = d;
+                if (d.length > 6) formatado = d.replace(/^(\d{4})(\d{2})(\d{0,2})$/, '$1.$2.$3').replace(/\.$/, '');
+                else if (d.length > 4) formatado = d.replace(/^(\d{4})(\d{0,2})$/, '$1.$2');
+                campoNcmCatalogo.value = formatado;
+            });
+        }
+
         const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
         const menuDropdown = document.getElementById('menuDropdown');
         if (btnMenuHamburguer && menuDropdown) {

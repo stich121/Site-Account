@@ -522,6 +522,13 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             return formatarCnpjOuCpf(digitos, digitos.length <= 11 ? 'PF' : 'PJ');
         }
 
+        function formatarNcm(valor) {
+            const d = (valor || '').replace(/\D/g, '').slice(0, 8);
+            if (d.length > 6) return d.replace(/^(\d{4})(\d{2})(\d{0,2})$/, '$1.$2.$3').replace(/\.$/, '');
+            if (d.length > 4) return d.replace(/^(\d{4})(\d{0,2})$/, '$1.$2');
+            return d;
+        }
+
         const campoBuscaClienteDocumento = document.getElementById('busca_cliente_documento');
         const btnBuscarClienteDocumento = document.getElementById('btnBuscarClienteDocumento');
         const selectClienteId = document.getElementById('cliente_id');
@@ -670,7 +677,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
         function aplicarItemCatalogoNaLinha(linha, item) {
             linha.querySelector('.item-descricao').value = item.descricao || '';
-            linha.querySelector('.item-ncm').value = item.ncm || '';
+            linha.querySelector('.item-ncm').value = formatarNcm(item.ncm || '');
             linha.querySelector('.item-cfop').value = item.cfop || '';
             linha.querySelector('.item-cst').value = item.cst_csosn || '';
             linha.querySelector('.item-unidade').value = item.unidade || 'UN';
@@ -717,6 +724,8 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 const campoItem = linha.querySelector(seletor);
                 if (campoItem && mapa[seletor] != null) campoItem.value = mapa[seletor];
             });
+            const campoNcm = linha.querySelector('.item-ncm');
+            if (campoNcm) campoNcm.value = formatarNcm(campoNcm.value);
         }
 
         let contadorItens = 0;
@@ -742,7 +751,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     '</div>' +
                     '<div class="field">' +
                         '<label>NCM</label>' +
-                        '<input type="text" name="item_ncm[]" class="item-ncm" maxlength="8" placeholder="8 dígitos">' +
+                        '<input type="text" name="item_ncm[]" class="item-ncm" maxlength="10" placeholder="0000.00.00" inputmode="numeric">' +
                     '</div>' +
                     '<div class="field">' +
                         '<label>CFOP</label>' +
@@ -859,6 +868,10 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
             linha.querySelector('.item-quantidade').addEventListener('input', recalcularTotal);
             linha.querySelector('.item-valor').addEventListener('input', recalcularTotal);
+            const campoNcmLinha = linha.querySelector('.item-ncm');
+            campoNcmLinha.addEventListener('input', function () {
+                campoNcmLinha.value = formatarNcm(campoNcmLinha.value);
+            });
             ['.item-icms-aliquota', '.item-ipi-aliquota', '.item-pis-aliquota', '.item-cofins-aliquota'].forEach(function (seletor) {
                 linha.querySelector(seletor).addEventListener('input', function () {
                     recalcularImpostosLinha(linha);

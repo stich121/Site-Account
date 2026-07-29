@@ -981,7 +981,7 @@ try {
                     $itensValidos[] = [
                         'produto_servico_id' => (int) ($produtoIds[$indice] ?? 0) > 0 ? (int) $produtoIds[$indice] : null,
                         'descricao' => $descricaoItem,
-                        'ncm' => trim((string) ($ncms[$indice] ?? '')) ?: null,
+                        'ncm' => preg_replace('/\D+/', '', (string) ($ncms[$indice] ?? '')) ?: null,
                         'cfop' => trim((string) ($cfops[$indice] ?? '')) ?: null,
                         'cst_csosn' => trim((string) ($csts[$indice] ?? '')) ?: null,
                         'codigo_servico_municipal' => null,
