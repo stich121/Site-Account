@@ -37,11 +37,52 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 - Clientes/tomadores.
 - Produtos e serviços.
 - Certificados digitais A1.
-- Criação de NF-e em rascunho.
-- Criação, validação, fila, transmissão e acompanhamento de NFS-e.
-- Status de rascunho, pendente, autorizada, rejeitada e cancelada.
-- Documento de conferência, downloads protegidos, histórico e logs.
-- Correção e reprocessamento de NFS-e rejeitada localmente.
+- Criação, validação, fila, transmissão e acompanhamento de **NF-e** (produto) direto na SEFAZ estadual.
+- Criação, validação, fila, transmissão e acompanhamento de **NFS-e** (serviço) na NFS-e Nacional.
+- Status de rascunho, pendente, autorizada, rejeitada e cancelada (ambos os tipos).
+- Documento de conferência (em layout de DANFE para NF-e), downloads protegidos, histórico e logs.
+- Correção e reprocessamento de nota rejeitada localmente (NF-e e NFS-e).
+
+## NF-e (produto) — funcionalidades concluídas
+
+### Cálculo de impostos por item
+
+- ICMS: CST (regime normal) ou CSOSN (Simples Nacional), escolhido conforme o CRT cadastrado da empresa; alíquota interestadual calculada automaticamente pela regra do Senado (Resolução 22/89 + 13/2012 — 4/7/12%); ICMS-ST com base/alíquota informadas manualmente no item.
+- IPI, PIS e COFINS: CST completo (tabela oficial, ~30 situações para PIS/COFINS) e alíquota, com valor calculado automaticamente (base × alíquota) e mostrado ao vivo no formulário antes mesmo de salvar.
+- IBS/CBS (Reforma Tributária, LC 214/2025): CST (12 situações), cClassTrib (71 códigos oficiais, filtrados pelo CST escolhido), base de cálculo e as três alíquotas (IBS Estadual, IBS Municipal, CBS), com valor calculado ao vivo. Fica em branco por padrão — só entra no XML (`tagIBSCBS`) quando o item tem cClassTrib preenchido.
+- O valor gravado e usado no XML é sempre recalculado no servidor a partir do que foi persistido; alíquotas do cadastro/formulário são só sugestão inicial, nunca a fonte de verdade.
+- Fora do escopo por decisão explícita: DIFAL/partilha para consumidor final não contribuinte em outra UF (bloqueado com mensagem clara em vez de calcular errado) e tabela de MVA por NCM/UF para ICMS-ST.
+
+### Geração, assinatura e transmissão
+
+- XML montado via `NFePHP\NFe\Make` (`nfephp-org/sped-nfe`), assinado e transmitido à SEFAZ do estado da empresa emissora (cada UF tem seu próprio webservice; a biblioteca resolve isso sozinha).
+- Chave de acesso, protocolo de autorização e XML autorizado persistidos na nota.
+- Fila de envio com trava por nota (mesmo padrão da NFS-e), rodável pelo painel ou por cron.
+- Consulta por chave e cancelamento (evento 110111, com justificativa de 15 a 255 caracteres).
+- DANFE em PDF gerado localmente (`nfephp-org/sped-da`), sem depender de serviço externo — tanto para a nota autorizada quanto uma **prévia** (rascunho/pendente, sem assinar/enviar, marcada automaticamente como "SEM VALOR FISCAL") acessível pelo botão "Conferência".
+
+### Catálogos de apoio ao preenchimento
+
+- CFOP: 357 códigos (grupos 5xxx/6xxx/7xxx de saída) com descrição oficial, autocompletar ao digitar.
+- NCM: tabela oficial completa (10.515 códigos de 8 dígitos, com descrição hierárquica completa), baixada da API pública do Portal Único de Comércio Exterior (Siscomex/Receita Federal). Busca por código ou por nome do produto, carregada uma vez pelo navegador (cache) e filtrada no cliente. Máscara automática `0000.00.00` enquanto digita um código puro; a máscara não interfere na busca por nome.
+- Descrição do item: autocompletar pelos produtos já cadastrados no catálogo da mesma empresa, preenchendo NCM/CFOP/CST/alíquotas/cEAN automaticamente ao selecionar.
+- IBS/CBS: mesmos catálogos oficiais já usados na NFS-e (cClassTrib/CST), reaproveitados no item da NF-e.
+
+### Cadastro de produtos/serviços
+
+- Tela reorganizada em seções (Identificação, Fiscal produto, Fiscal serviço, Preço e impostos).
+- Campos adicionais: Origem da mercadoria, CEST, CNPJ do fabricante, indicador de escala relevante e código de benefício fiscal na UF (usados quando o produto está sujeito a ICMS-ST ou é importado).
+- Edição de item já cadastrado (antes só dava para desativar/reativar).
+
+### Empresa emissora e numeração
+
+- Série da NF-e configurável por empresa; numeração sequencial por empresa + série.
+- CRT da empresa passou a ser efetivamente usado (antes só a NFS-e lia esse campo) para decidir CSOSN × CST em todo o formulário.
+
+### Diagnóstico e operação
+
+- `nfe-diagnostico.php`: confere no servidor real se as extensões PHP (`soap`, `curl` etc.) e as bibliotecas (`sped-nfe`, `sped-da`) estão disponíveis antes de confiar no envio.
+- `processar-fila-nfe.php`: mesmo padrão de fila/log da NFS-e, rodável por cron.
 
 ## NFS-e Nacional — funcionalidades concluídas
 
@@ -142,8 +183,9 @@ Tabelas principais:
 - `notas_clientes`
 - `notas_produtos_servicos`
 - `notas_fiscais`
-- `notas_fiscais_itens`
+- `notas_fiscais_itens` (inclui os campos de ICMS/ICMS-ST/IPI/PIS/COFINS/IBS/CBS por item)
 - `notas_fiscais_nfse`
+- `notas_fiscais_nfe` (finalidade, transporte, pagamento, informações complementares)
 - `notas_fiscais_log`
 
 O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios` deve ser executada somente no banco principal, conforme os comentários do próprio arquivo.
@@ -170,6 +212,9 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `nfse-nbs-correlacao.json` | Correlação serviço–NBS |
 | `ibge-municipios.json` | Municípios e códigos IBGE |
 | `cfop-codigos.json` | Catálogo de CFOPs (venda) para autocompletar |
+| `ncm-codigos.json` | Tabela NCM oficial completa (Siscomex), para autocompletar |
+| `ibscbs-cst-codigos.json` | CST do IBS/CBS (reforma tributária), para o item da NF-e |
+| `ibscbs-cclass-codigos.json` | cClassTrib do IBS/CBS (reforma tributária), para o item da NF-e |
 | `includes/nfe-impostos.php` | Cálculo de ICMS/ICMS-ST/IPI/PIS/COFINS por item da NF-e |
 | `nfe-xml-fiscal.php` | Montagem do XML da NF-e (NFePHP\NFe\Make) |
 | `nfe-sefaz-integracao.php` | Assinatura e transmissão à SEFAZ (nfephp-org/sped-nfe) |
@@ -287,6 +332,8 @@ Não versionar:
 
 ## Checklist antes de emitir em produção
 
+### NFS-e
+
 - [ ] Empresa com CNPJ, IM, endereço e código IBGE completos.
 - [ ] Simples, regime, tributação municipal e regime especial corretos.
 - [ ] Certificado A1 válido e pertencente à empresa.
@@ -298,6 +345,20 @@ Não versionar:
 - [ ] cIndOp, CST e cClassTrib conferidos.
 - [ ] Valores, retenções, descontos e competência revisados.
 - [ ] Primeiro teste realizado em homologação.
+- [ ] Fila, cron e logs verificados.
+
+### NF-e
+
+- [ ] `composer install --no-dev` rodado no servidor real (a pasta `vendor/` não vai no `git push`, está no `.gitignore`).
+- [ ] `nfe-diagnostico.php` sem itens vermelhos (extensões `soap`/`curl` e bibliotecas `sped-nfe`/`sped-da`).
+- [ ] Empresa com CNPJ, IE, endereço, UF e código IBGE completos; CRT configurado; série da NF-e definida.
+- [ ] Certificado A1 válido e pertencente à empresa.
+- [ ] Ambiente da empresa em Homologação para o primeiro teste.
+- [ ] Cliente destinatário com endereço completo (obrigatório para a tag `enderDest`).
+- [ ] Item com NCM (8 dígitos), CFOP e CST/CSOSN preenchidos; alíquotas de ICMS/IPI/PIS/COFINS conferidas.
+- [ ] Se a venda for interestadual para consumidor final sem IE, a nota é bloqueada (DIFAL fora do escopo) — não é bug.
+- [ ] Prévia em DANFE (botão "Conferência") conferida antes de mandar pra fila.
+- [ ] Primeiro teste completo realizado e autorizado em homologação antes de trocar a empresa para Produção.
 - [ ] Fila, cron e logs verificados.
 
 ## Histórico das principais entregas
@@ -320,6 +381,14 @@ Não versionar:
 - Correção do grupo `pTotTrib`/`vTotTrib`: quando só parte dos tributos aproximados (federal/estadual/municipal) era informada, o campo faltante era omitido do XML em vez de enviado como zero, quebrando o schema (erro E1235).
 - Inclusão da Inscrição Municipal (`IM`) do prestador na DPS, exigida pelo Sefin Nacional quando o CNC NFS-e do município emissor está vinculado a ela (erro E0116); validação no servidor passou a exigir a IM cadastrada na empresa emissora antes de montar a DPS.
 - Diagnóstico do erro E0312 (código de tributação não administrado pelo município na data de competência): a causa mais provável não é o código LC 116 em si nem a adesão do município ao Sistema Nacional, e sim o campo "Município da prestação" (`cLocPrestacao`) estar apontando para uma cidade diferente da do prestador em serviços cujo ISSQN é devido no local do estabelecimento prestador (como contabilidade, fora das exceções do art. 3º da LC 116).
+- **Emissão real de NF-e (produto), do zero**: até então a tela de NF-e só salvava rascunho local, sem gerar XML nem falar com a SEFAZ. Ficou pronto: cálculo de ICMS/ICMS-ST/IPI/PIS/COFINS/IBS-CBS por item; geração, assinatura e transmissão do XML via `nfephp-org/sped-nfe`; fila de envio, consulta e cancelamento; DANFE em PDF (autorizada e em prévia) via `nfephp-org/sped-da`.
+- Autocompletar de CFOP (357 códigos oficiais de saída) e de NCM (tabela oficial completa, 10.515 códigos, baixada do Siscomex) com busca por código ou por nome do produto.
+- Autocompletar de descrição do item pelo catálogo de produtos da empresa, com preenchimento automático de NCM/CFOP/CST/alíquotas.
+- Situação tributária completa nos itens da NF-e: CSOSN × CST do ICMS conforme o regime da empresa, e a tabela oficial de ~30 códigos para PIS/COFINS — com o valor de cada imposto calculado e mostrado ao vivo no formulário.
+- Suporte ao grupo IBS/CBS por item na NF-e (Reforma Tributária, LC 214/2025), reaproveitando os catálogos oficiais já usados na NFS-e.
+- Cadastro de produtos/serviços reorganizado em seções, com campos de CEST/origem/fabricante/benefício fiscal, e passou a permitir edição de item (antes só desativar/reativar).
+- Correção de dois bugs de dado, não de código novo: `catalogoJson` sendo escapado e serializado em dobro (quebrava a lista de itens do catálogo dentro do `<script>` assim que havia produtos cadastrados) e a coluna "Detalhe" da fila de NF-e mostrando a chave de acesso em vez do motivo real de rejeição.
+- Correção de migração ausente: colunas novas do catálogo de produtos só tinham sido adicionadas em uma das três cópias da função de schema que o projeto já mantinha por entry-point (padrão pré-existente, não introduzido agora).
 
 ## Limites e cuidados
 
@@ -327,7 +396,9 @@ Não versionar:
 - Endpoints nacionais e municipais são serviços externos.
 - Novas notas técnicas exigem atualização dos catálogos.
 - Após falha de rede, reconcilie a DPS antes de reenviar.
-- A transmissão descrita aqui é da NFS-e Nacional; NF-e possui fluxo distinto.
+- NF-e não calcula DIFAL/partilha (venda interestadual para consumidor final não contribuinte) — a emissão é bloqueada nesse cenário em vez de calcular errado.
+- NF-e não tem Carta de Correção Eletrônica (CC-e) nem contingência offline (SVC-AN/RS, EPEC) implementadas — só o fluxo normal de emissão, consulta e cancelamento.
+- ICMS-ST na NF-e usa base/alíquota informadas manualmente no item; não há tabela de MVA por NCM/UF embutida.
 
 ## Referências
 
@@ -337,4 +408,4 @@ Não versionar:
 
 ---
 
-Última consolidação: 28 de julho de 2026 (correções de emissão NFS-e: `pTotTrib`/`vTotTrib` incompletos e IM do prestador ausente).
+Última consolidação: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos).
