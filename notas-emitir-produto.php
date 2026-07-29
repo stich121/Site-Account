@@ -394,6 +394,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                 <?php endforeach; ?>
                             </datalist>
                             <datalist id="datalistItensDescricao"></datalist>
+                            <datalist id="datalistNcm"></datalist>
 
                             <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
                         </div>
@@ -527,6 +528,49 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             if (d.length > 6) return d.replace(/^(\d{4})(\d{2})(\d{0,2})$/, '$1.$2.$3').replace(/\.$/, '');
             if (d.length > 4) return d.replace(/^(\d{4})(\d{0,2})$/, '$1.$2');
             return d;
+        }
+
+        function pareceCodigoNcm(valor) {
+            return /^[\d.]*$/.test(valor || '');
+        }
+
+        function escaparHtml(texto) {
+            return String(texto).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        let ncmCodigos = [];
+        fetch('ncm-codigos.json', { cache: 'force-cache' })
+            .then(function (resposta) { return resposta.json(); })
+            .then(function (dados) { ncmCodigos = dados; })
+            .catch(function () { ncmCodigos = []; });
+
+        const datalistNcm = document.getElementById('datalistNcm');
+        let buscaNcmTimeout = null;
+        function buscarNcm(textoDigitado) {
+            if (!datalistNcm) return;
+            clearTimeout(buscaNcmTimeout);
+            buscaNcmTimeout = setTimeout(function () {
+                const termo = (textoDigitado || '').trim().toLowerCase();
+                if (termo.length < 2) {
+                    datalistNcm.innerHTML = '';
+                    return;
+                }
+                const termoDigitos = termo.replace(/\D/g, '');
+                const encontrados = [];
+                for (let i = 0; i < ncmCodigos.length && encontrados.length < 40; i++) {
+                    const codigo = ncmCodigos[i][0];
+                    const descricao = ncmCodigos[i][1];
+                    const codigoDigitos = codigo.replace(/\D/g, '');
+                    const bateCodigo = termoDigitos.length >= 2 && codigoDigitos.indexOf(termoDigitos) === 0;
+                    const bateDescricao = descricao.toLowerCase().indexOf(termo) !== -1;
+                    if (bateCodigo || bateDescricao) {
+                        encontrados.push([codigo, descricao]);
+                    }
+                }
+                datalistNcm.innerHTML = encontrados.map(function (item) {
+                    return '<option value="' + item[0] + '">' + item[0] + ' - ' + escaparHtml(item[1]) + '</option>';
+                }).join('');
+            }, 200);
         }
 
         const campoBuscaClienteDocumento = document.getElementById('busca_cliente_documento');
@@ -751,7 +795,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     '</div>' +
                     '<div class="field">' +
                         '<label>NCM</label>' +
-                        '<input type="text" name="item_ncm[]" class="item-ncm" maxlength="10" placeholder="0000.00.00" inputmode="numeric">' +
+                        '<input type="text" name="item_ncm[]" class="item-ncm" maxlength="10" placeholder="Digite o código ou o nome do produto" inputmode="numeric" list="datalistNcm" autocomplete="off">' +
                     '</div>' +
                     '<div class="field">' +
                         '<label>CFOP</label>' +
@@ -870,7 +914,10 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             linha.querySelector('.item-valor').addEventListener('input', recalcularTotal);
             const campoNcmLinha = linha.querySelector('.item-ncm');
             campoNcmLinha.addEventListener('input', function () {
-                campoNcmLinha.value = formatarNcm(campoNcmLinha.value);
+                if (pareceCodigoNcm(campoNcmLinha.value)) {
+                    campoNcmLinha.value = formatarNcm(campoNcmLinha.value);
+                }
+                buscarNcm(campoNcmLinha.value);
             });
             ['.item-icms-aliquota', '.item-ipi-aliquota', '.item-pis-aliquota', '.item-cofins-aliquota'].forEach(function (seletor) {
                 linha.querySelector(seletor).addEventListener('input', function () {

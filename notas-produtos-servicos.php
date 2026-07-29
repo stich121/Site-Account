@@ -405,7 +405,8 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                     <div class="form-grid">
                         <div class="field">
                             <label for="ncm">NCM</label>
-                            <input id="ncm" name="ncm" type="text" maxlength="10" placeholder="0000.00.00" inputmode="numeric" value="<?php echo h(formatarNcmExibicao($itemEmEdicao['ncm'] ?? '')); ?>">
+                            <input id="ncm" name="ncm" type="text" maxlength="10" placeholder="Digite o código ou o nome do produto" inputmode="numeric" list="datalistNcm" autocomplete="off" value="<?php echo h(formatarNcmExibicao($itemEmEdicao['ncm'] ?? '')); ?>">
+                            <datalist id="datalistNcm"></datalist>
                         </div>
                         <div class="field">
                             <label for="cfop">CFOP</label>
@@ -562,14 +563,59 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
     </div>
 
     <script>
+        function formatarNcmCatalogo(valor) {
+            const d = (valor || '').replace(/\D/g, '').slice(0, 8);
+            if (d.length > 6) return d.replace(/^(\d{4})(\d{2})(\d{0,2})$/, '$1.$2.$3').replace(/\.$/, '');
+            if (d.length > 4) return d.replace(/^(\d{4})(\d{0,2})$/, '$1.$2');
+            return d;
+        }
+
+        function escaparHtmlCatalogo(texto) {
+            return String(texto).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        let ncmCodigosCatalogo = [];
+        fetch('ncm-codigos.json', { cache: 'force-cache' })
+            .then(function (resposta) { return resposta.json(); })
+            .then(function (dados) { ncmCodigosCatalogo = dados; })
+            .catch(function () { ncmCodigosCatalogo = []; });
+
+        const datalistNcmCatalogo = document.getElementById('datalistNcm');
+        let buscaNcmCatalogoTimeout = null;
+        function buscarNcmCatalogo(textoDigitado) {
+            if (!datalistNcmCatalogo) return;
+            clearTimeout(buscaNcmCatalogoTimeout);
+            buscaNcmCatalogoTimeout = setTimeout(function () {
+                const termo = (textoDigitado || '').trim().toLowerCase();
+                if (termo.length < 2) {
+                    datalistNcmCatalogo.innerHTML = '';
+                    return;
+                }
+                const termoDigitos = termo.replace(/\D/g, '');
+                const encontrados = [];
+                for (let i = 0; i < ncmCodigosCatalogo.length && encontrados.length < 40; i++) {
+                    const codigo = ncmCodigosCatalogo[i][0];
+                    const descricao = ncmCodigosCatalogo[i][1];
+                    const codigoDigitos = codigo.replace(/\D/g, '');
+                    const bateCodigo = termoDigitos.length >= 2 && codigoDigitos.indexOf(termoDigitos) === 0;
+                    const bateDescricao = descricao.toLowerCase().indexOf(termo) !== -1;
+                    if (bateCodigo || bateDescricao) {
+                        encontrados.push([codigo, descricao]);
+                    }
+                }
+                datalistNcmCatalogo.innerHTML = encontrados.map(function (item) {
+                    return '<option value="' + item[0] + '">' + item[0] + ' - ' + escaparHtmlCatalogo(item[1]) + '</option>';
+                }).join('');
+            }, 200);
+        }
+
         const campoNcmCatalogo = document.getElementById('ncm');
         if (campoNcmCatalogo) {
             campoNcmCatalogo.addEventListener('input', function () {
-                const d = campoNcmCatalogo.value.replace(/\D/g, '').slice(0, 8);
-                let formatado = d;
-                if (d.length > 6) formatado = d.replace(/^(\d{4})(\d{2})(\d{0,2})$/, '$1.$2.$3').replace(/\.$/, '');
-                else if (d.length > 4) formatado = d.replace(/^(\d{4})(\d{0,2})$/, '$1.$2');
-                campoNcmCatalogo.value = formatado;
+                if (/^[\d.]*$/.test(campoNcmCatalogo.value)) {
+                    campoNcmCatalogo.value = formatarNcmCatalogo(campoNcmCatalogo.value);
+                }
+                buscarNcmCatalogo(campoNcmCatalogo.value);
             });
         }
 
