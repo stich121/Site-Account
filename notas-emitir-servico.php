@@ -51,15 +51,27 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     <?php endif; ?>
                     <div class="form-grid">
                         <div class="field">
-                            <label for="empresa_emissora_id">Empresa emissora</label>
-                            <select id="empresa_emissora_id" name="empresa_emissora_id" required>
-                                <option value="">Selecione</option>
-                                <?php $empresaEmissoraPadrao = (int) ($_SESSION['nfse_empresa_emissora_ativa_id'] ?? 0); ?>
-                                <?php foreach ($empresasAtivas as $empresa): ?>
-                                    <option value="<?php echo h((string) $empresa['id']); ?>" data-ibge="<?php echo h($empresa['codigo_ibge_municipio'] ?? ''); ?>" <?php echo (!$notaEmEdicao && $empresaEmissoraPadrao === (int) $empresa['id']) ? 'selected' : ''; ?>><?php echo h($empresa['razao_social']); ?> (<?php echo h(($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)</option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">Definida pela seleção "Emitindo por" no topo da página. <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
+                            <label>Empresa emissora</label>
+                            <?php
+                                $empresaEmissoraPadrao = (int) ($_SESSION['nfse_empresa_emissora_ativa_id'] ?? 0);
+                                $empresaExibicaoId = $notaEmEdicao ? (int) $notaEmEdicao['empresa_emissora_id'] : $empresaEmissoraPadrao;
+                                $empresaAtivaSelecionada = null;
+                                foreach ($empresasAtivas as $empresa) {
+                                    if ((int) $empresa['id'] === $empresaExibicaoId) {
+                                        $empresaAtivaSelecionada = $empresa;
+                                        break;
+                                    }
+                                }
+                            ?>
+                            <div class="campo-fixo">
+                                <?php if ($empresaAtivaSelecionada): ?>
+                                    <?php echo h($empresaAtivaSelecionada['razao_social']); ?> (<?php echo h(($empresaAtivaSelecionada['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)
+                                <?php else: ?>
+                                    Nenhuma empresa selecionada
+                                <?php endif; ?>
+                            </div>
+                            <input type="hidden" id="empresa_emissora_id" name="empresa_emissora_id" value="<?php echo h((string) $empresaExibicaoId); ?>" data-ibge="<?php echo h($empresaAtivaSelecionada['codigo_ibge_municipio'] ?? ''); ?>">
+                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;"><?php echo $notaEmEdicao ? 'A empresa emissora não pode ser alterada nesta correção.' : 'Para trocar, use "Emitindo por" no topo da página.'; ?> <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
                             <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF</label>
@@ -501,8 +513,6 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             if (informarDps) informarDps.checked = Boolean(nfse.serie_dps || nfse.numero_dps);
             const itemServico = itens[0] || null;
             if (itemServico && form.elements.namedItem('nfse_valor_servico')) form.elements.namedItem('nfse_valor_servico').value = itemServico.valor_total;
-            const empresa = form.elements.namedItem('empresa_emissora_id');
-            if (empresa) { empresa.disabled = true; empresa.title = 'A empresa emissora não pode ser alterada nesta correção.'; }
             const cindopBusca = document.getElementById('nfse_ibscbs_codigo_indicador_operacao_busca');
             if (cindopBusca && nfse.ibscbs_codigo_indicador_operacao) cindopBusca.value = nfse.ibscbs_codigo_indicador_operacao;
             const cclassBusca = document.getElementById('nfse_ibscbs_classificacao_tributaria_busca');
@@ -796,14 +806,8 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
         const empresaSelect = document.getElementById('empresa_emissora_id');
 
-        if (empresaSelect) {
-            empresaSelect.addEventListener('change', function () {
-                const opcao = empresaSelect.options[empresaSelect.selectedIndex];
-                if (opcao && opcao.dataset.ibge) selecionarMunicipioPorCodigo(opcao.dataset.ibge);
-            });
-            if (empresaSelect.value && !(dadosEdicaoNota && dadosEdicaoNota.nota)) {
-                empresaSelect.dispatchEvent(new Event('change'));
-            }
+        if (empresaSelect && empresaSelect.dataset.ibge && !(dadosEdicaoNota && dadosEdicaoNota.nota)) {
+            selecionarMunicipioPorCodigo(empresaSelect.dataset.ibge);
         }
 
         document.querySelectorAll('[data-form-jump]').forEach(function (botao) {
@@ -919,14 +923,13 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 })
                 .then(function (municipios) {
                     municipiosIbge = Array.isArray(municipios) ? municipios : [];
-                    const opcaoEmpresa = empresaSelect ? empresaSelect.options[empresaSelect.selectedIndex] : null;
                     const municipioSalvo = (dadosEdicaoNota && dadosEdicaoNota.nfse && dadosEdicaoNota.nfse.municipio_prestacao)
                         || (dadosRestaurar && dadosRestaurar.nfse && dadosRestaurar.nfse.municipio_prestacao)
                         || '';
                     if (municipioSalvo) {
                         selecionarMunicipioPorCodigo(municipioSalvo);
-                    } else if (opcaoEmpresa && opcaoEmpresa.dataset.ibge) {
-                        selecionarMunicipioPorCodigo(opcaoEmpresa.dataset.ibge);
+                    } else if (empresaSelect && empresaSelect.dataset.ibge) {
+                        selecionarMunicipioPorCodigo(empresaSelect.dataset.ibge);
                     }
                 })
                 .catch(function () {

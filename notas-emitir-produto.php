@@ -47,15 +47,26 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     <input type="hidden" name="acao" value="criar_nota">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="empresa_emissora_id">Empresa emissora</label>
-                            <select id="empresa_emissora_id" name="empresa_emissora_id" required>
-                                <option value="">Selecione</option>
-                                <?php $empresaEmissoraPadrao = (int) ($_SESSION['nfse_empresa_emissora_ativa_id'] ?? 0); ?>
-                                <?php foreach ($empresasAtivas as $empresa): ?>
-                                    <option value="<?php echo h((string) $empresa['id']); ?>" <?php echo $empresaEmissoraPadrao === (int) $empresa['id'] ? 'selected' : ''; ?>><?php echo h($empresa['razao_social']); ?> (<?php echo h(($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)</option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">Definida pela seleção "Emitindo por" no topo da página. <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
+                            <label>Empresa emissora</label>
+                            <?php
+                                $empresaEmissoraPadrao = (int) ($_SESSION['nfse_empresa_emissora_ativa_id'] ?? 0);
+                                $empresaAtivaSelecionada = null;
+                                foreach ($empresasAtivas as $empresa) {
+                                    if ((int) $empresa['id'] === $empresaEmissoraPadrao) {
+                                        $empresaAtivaSelecionada = $empresa;
+                                        break;
+                                    }
+                                }
+                            ?>
+                            <div class="campo-fixo">
+                                <?php if ($empresaAtivaSelecionada): ?>
+                                    <?php echo h($empresaAtivaSelecionada['razao_social']); ?> (<?php echo h(($empresaAtivaSelecionada['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)
+                                <?php else: ?>
+                                    Nenhuma empresa selecionada
+                                <?php endif; ?>
+                            </div>
+                            <input type="hidden" id="empresa_emissora_id" name="empresa_emissora_id" value="<?php echo h((string) $empresaEmissoraPadrao); ?>">
+                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">Para trocar, use "Emitindo por" no topo da página. <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
                             <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF</label>
@@ -333,14 +344,6 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
             recalcularTotal();
         })();
-
-        if (empresaSelect) {
-            empresaSelect.addEventListener('change', function () {
-                corpoItens.querySelectorAll('.item-catalogo').forEach(function (select) {
-                    select.innerHTML = montarOpcoesCatalogo(empresaSelect.value);
-                });
-            });
-        }
 
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
