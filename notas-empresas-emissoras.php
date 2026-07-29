@@ -525,28 +525,56 @@ function rotuloCrt(?int $crt): string
                         <input id="nfe_serie" name="nfe_serie" type="text" maxlength="3" value="<?php echo h((string) ($empresaEmEdicao['nfe_serie'] ?? '1')); ?>">
                     </div>
                     <div class="field">
-                        <label for="nfe_numero_base">Última NF-e emitida (ajuste manual)</label>
+                        <label for="nfe_numero_base">
+                            Última NF-e emitida (ajuste manual)
+                            <span class="info-tooltip-wrap">
+                                <button type="button" class="info-btn" data-info-target="infoNfeNumeroBase" aria-expanded="false" aria-label="Mais informações sobre este campo">
+                                    <i class="fa-solid fa-info"></i>
+                                </button>
+                                <span class="info-tooltip-box" id="infoNfeNumeroBase" role="tooltip">
+                                    Preencha aqui se já existir numeração emitida fora do sistema (ou para corrigir a sequência). A próxima NF-e emitida por aqui sempre usa o maior valor entre este ajuste e o que já foi lançado pelo sistema, mais 1 — depois disso a numeração segue sozinha.
+                                </span>
+                            </span>
+                        </label>
                         <input id="nfe_numero_base" name="nfe_numero_base" type="number" min="0" step="1" value="<?php echo h((string) ($empresaEmEdicao['nfe_numero_base'] ?? 0)); ?>">
-                        <span class="muted">
-                            Preencha aqui se já existir numeração emitida fora do sistema (ou para corrigir a sequência). A próxima NF-e emitida por aqui sempre usa o maior valor entre este ajuste e o que já foi lançado pelo sistema, mais 1 — depois disso a numeração segue sozinha.
-                            <?php if ($empresaEmEdicao !== null): ?>
-                                <br>Já lançado pelo sistema nesta série: <?php echo $empresaEmEdicao['ultima_nfe_sistema'] !== null ? 'Nº ' . h((string) $empresaEmEdicao['ultima_nfe_sistema']) : 'nenhuma ainda'; ?>.
+                        <?php if ($empresaEmEdicao !== null): ?>
+                            <span class="muted">
+                                Já lançado pelo sistema nesta série: <?php echo $empresaEmEdicao['ultima_nfe_sistema'] !== null ? 'Nº ' . h((string) $empresaEmEdicao['ultima_nfe_sistema']) : 'nenhuma ainda'; ?>.
                                 Próxima NF-e será a Nº <?php echo h((string) ((int) ($empresaEmEdicao['ultima_nfe_efetiva'] ?? 0) + 1)); ?>.
-                            <?php endif; ?>
-                        </span>
+                            </span>
+                        <?php endif; ?>
                     </div>
                     <div class="field">
-                        <label for="nfse_opcao_simples_nacional">Opção pelo Simples na NFS-e</label>
+                        <label for="nfse_opcao_simples_nacional">
+                            Opção pelo Simples na NFS-e
+                            <span class="info-tooltip-wrap">
+                                <button type="button" class="info-btn" data-info-target="infoNfseOpcaoSimples" aria-expanded="false" aria-label="Mais informações sobre este campo">
+                                    <i class="fa-solid fa-info"></i>
+                                </button>
+                                <span class="info-tooltip-box" id="infoNfseOpcaoSimples" role="tooltip">
+                                    Classificação específica da NFS-e; não é inferida pelo CRT.
+                                </span>
+                            </span>
+                        </label>
                         <?php $opSnAtual = (int) ($empresaEmEdicao['nfse_opcao_simples_nacional'] ?? 1); ?>
                         <select id="nfse_opcao_simples_nacional" name="nfse_opcao_simples_nacional" required>
                             <option value="1" <?php echo $opSnAtual === 1 ? 'selected' : ''; ?>>1 - Não optante</option>
                             <option value="2" <?php echo $opSnAtual === 2 ? 'selected' : ''; ?>>2 - MEI</option>
                             <option value="3" <?php echo $opSnAtual === 3 ? 'selected' : ''; ?>>3 - ME/EPP optante</option>
                         </select>
-                        <span class="muted">Classificação específica da NFS-e; não é inferida pelo CRT.</span>
                     </div>
                     <div class="field">
-                        <label for="nfse_regime_apuracao_sn">Regime de apuração do Simples</label>
+                        <label for="nfse_regime_apuracao_sn">
+                            Regime de apuração do Simples
+                            <span class="info-tooltip-wrap">
+                                <button type="button" class="info-btn" data-info-target="infoNfseRegimeApuracao" aria-expanded="false" aria-label="Mais informações sobre este campo">
+                                    <i class="fa-solid fa-info"></i>
+                                </button>
+                                <span class="info-tooltip-box" id="infoNfseRegimeApuracao" role="tooltip">
+                                    Obrigatório somente para ME/EPP optante (opção 3).
+                                </span>
+                            </span>
+                        </label>
                         <?php $regSnAtual = $empresaEmEdicao['nfse_regime_apuracao_sn'] ?? null; ?>
                         <select id="nfse_regime_apuracao_sn" name="nfse_regime_apuracao_sn">
                             <option value="">Não se aplica</option>
@@ -554,7 +582,6 @@ function rotuloCrt(?int $crt): string
                             <option value="2" <?php echo (int) $regSnAtual === 2 ? 'selected' : ''; ?>>2 - Federais pelo Simples e ISSQN pelo regime normal</option>
                             <option value="3" <?php echo (int) $regSnAtual === 3 ? 'selected' : ''; ?>>3 - Apuração dos tributos pelo Simples (MEI)</option>
                         </select>
-                        <span class="muted">Obrigatório somente para ME/EPP optante (opção 3).</span>
                     </div>
                     <div class="field">
                         <label for="nfse_tributacao_issqn">Tributação municipal padrão</label>
@@ -728,6 +755,34 @@ function rotuloCrt(?int $crt): string
                 }
             });
         }
+
+        document.querySelectorAll('.info-btn').forEach(function (botaoInfo) {
+            const caixaInfo = document.getElementById(botaoInfo.dataset.infoTarget);
+            if (!caixaInfo) return;
+            botaoInfo.addEventListener('click', function (evento) {
+                evento.stopPropagation();
+                const jaAberta = caixaInfo.classList.contains('aberto');
+                document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (outra) {
+                    outra.classList.remove('aberto');
+                });
+                document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (outroBotao) {
+                    outroBotao.setAttribute('aria-expanded', 'false');
+                });
+                if (!jaAberta) {
+                    caixaInfo.classList.add('aberto');
+                    botaoInfo.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+        document.addEventListener('click', function (evento) {
+            if (evento.target.closest('.info-tooltip-wrap')) return;
+            document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (caixa) {
+                caixa.classList.remove('aberto');
+            });
+            document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (botao) {
+                botao.setAttribute('aria-expanded', 'false');
+            });
+        });
 
         function formatarCnpj(valor) {
             const digitos = (valor || '').replace(/\D/g, '').slice(0, 14);

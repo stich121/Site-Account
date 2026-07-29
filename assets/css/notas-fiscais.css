@@ -350,6 +350,45 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
 .field { display: grid; gap: 0.4rem; }
 .field label { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
 
+/* Botão de informação (ícone "i") que abre uma caixa de texto explicativa ao lado do campo */
+.info-tooltip-wrap { position: relative; display: inline-flex; margin-left: 0.35rem; vertical-align: middle; }
+.info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    cursor: pointer;
+    line-height: 1;
+}
+.info-btn:hover, .info-btn[aria-expanded="true"] { background: var(--primary-soft); color: var(--primary); }
+.info-tooltip-box {
+    display: none;
+    position: absolute;
+    z-index: 30;
+    top: 140%;
+    left: 0;
+    width: 280px;
+    max-width: min(320px, 80vw);
+    padding: 0.75rem 0.9rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-pop);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 400;
+    line-height: 1.55;
+    white-space: normal;
+}
+.info-tooltip-box.aberto { display: block; }
+
 /* Campo somente leitura: mostra um valor definido em outro lugar (ex.: empresa emissora no cabeçalho) */
 .campo-fixo {
     width: 100%;
