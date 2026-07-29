@@ -42,6 +42,7 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 - Status de rascunho, pendente, autorizada, rejeitada e cancelada (ambos os tipos).
 - Documento de conferência (em layout de DANFE para NF-e), downloads protegidos, histórico e logs.
 - Correção e reprocessamento de nota rejeitada localmente (NF-e e NFS-e).
+- Filtro por empresa emissora nas telas de **notas fiscais** e de **clientes**: mostra só as notas (ou só os clientes que já têm nota) do CNPJ emitente escolhido.
 
 ## NF-e (produto) — funcionalidades concluídas
 
@@ -77,7 +78,8 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 
 ### Empresa emissora e numeração
 
-- Série da NF-e configurável por empresa; numeração sequencial por empresa + série.
+- Série da NF-e configurável por empresa; numeração sequencial independente por empresa + tipo de nota (NF-e/NFS-e) + série — nunca mistura entre empresas.
+- Ajuste manual da numeração (`nfe_numero_base`): campo no cadastro da empresa para registrar a última NF-e emitida fora do sistema (ou corrigir a sequência). A próxima nota emitida usa sempre o maior valor entre esse ajuste e o que já foi lançado pelo sistema, mais 1 — depois disso a numeração segue sozinha, sem precisar mexer no campo de novo. O cadastro mostra ao vivo o último número já lançado e qual será o próximo (calculado a partir de `notas_fiscais`, não é um contador solto que possa dessincronizar).
 - CRT da empresa passou a ser efetivamente usado (antes só a NFS-e lia esse campo) para decidir CSOSN × CST em todo o formulário.
 
 ### Diagnóstico e operação
@@ -96,6 +98,7 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 - Opção pelo Simples Nacional e regime de apuração.
 - Tributação municipal e regime especial obtidos do cadastro da empresa emissora.
 - Edição, desativação e exclusão controlada.
+- Textos de ajuda de campo (ex.: opção pelo Simples, regime de apuração, ajuste manual da numeração) exibidos por um botão "i" que abre uma caixa de diálogo ao lado do campo, em vez de texto sempre visível — componente compartilhado em `assets/css/notas-fiscais.css` (`.info-tooltip-wrap`/`.info-btn`/`.info-tooltip-box`), reaproveitável nas outras telas do emissor.
 
 ### Certificado digital
 
@@ -224,6 +227,7 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `nfe-diagnostico.php` | Diagnóstico do ambiente (extensões PHP e libs) para NF-e |
 | `notas-fiscais-schema.sql` | Schema fiscal |
 | `seguranca.php` | Sessão, CSRF e segurança |
+| `assets/css/notas-fiscais.css` | Design system e componentes de UI (inclui o botão "i" de ajuda) compartilhados pelas telas do emissor |
 
 ## Instalação
 
@@ -390,6 +394,9 @@ Não versionar:
 - Cadastro de produtos/serviços reorganizado em seções, com campos de CEST/origem/fabricante/benefício fiscal, e passou a permitir edição de item (antes só desativar/reativar).
 - Correção de dois bugs de dado, não de código novo: `catalogoJson` sendo escapado e serializado em dobro (quebrava a lista de itens do catálogo dentro do `<script>` assim que havia produtos cadastrados) e a coluna "Detalhe" da fila de NF-e mostrando a chave de acesso em vez do motivo real de rejeição.
 - Correção de migração ausente: colunas novas do catálogo de produtos só tinham sido adicionadas em uma das três cópias da função de schema que o projeto já mantinha por entry-point (padrão pré-existente, não introduzido agora).
+- Filtro por empresa emissora nas telas de notas fiscais e de clientes (o filtro de clientes usa `EXISTS` em `notas_fiscais`, já que o cadastro de cliente é compartilhado entre empresas e não tem coluna própria de empresa emissora).
+- Ajuste manual da numeração de NF-e por empresa (`nfe_numero_base`): permite "avançar" a sequência quando já existe nota emitida fora do sistema, sem nunca reduzir o próximo número. Cadastro da empresa passou a mostrar ao vivo o último número lançado e o próximo, calculado direto de `notas_fiscais` (não é contador solto).
+- Botão de informação ("i") com caixa de diálogo para os textos de ajuda de campo do cadastro da empresa emissora, substituindo texto sempre visível — componente novo e reaproveitável em `assets/css/notas-fiscais.css`.
 
 ## Limites e cuidados
 
@@ -410,4 +417,4 @@ Não versionar:
 
 ---
 
-Última consolidação: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos).
+Última consolidação: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos; e, na sequência, filtro por empresa emissora em notas/clientes, ajuste manual da numeração de NF-e com exibição ao vivo do próximo número, e botão de informação para os textos de ajuda do cadastro da empresa).

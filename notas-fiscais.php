@@ -591,6 +591,39 @@ function liberarLockAcaoNota(PDO $db, int $notaId): void
     $stmt->execute(['nome' => 'account_nfse_nota_' . $notaId]);
 }
 
+function paginasVisiveisNotas(int $paginaAtual, int $totalPaginas): array
+{
+    $paginas = [1, 2, 3];
+    for ($i = 10; $i < $totalPaginas; $i += 10) {
+        $paginas[] = $i;
+    }
+    for ($i = $paginaAtual - 1; $i <= $paginaAtual + 1; $i++) {
+        $paginas[] = $i;
+    }
+    $paginas[] = $totalPaginas;
+    $paginas = array_values(array_unique(array_filter($paginas, static fn (int $p): bool => $p >= 1 && $p <= $totalPaginas)));
+    sort($paginas);
+    return $paginas;
+}
+
+function linkFiltroNotas(array $sobrescrever, string $filtroStatus, int $filtroEmpresaId, string $filtroMes): string
+{
+    $params = ['mes' => $filtroMes];
+    if ($filtroStatus !== '') {
+        $params['status'] = $filtroStatus;
+    }
+    if ($filtroEmpresaId > 0) {
+        $params['empresa_emissora_id'] = $filtroEmpresaId;
+    }
+    $params = array_merge($params, $sobrescrever);
+    foreach ($params as $chave => $valor) {
+        if ($chave !== 'mes' && ($valor === '' || $valor === 0)) {
+            unset($params[$chave]);
+        }
+    }
+    return 'notas-fiscais?' . http_build_query($params);
+}
+
 function buscarNotaFiscalCompleta(PDO $db, int $notaId): ?array
 {
     $stmt = $db->prepare('SELECT n.*, e.razao_social AS empresa_razao_social, e.cnpj AS empresa_cnpj, e.inscricao_estadual AS empresa_ie, e.municipio AS empresa_municipio, e.uf AS empresa_uf, e.crt AS empresa_crt, e.ambiente_emissao AS empresa_ambiente_emissao, e.certificado_arquivo, e.certificado_senha_cifrada, c.nome_razao_social AS cliente_nome, c.cnpj_cpf AS cliente_documento, c.municipio AS cliente_municipio, c.uf AS cliente_uf FROM notas_fiscais n INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id INNER JOIN notas_clientes c ON c.id = n.cliente_id WHERE n.id = :id LIMIT 1');
@@ -841,6 +874,108 @@ try {
         exit;
     }
 
+    // ZIP com todos os XMLs e PDFs de um mes (so notas autorizadas tem documento fiscal de verdade).
+    if (isset($_GET['zip_mes'])) {
+        $mesZip = trim((string) $_GET['zip_mes']);
+        if (!preg_match('/^\d{4}-\d{2}$/', $mesZip)) {
+            http_response_code(400);
+            echo 'Mês inválido para o ZIP.';
+            exit;
+        }
+        if (!class_exists('ZipArchive')) {
+            http_response_code(500);
+            echo 'Geração de ZIP indisponível: a extensão PHP "zip" não está habilitada neste servidor.';
+            exit;
+        }
+
+        $empresaZipId = (int) ($_GET['empresa_emissora_id'] ?? 0);
+        $inicioMesZip = $mesZip . '-01';
+        $fimMesZip = date('Y-m-t', strtotime($inicioMesZip));
+
+        $whereZip = ["n.status = 'autorizada'", 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim'];
+        $bindZip = ['mes_inicio' => $inicioMesZip, 'mes_fim' => $fimMesZip];
+        if (!$podeAdministrar) {
+            $whereZip[] = 'n.funcionario_id = :funcionario_id';
+            $bindZip['funcionario_id'] = $funcionarioId;
+        }
+        if ($empresaZipId > 0) {
+            $whereZip[] = 'n.empresa_emissora_id = :empresa_emissora_id';
+            $bindZip['empresa_emissora_id'] = $empresaZipId;
+        }
+
+        $stmtZip = $dbNotas->prepare(
+            'SELECT n.id FROM notas_fiscais n WHERE ' . implode(' AND ', $whereZip) . ' ORDER BY n.numero_interno ASC'
+        );
+        $stmtZip->execute($bindZip);
+        $idsNotasZip = array_map('intval', array_column($stmtZip->fetchAll(), 'id'));
+
+        if (empty($idsNotasZip)) {
+            http_response_code(404);
+            echo 'Nenhuma nota autorizada encontrada para esse período.';
+            exit;
+        }
+
+        $arquivoZipTemp = tempnam(sys_get_temp_dir(), 'notas_zip_');
+        $zip = new ZipArchive();
+        if ($zip->open($arquivoZipTemp, ZipArchive::OVERWRITE) !== true) {
+            http_response_code(500);
+            echo 'Não foi possível gerar o arquivo ZIP.';
+            exit;
+        }
+
+        $totalArquivosZip = 0;
+        foreach ($idsNotasZip as $idNotaZip) {
+            $notaZip = buscarNotaFiscalCompleta($dbNotas, $idNotaZip);
+            if (!$notaZip || empty($notaZip['chave_acesso'])) {
+                continue;
+            }
+
+            $pastaEmpresaZip = trim((string) preg_replace('/[^A-Za-z0-9 _-]/', '', (string) $notaZip['empresa_razao_social']));
+            $pastaEmpresaZip = $pastaEmpresaZip !== '' ? $pastaEmpresaZip : 'Empresa';
+            $prefixoArquivoZip = ($notaZip['tipo_nota'] === 'nfse' ? 'NFSe' : 'NFe') . '-' . $notaZip['numero_interno'] . '-' . preg_replace('/\D/', '', (string) $notaZip['chave_acesso']);
+
+            $xmlZip = trim((string) ($notaZip['xml_gerado'] ?? ''));
+            try {
+                if ($xmlZip === '' && $notaZip['tipo_nota'] === 'nfse') {
+                    $consultaZip = consultarNfseRemota($notaZip, $notaZip['ambiente'], $notaZip['chave_acesso']);
+                    $xmlZip = $consultaZip['xml'];
+                }
+            } catch (Throwable $e) {
+                $xmlZip = '';
+            }
+            if ($xmlZip !== '') {
+                $zip->addFromString($pastaEmpresaZip . '/' . $prefixoArquivoZip . '.xml', $xmlZip);
+                $totalArquivosZip++;
+            }
+
+            try {
+                $pdfZip = $notaZip['tipo_nota'] === 'nfe'
+                    ? gerarDanfePdf($xmlZip)
+                    : baixarDanfseRemoto($notaZip, $notaZip['ambiente'], $notaZip['chave_acesso'], $xmlZip !== '' ? $xmlZip : null);
+                $zip->addFromString($pastaEmpresaZip . '/' . $prefixoArquivoZip . '.pdf', $pdfZip);
+                $totalArquivosZip++;
+            } catch (Throwable $e) {
+                // PDF pode falhar (ex.: endpoint de DANFSe descontinuado); mantem so o XML dessa nota no ZIP.
+            }
+        }
+
+        $zip->close();
+
+        if ($totalArquivosZip === 0) {
+            unlink($arquivoZipTemp);
+            http_response_code(409);
+            echo 'Nenhum XML ou PDF pôde ser gerado para esse período.';
+            exit;
+        }
+
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="notas-fiscais-' . $mesZip . '.zip"');
+        header('Content-Length: ' . filesize($arquivoZipTemp));
+        readfile($arquivoZipTemp);
+        unlink($arquivoZipTemp);
+        exit;
+    }
+
     if (empty($_SESSION['csrf_notas_fiscais'])) {
         $_SESSION['csrf_notas_fiscais'] = bin2hex(random_bytes(32));
     }
@@ -945,6 +1080,11 @@ try {
     }
     $filtroStatus = trim($_GET['status'] ?? '');
     $filtroEmpresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
+    // Sem "mes" na URL: mes atual por padrao. Com "mes" vazio (link "Ver todos os meses"): sem filtro de periodo.
+    $filtroMes = isset($_GET['mes']) ? trim((string) $_GET['mes']) : date('Y-m');
+    if ($filtroMes !== '' && !preg_match('/^\d{4}-\d{2}$/', $filtroMes)) {
+        $filtroMes = date('Y-m');
+    }
     $where = [];
     $bind = [];
     if (!$podeAdministrar) {
@@ -959,10 +1099,27 @@ try {
         $where[] = 'n.empresa_emissora_id = :empresa_emissora_id';
         $bind['empresa_emissora_id'] = $filtroEmpresaId;
     }
+    if ($filtroMes !== '') {
+        $inicioMesFiltro = $filtroMes . '-01';
+        $where[] = 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim';
+        $bind['mes_inicio'] = $inicioMesFiltro;
+        $bind['mes_fim'] = date('Y-m-t', strtotime($inicioMesFiltro));
+    }
     $sqlWhere = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
     $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
     $empresasEmissorasFiltro = $stmt->fetchAll();
+
+    $notasPorPagina = 50;
+    $stmtTotal = $dbNotas->prepare('SELECT COUNT(*) FROM notas_fiscais n ' . $sqlWhere);
+    $stmtTotal->execute($bind);
+    $totalNotasFiltradas = (int) $stmtTotal->fetchColumn();
+    $totalPaginasNotas = max(1, (int) ceil($totalNotasFiltradas / $notasPorPagina));
+    $paginaAtualNotas = max(1, (int) ($_GET['pagina'] ?? 1));
+    if ($paginaAtualNotas > $totalPaginasNotas) {
+        $paginaAtualNotas = $totalPaginasNotas;
+    }
+    $offsetNotas = ($paginaAtualNotas - 1) * $notasPorPagina;
 
     $stmt = $dbNotas->prepare(
         'SELECT n.id, n.tipo_nota, n.numero_interno, n.status, n.valor_total, n.data_emissao, n.criado_em, n.funcionario_id,
@@ -973,9 +1130,14 @@ try {
          INNER JOIN notas_clientes c ON c.id = n.cliente_id
          ' . $sqlWhere . '
          ORDER BY n.criado_em DESC
-         LIMIT 200'
+         LIMIT :limite OFFSET :offset'
     );
-    $stmt->execute($bind);
+    foreach ($bind as $chaveBind => $valorBind) {
+        $stmt->bindValue($chaveBind, $valorBind);
+    }
+    $stmt->bindValue('limite', $notasPorPagina, PDO::PARAM_INT);
+    $stmt->bindValue('offset', $offsetNotas, PDO::PARAM_INT);
+    $stmt->execute();
     $notas = $stmt->fetchAll();
 
     if ($podeAdministrar && !empty($notas)) {
@@ -1054,6 +1216,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                 <h2 style="margin-bottom:0;"><i class="fa-solid fa-list-check"></i> <?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?></h2>
                 <form method="get" class="row-actions">
+                    <input class="select-filtro" type="month" name="mes" value="<?php echo h($filtroMes); ?>" onchange="this.form.submit()">
                     <select class="select-filtro" name="empresa_emissora_id" onchange="this.form.submit()">
                         <option value="">Todas as empresas</option>
                         <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
@@ -1067,6 +1230,15 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         <?php endforeach; ?>
                     </select>
                 </form>
+            </div>
+            <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap;">
+                <?php if ($filtroMes !== ''): ?>
+                    <span class="muted">Exibindo notas emitidas em <?php echo h(date('m/Y', strtotime($filtroMes . '-01'))); ?>.</span>
+                    <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['mes' => '', 'pagina' => 1], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>">Ver todos os meses</a>
+                    <a class="btn btn-outline btn-small" href="notas-fiscais?zip_mes=<?php echo h($filtroMes); ?><?php echo $filtroEmpresaId > 0 ? '&empresa_emissora_id=' . $filtroEmpresaId : ''; ?>"><i class="fa-solid fa-file-zipper"></i> Baixar ZIP do mês (XML + PDF)</a>
+                <?php else: ?>
+                    <span class="muted">Exibindo notas de todos os meses. Selecione um mês para poder baixar o ZIP com XML/PDF.</span>
+                <?php endif; ?>
             </div>
             <div class="table-wrap">
                 <table class="lista">
@@ -1154,6 +1326,34 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     </tbody>
                 </table>
             </div>
+            <?php if ($totalPaginasNotas > 1): ?>
+                <div class="row-actions" style="margin-top:1rem; flex-wrap:wrap; align-items:center;">
+                    <span class="muted">Página <?php echo $paginaAtualNotas; ?> de <?php echo $totalPaginasNotas; ?> (<?php echo $totalNotasFiltradas; ?> notas no total).</span>
+                    <?php if ($paginaAtualNotas > 1): ?>
+                        <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $paginaAtualNotas - 1], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>"><i class="fa-solid fa-chevron-left"></i> Anterior</a>
+                    <?php endif; ?>
+                    <?php
+                        $paginasVisiveis = paginasVisiveisNotas($paginaAtualNotas, $totalPaginasNotas);
+                        $paginaAnteriorRenderizada = 0;
+                        foreach ($paginasVisiveis as $numeroPagina):
+                            if ($paginaAnteriorRenderizada !== 0 && $numeroPagina - $paginaAnteriorRenderizada > 1):
+                    ?>
+                        <span class="muted">…</span>
+                    <?php endif; ?>
+                        <?php if ($numeroPagina === $paginaAtualNotas): ?>
+                            <span class="btn btn-small" style="cursor:default;"><?php echo $numeroPagina; ?></span>
+                        <?php else: ?>
+                            <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $numeroPagina], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>"><?php echo $numeroPagina; ?></a>
+                        <?php endif; ?>
+                    <?php
+                            $paginaAnteriorRenderizada = $numeroPagina;
+                        endforeach;
+                    ?>
+                    <?php if ($paginaAtualNotas < $totalPaginasNotas): ?>
+                        <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $paginaAtualNotas + 1], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>">Próxima <i class="fa-solid fa-chevron-right"></i></a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </section>
     </div>
 
