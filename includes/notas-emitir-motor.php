@@ -7,7 +7,7 @@
  *   ignorando qualquer valor de tipo_nota vindo do POST.
  *
  * Ao final da inclusão, ficam disponíveis para a página: $erro, $sucesso, $notaEmEdicao,
- * $nfseEmEdicao, $itensEmEdicao, $dadosRestaurar, $empresasAtivas, $clientes, $catalogo,
+ * $nfseEmEdicao, $nfeEmEdicao, $itensEmEdicao, $dadosRestaurar, $empresasAtivas, $clientes, $catalogo,
  * $csrf, $usuario, $catalogoJson, $edicaoJson, $restaurarJson, $codigosTributacaoNacionalNfse,
  * $correlacaoNbsNfse, $cfopCodigosNfe, $db, $dbNotas, $funcionarioId, $usuarioRaw, $nivelAcesso, $podeAdministrar.
  */
@@ -24,6 +24,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 require_once __DIR__ . '/../config_db.php';
 require_once __DIR__ . '/../config_db_notas.php';
 require_once __DIR__ . '/../nfse-codigos-tributacao-nacional.php';
+require_once __DIR__ . '/nfe-impostos.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -34,6 +35,7 @@ $erro = '';
 $sucesso = '';
 $notaEmEdicao = null;
 $nfseEmEdicao = null;
+$nfeEmEdicao = null;
 $itensEmEdicao = [];
 $dadosRestaurar = null;
 
@@ -403,6 +405,110 @@ function prepararColunasCertificadoEmpresa(PDO $db): void
     }
 }
 
+function prepararColunaSerieNfeEmpresaEmissora(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfe_serie')) {
+        $db->exec("ALTER TABLE empresas_emissoras ADD COLUMN nfe_serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER crt");
+    }
+}
+
+function prepararColunaSerieNotaFiscal(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'notas_fiscais', 'serie')) {
+        $db->exec("ALTER TABLE notas_fiscais ADD COLUMN serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER numero_interno");
+    }
+}
+
+function prepararTabelaNotasFiscaisNfe(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfe (
+            nota_id BIGINT UNSIGNED NOT NULL,
+            finalidade_emissao ENUM('normal','complementar','ajuste','devolucao') NOT NULL DEFAULT 'normal',
+            indicador_presenca TINYINT UNSIGNED NOT NULL DEFAULT 9,
+            nfe_referenciada VARCHAR(44) NULL,
+            modalidade_frete TINYINT UNSIGNED NOT NULL DEFAULT 9,
+            transportador_nome VARCHAR(180) NULL,
+            transportador_cnpj_cpf VARCHAR(20) NULL,
+            transportador_ie VARCHAR(20) NULL,
+            transportador_endereco VARCHAR(180) NULL,
+            transportador_municipio VARCHAR(120) NULL,
+            transportador_uf CHAR(2) NULL,
+            veiculo_placa VARCHAR(10) NULL,
+            veiculo_uf CHAR(2) NULL,
+            veiculo_rntc VARCHAR(20) NULL,
+            volumes_quantidade INT UNSIGNED NULL,
+            volumes_especie VARCHAR(60) NULL,
+            volumes_marca VARCHAR(60) NULL,
+            volumes_numeracao VARCHAR(60) NULL,
+            volumes_peso_liquido DECIMAL(12,3) NULL,
+            volumes_peso_bruto DECIMAL(12,3) NULL,
+            forma_pagamento_codigo VARCHAR(2) NOT NULL DEFAULT '90',
+            indicador_pagamento TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            valor_pago DECIMAL(12,2) NULL,
+            valor_troco DECIMAL(12,2) NULL,
+            informacoes_complementares TEXT NULL,
+            chave_acesso_evento_cancelamento VARCHAR(60) NULL,
+            PRIMARY KEY (nota_id),
+            CONSTRAINT fk_notas_fiscais_nfe_nota
+                FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
+function prepararColunasImpostoItensNotas(PDO $db): void
+{
+    $colunas = [
+        'numero_item' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN numero_item SMALLINT UNSIGNED NULL AFTER produto_servico_id',
+        'cean' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cean VARCHAR(14) NULL AFTER ncm',
+        'cean_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cean_tributavel VARCHAR(14) NULL AFTER cean',
+        'unidade_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN unidade_tributavel VARCHAR(10) NULL AFTER unidade',
+        'quantidade_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN quantidade_tributavel DECIMAL(12,3) NULL AFTER unidade_tributavel',
+        'valor_unitario_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN valor_unitario_tributavel DECIMAL(12,4) NULL AFTER quantidade_tributavel',
+        'icms_origem' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_origem TINYINT UNSIGNED NULL AFTER cst_csosn',
+        'icms_modalidade_bc' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_modalidade_bc TINYINT UNSIGNED NULL AFTER icms_origem',
+        'icms_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_base_calculo DECIMAL(12,2) NULL AFTER icms_modalidade_bc',
+        'icms_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_aliquota DECIMAL(6,4) NULL AFTER icms_base_calculo',
+        'icms_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_valor DECIMAL(12,2) NULL AFTER icms_aliquota',
+        'icms_st_modalidade_bc' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_modalidade_bc TINYINT UNSIGNED NULL AFTER icms_valor',
+        'icms_st_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_aliquota DECIMAL(6,4) NULL AFTER icms_st_modalidade_bc',
+        'icms_st_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_base_calculo DECIMAL(12,2) NULL AFTER icms_st_aliquota',
+        'icms_st_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_valor DECIMAL(12,2) NULL AFTER icms_st_base_calculo',
+        'ipi_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER icms_st_valor',
+        'ipi_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_base_calculo DECIMAL(12,2) NULL AFTER ipi_cst',
+        'ipi_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_aliquota DECIMAL(6,4) NULL AFTER ipi_base_calculo',
+        'ipi_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_valor DECIMAL(12,2) NULL AFTER ipi_aliquota',
+        'pis_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_cst VARCHAR(2) NULL AFTER ipi_valor',
+        'pis_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_base_calculo DECIMAL(12,2) NULL AFTER pis_cst',
+        'pis_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_aliquota DECIMAL(6,4) NULL AFTER pis_base_calculo',
+        'pis_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_valor DECIMAL(12,2) NULL AFTER pis_aliquota',
+        'cofins_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_cst VARCHAR(2) NULL AFTER pis_valor',
+        'cofins_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_base_calculo DECIMAL(12,2) NULL AFTER cofins_cst',
+        'cofins_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_aliquota DECIMAL(6,4) NULL AFTER cofins_base_calculo',
+        'cofins_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_valor DECIMAL(12,2) NULL AFTER cofins_aliquota',
+    ];
+    foreach ($colunas as $coluna => $sql) {
+        if (!colunaExisteNotas($db, 'notas_fiscais_itens', $coluna)) {
+            $db->exec($sql);
+        }
+    }
+}
+
+function prepararColunasImpostoProdutosServicosNotas(PDO $db): void
+{
+    $colunas = [
+        'ipi_cst' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER cst_csosn',
+        'aliquota_ipi' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN aliquota_ipi DECIMAL(5,2) NULL AFTER ipi_cst',
+        'cean' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cean VARCHAR(14) NULL AFTER codigo_interno',
+    ];
+    foreach ($colunas as $coluna => $sql) {
+        if (!colunaExisteNotas($db, 'notas_produtos_servicos', $coluna)) {
+            $db->exec($sql);
+        }
+    }
+}
+
 function prepararTabelaNotasFiscaisNfse(PDO $db): void
 {
     $db->exec(
@@ -577,6 +683,11 @@ try {
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);
+    prepararColunaSerieNfeEmpresaEmissora($dbNotas);
+    prepararColunaSerieNotaFiscal($dbNotas);
+    prepararTabelaNotasFiscaisNfe($dbNotas);
+    prepararColunasImpostoItensNotas($dbNotas);
+    prepararColunasImpostoProdutosServicosNotas($dbNotas);
 
     prepararColunaPermiteNotasFiscais($db);
 
@@ -608,13 +719,19 @@ try {
         $stmtEdicao = $dbNotas->prepare($sqlEdicao);
         $stmtEdicao->execute($paramsEdicao);
         $candidataEdicao = $stmtEdicao->fetch() ?: null;
-        if (!$candidataEdicao || $candidataEdicao['tipo_nota'] !== 'nfse' || !in_array($candidataEdicao['status'], ['rascunho', 'rejeitada'], true)) {
-            $erro = 'Esta nota não pode ser editada. Somente rascunhos e NFS-e rejeitadas podem ser corrigidos.';
+        if (!$candidataEdicao || !in_array($candidataEdicao['tipo_nota'], ['nfse', 'nfe'], true) || !in_array($candidataEdicao['status'], ['rascunho', 'rejeitada'], true)) {
+            $erro = 'Esta nota não pode ser editada. Somente rascunhos e notas rejeitadas podem ser corrigidas.';
         } else {
             $notaEmEdicao = $candidataEdicao;
-            $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
-            $stmtEdicao->execute(['nota_id' => $notaEdicaoId]);
-            $nfseEmEdicao = $stmtEdicao->fetch() ?: [];
+            if ($candidataEdicao['tipo_nota'] === 'nfse') {
+                $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse WHERE nota_id = :nota_id LIMIT 1');
+                $stmtEdicao->execute(['nota_id' => $notaEdicaoId]);
+                $nfseEmEdicao = $stmtEdicao->fetch() ?: [];
+            } else {
+                $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfe WHERE nota_id = :nota_id LIMIT 1');
+                $stmtEdicao->execute(['nota_id' => $notaEdicaoId]);
+                $nfeEmEdicao = $stmtEdicao->fetch() ?: [];
+            }
             $stmtEdicao = $dbNotas->prepare('SELECT * FROM notas_fiscais_itens WHERE nota_id = :nota_id ORDER BY id ASC');
             $stmtEdicao->execute(['nota_id' => $notaEdicaoId]);
             $itensEmEdicao = $stmtEdicao->fetchAll();
@@ -626,6 +743,7 @@ try {
             $erro = 'Esta nota é do tipo ' . ($notaEmEdicao['tipo_nota'] === 'nfse' ? 'NFS-e (serviço)' : 'NF-e (produto)') . '. Abra a tela de emissão correspondente para editá-la.';
             $notaEmEdicao = null;
             $nfseEmEdicao = null;
+            $nfeEmEdicao = null;
             $itensEmEdicao = [];
         }
     }
@@ -652,6 +770,7 @@ try {
             $itensValidos = [];
             $valorTotalNota = 0.0;
             $dadosNfse = null;
+            $dadosNfe = null;
 
             if ($tipoNota === 'nfse') {
                 $numerico = static function (string $campo): ?float {
@@ -806,6 +925,15 @@ try {
                     'ibscbs_classificacao_tributaria' => $ibscbsClassificacaoTributaria !== '' ? $ibscbsClassificacaoTributaria : null,
                 ];
             } else {
+                $numericoNfe = static function (string $valorBruto): float {
+                    $valorBruto = trim($valorBruto);
+                    if (str_contains($valorBruto, ',')) {
+                        $valorBruto = str_replace('.', '', $valorBruto);
+                        $valorBruto = str_replace(',', '.', $valorBruto);
+                    }
+                    return (float) $valorBruto;
+                };
+
                 $descricoes = $_POST['item_descricao'] ?? [];
                 $ncms = $_POST['item_ncm'] ?? [];
                 $cfops = $_POST['item_cfop'] ?? [];
@@ -814,11 +942,19 @@ try {
                 $quantidades = $_POST['item_quantidade'] ?? [];
                 $valoresUnitarios = $_POST['item_valor_unitario'] ?? [];
                 $produtoIds = $_POST['item_produto_id'] ?? [];
+                $ceans = $_POST['item_cean'] ?? [];
+                $icmsOrigens = $_POST['item_icms_origem'] ?? [];
+                $icmsStBases = $_POST['item_icms_st_base_calculo'] ?? [];
+                $icmsStAliquotas = $_POST['item_icms_st_aliquota'] ?? [];
+                $ipiCsts = $_POST['item_ipi_cst'] ?? [];
+                $ipiAliquotas = $_POST['item_ipi_aliquota'] ?? [];
+                $pisAliquotas = $_POST['item_pis_aliquota'] ?? [];
+                $cofinsAliquotas = $_POST['item_cofins_aliquota'] ?? [];
 
                 foreach ($descricoes as $indice => $descricaoItem) {
                     $descricaoItem = trim((string) $descricaoItem);
-                    $quantidade = (float) str_replace(',', '.', (string) ($quantidades[$indice] ?? '0'));
-                    $valorUnitario = (float) str_replace(',', '.', (string) ($valoresUnitarios[$indice] ?? '0'));
+                    $quantidade = $numericoNfe((string) ($quantidades[$indice] ?? '0'));
+                    $valorUnitario = $numericoNfe((string) ($valoresUnitarios[$indice] ?? '0'));
 
                     if ($descricaoItem === '' || $quantidade <= 0) {
                         continue;
@@ -838,8 +974,44 @@ try {
                         'quantidade' => $quantidade,
                         'valor_unitario' => $valorUnitario,
                         'valor_total' => $valorTotalItem,
+                        'cean' => trim((string) ($ceans[$indice] ?? '')) ?: null,
+                        'icms_origem' => (string) ($icmsOrigens[$indice] ?? '0'),
+                        'icms_st_base_calculo' => $numericoNfe((string) ($icmsStBases[$indice] ?? '0')),
+                        'icms_st_aliquota' => $numericoNfe((string) ($icmsStAliquotas[$indice] ?? '0')),
+                        'ipi_cst' => trim((string) ($ipiCsts[$indice] ?? '')),
+                        'ipi_aliquota' => $numericoNfe((string) ($ipiAliquotas[$indice] ?? '0')),
+                        'icms_aliquota' => $numericoNfe((string) ($_POST['item_icms_aliquota'][$indice] ?? '0')),
+                        'pis_aliquota' => $numericoNfe((string) ($pisAliquotas[$indice] ?? '0')),
+                        'cofins_aliquota' => $numericoNfe((string) ($cofinsAliquotas[$indice] ?? '0')),
                     ];
                 }
+
+                $dadosNfe = [
+                    'finalidade_emissao' => in_array($_POST['nfe_finalidade_emissao'] ?? '', ['normal', 'complementar', 'ajuste', 'devolucao'], true) ? $_POST['nfe_finalidade_emissao'] : 'normal',
+                    'indicador_presenca' => (int) ($_POST['nfe_indicador_presenca'] ?? 9),
+                    'nfe_referenciada' => trim((string) ($_POST['nfe_referenciada'] ?? '')) !== '' ? preg_replace('/\D+/', '', $_POST['nfe_referenciada']) : null,
+                    'modalidade_frete' => (int) ($_POST['nfe_modalidade_frete'] ?? 9),
+                    'transportador_nome' => trim((string) ($_POST['nfe_transportador_nome'] ?? '')) ?: null,
+                    'transportador_cnpj_cpf' => trim((string) ($_POST['nfe_transportador_cnpj_cpf'] ?? '')) ?: null,
+                    'transportador_ie' => trim((string) ($_POST['nfe_transportador_ie'] ?? '')) ?: null,
+                    'transportador_endereco' => trim((string) ($_POST['nfe_transportador_endereco'] ?? '')) ?: null,
+                    'transportador_municipio' => trim((string) ($_POST['nfe_transportador_municipio'] ?? '')) ?: null,
+                    'transportador_uf' => trim((string) ($_POST['nfe_transportador_uf'] ?? '')) ?: null,
+                    'veiculo_placa' => trim((string) ($_POST['nfe_veiculo_placa'] ?? '')) ?: null,
+                    'veiculo_uf' => trim((string) ($_POST['nfe_veiculo_uf'] ?? '')) ?: null,
+                    'veiculo_rntc' => trim((string) ($_POST['nfe_veiculo_rntc'] ?? '')) ?: null,
+                    'volumes_quantidade' => trim((string) ($_POST['nfe_volumes_quantidade'] ?? '')) !== '' ? (int) $_POST['nfe_volumes_quantidade'] : null,
+                    'volumes_especie' => trim((string) ($_POST['nfe_volumes_especie'] ?? '')) ?: null,
+                    'volumes_marca' => trim((string) ($_POST['nfe_volumes_marca'] ?? '')) ?: null,
+                    'volumes_numeracao' => trim((string) ($_POST['nfe_volumes_numeracao'] ?? '')) ?: null,
+                    'volumes_peso_liquido' => trim((string) ($_POST['nfe_volumes_peso_liquido'] ?? '')) !== '' ? $numericoNfe($_POST['nfe_volumes_peso_liquido']) : null,
+                    'volumes_peso_bruto' => trim((string) ($_POST['nfe_volumes_peso_bruto'] ?? '')) !== '' ? $numericoNfe($_POST['nfe_volumes_peso_bruto']) : null,
+                    'forma_pagamento_codigo' => trim((string) ($_POST['nfe_forma_pagamento_codigo'] ?? '')) ?: '90',
+                    'indicador_pagamento' => (int) ($_POST['nfe_indicador_pagamento'] ?? 0),
+                    'valor_pago' => trim((string) ($_POST['nfe_valor_pago'] ?? '')) !== '' ? $numericoNfe($_POST['nfe_valor_pago']) : null,
+                    'valor_troco' => trim((string) ($_POST['nfe_valor_troco'] ?? '')) !== '' ? $numericoNfe($_POST['nfe_valor_troco']) : 0,
+                    'informacoes_complementares' => trim((string) ($_POST['nfe_informacoes_complementares'] ?? '')) ?: null,
+                ];
             }
 
             $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id AND ativo = 1 LIMIT 1');
@@ -849,6 +1021,22 @@ try {
             $stmtCliente->execute(['id' => $clienteId]);
             $clienteSelecionado = $stmtCliente->fetch() ?: null;
             $ambienteNota = ($empresaSelecionada['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'producao' : 'homologacao';
+            $erroDifalNfe = null;
+            if ($tipoNota === 'nfe' && $empresaSelecionada !== null && $clienteSelecionado !== null) {
+                $erroDifalNfe = nfeBloqueioDifal($empresaSelecionada, $clienteSelecionado);
+                if ($erroDifalNfe === null) {
+                    foreach ($itensValidos as &$itemNfe) {
+                        $impostosItem = nfeCalcularImpostosItem(
+                            $itemNfe,
+                            $empresaSelecionada,
+                            (string) ($itemNfe['cfop'] ?? ''),
+                            (string) ($clienteSelecionado['uf'] ?? '')
+                        );
+                        $itemNfe = array_merge($itemNfe, $impostosItem);
+                    }
+                    unset($itemNfe);
+                }
+            }
             if ($tipoNota === 'nfse' && $dadosNfse !== null && $empresaSelecionada !== null) {
                 $dadosNfse['tributacao_issqn'] = (string) ($empresaSelecionada['nfse_tributacao_issqn'] ?? '');
                 $dadosNfse['regime_especial_tributacao'] = trim((string) ($empresaSelecionada['nfse_regime_especial_tributacao'] ?? '')) ?: null;
@@ -923,10 +1111,20 @@ try {
                 $erro = 'Selecione uma classificação tributária (cClassTrib) vigente e permitida para NFS-e.';
             } elseif ($tipoNota === 'nfse' && $cclassOficial !== null && (string) $dadosNfse['ibscbs_cst'] !== (string) ($cclassOficial['cst'] ?? '')) {
                 $erro = 'O CST IBS/CBS não corresponde à classificação tributária selecionada.';
+            } elseif ($tipoNota === 'nfe' && (empty($empresaSelecionada['cnpj']) || empty($empresaSelecionada['uf']) || !preg_match('/^\d{7}$/', (string) ($empresaSelecionada['codigo_ibge_municipio'] ?? '')) || empty($empresaSelecionada['inscricao_estadual']) || empty($empresaSelecionada['logradouro']) || empty($empresaSelecionada['numero']) || empty($empresaSelecionada['bairro']) || empty($empresaSelecionada['cep']))) {
+                $erro = 'Complete CNPJ, Inscrição Estadual, endereço, UF e código IBGE da empresa emissora antes de emitir NF-e.';
+            } elseif ($tipoNota === 'nfe' && !in_array((int) ($empresaSelecionada['crt'] ?? 0), [1, 2, 3], true)) {
+                $erro = 'Configure o regime tributário (CRT) da empresa emissora antes de emitir NF-e.';
+            } elseif ($tipoNota === 'nfe' && empty($clienteSelecionado['uf'])) {
+                $erro = 'Informe a UF do cliente destinatário antes de emitir NF-e.';
+            } elseif ($tipoNota === 'nfe' && $erroDifalNfe !== null) {
+                $erro = $erroDifalNfe;
             } elseif (empty($itensValidos)) {
                 $erro = $tipoNota === 'nfse'
                     ? 'Informe a descrição do serviço e um valor do serviço maior que zero.'
                     : 'Adicione ao menos um item com descrição e quantidade maior que zero.';
+            } elseif ($tipoNota === 'nfe' && count(array_filter($itensValidos, static fn($item) => empty($item['cfop']) || empty($item['cst_csosn']) || empty($item['ncm']) || !preg_match('/^\d{8}$/', (string) $item['ncm']))) > 0) {
+                $erro = 'Todo item precisa de NCM (8 dígitos), CFOP e CST/CSOSN preenchidos.';
             } else {
                 $lockEdicaoAdquirido = false;
                 try {
@@ -954,22 +1152,24 @@ try {
                         $stmt->execute(['cliente_id' => $clienteId, 'natureza_operacao' => $naturezaOperacao, 'forma_pagamento' => $formaPagamento !== '' ? $formaPagamento : null, 'data_emissao' => $dataEmissao, 'data_saida_entrada' => $dataSaidaEntrada !== '' ? $dataSaidaEntrada : null, 'valor_total' => round($valorTotalNota, 2), 'informacoes_frete' => $informacoesFrete !== '' ? $informacoesFrete : null, 'id' => $notaId]);
                         $dbNotas->prepare('DELETE FROM notas_fiscais_itens WHERE nota_id = :nota_id')->execute(['nota_id' => $notaId]);
                         $dbNotas->prepare('DELETE FROM notas_fiscais_nfse WHERE nota_id = :nota_id')->execute(['nota_id' => $notaId]);
+                        $dbNotas->prepare('DELETE FROM notas_fiscais_nfe WHERE nota_id = :nota_id')->execute(['nota_id' => $notaId]);
                     } else {
+                    $serieNota = $tipoNota === 'nfe' ? (string) ($empresaSelecionada['nfe_serie'] ?? '1') : '1';
                     $stmt = $dbNotas->prepare(
                         'SELECT COALESCE(MAX(numero_interno), 0) + 1 FROM notas_fiscais
-                         WHERE empresa_emissora_id = :empresa_id AND tipo_nota = :tipo_nota FOR UPDATE'
+                         WHERE empresa_emissora_id = :empresa_id AND tipo_nota = :tipo_nota AND serie = :serie FOR UPDATE'
                     );
-                    $stmt->execute(['empresa_id' => $empresaId, 'tipo_nota' => $tipoNota]);
+                    $stmt->execute(['empresa_id' => $empresaId, 'tipo_nota' => $tipoNota, 'serie' => $serieNota]);
                     $numeroInterno = (int) $stmt->fetchColumn();
 
                     $stmt = $dbNotas->prepare(
                         'INSERT INTO notas_fiscais (
                             empresa_emissora_id, cliente_id, funcionario_id, tipo_nota, natureza_operacao,
-                            numero_interno, status, ambiente, forma_pagamento, data_emissao, data_saida_entrada,
+                            numero_interno, serie, status, ambiente, forma_pagamento, data_emissao, data_saida_entrada,
                             valor_total, informacoes_frete
                          ) VALUES (
                             :empresa_id, :cliente_id, :funcionario_id, :tipo_nota, :natureza_operacao,
-                            :numero_interno, \'rascunho\', :ambiente, :forma_pagamento, :data_emissao, :data_saida_entrada,
+                            :numero_interno, :serie, \'rascunho\', :ambiente, :forma_pagamento, :data_emissao, :data_saida_entrada,
                             :valor_total, :informacoes_frete
                          )'
                     );
@@ -980,6 +1180,7 @@ try {
                         'tipo_nota' => $tipoNota,
                         'natureza_operacao' => $naturezaOperacao,
                         'numero_interno' => $numeroInterno,
+                        'serie' => $serieNota,
                         'ambiente' => $ambienteNota,
                         'forma_pagamento' => $formaPagamento !== '' ? $formaPagamento : null,
                         'data_emissao' => $dataEmissao,
@@ -993,10 +1194,16 @@ try {
                     $stmtItem = $dbNotas->prepare(
                         'INSERT INTO notas_fiscais_itens (
                             nota_id, produto_servico_id, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade,
-                            quantidade, valor_unitario, valor_total
+                            quantidade, valor_unitario, valor_total, cean, icms_origem, icms_modalidade_bc, icms_base_calculo,
+                            icms_aliquota, icms_valor, icms_st_modalidade_bc, icms_st_aliquota, icms_st_base_calculo, icms_st_valor,
+                            ipi_cst, ipi_base_calculo, ipi_aliquota, ipi_valor, pis_cst, pis_base_calculo, pis_aliquota, pis_valor,
+                            cofins_cst, cofins_base_calculo, cofins_aliquota, cofins_valor
                          ) VALUES (
                             :nota_id, :produto_servico_id, :descricao, :ncm, :cfop, :cst_csosn, :codigo_servico_municipal, :unidade,
-                            :quantidade, :valor_unitario, :valor_total
+                            :quantidade, :valor_unitario, :valor_total, :cean, :icms_origem, :icms_modalidade_bc, :icms_base_calculo,
+                            :icms_aliquota, :icms_valor, :icms_st_modalidade_bc, :icms_st_aliquota, :icms_st_base_calculo, :icms_st_valor,
+                            :ipi_cst, :ipi_base_calculo, :ipi_aliquota, :ipi_valor, :pis_cst, :pis_base_calculo, :pis_aliquota, :pis_valor,
+                            :cofins_cst, :cofins_base_calculo, :cofins_aliquota, :cofins_valor
                          )'
                     );
                     foreach ($itensValidos as $item) {
@@ -1007,6 +1214,28 @@ try {
                             'ncm' => $item['ncm'],
                             'cfop' => $item['cfop'],
                             'cst_csosn' => $item['cst_csosn'],
+                            'cean' => $item['cean'] ?? null,
+                            'icms_origem' => $item['icms_origem'] ?? null,
+                            'icms_modalidade_bc' => $item['icms_modalidade_bc'] ?? null,
+                            'icms_base_calculo' => $item['icms_base_calculo'] ?? null,
+                            'icms_aliquota' => $item['icms_aliquota'] ?? null,
+                            'icms_valor' => $item['icms_valor'] ?? null,
+                            'icms_st_modalidade_bc' => $item['icms_st_modalidade_bc'] ?? null,
+                            'icms_st_aliquota' => $item['icms_st_aliquota'] ?? null,
+                            'icms_st_base_calculo' => $item['icms_st_base_calculo'] ?? null,
+                            'icms_st_valor' => $item['icms_st_valor'] ?? null,
+                            'ipi_cst' => $item['ipi_cst'] ?? null,
+                            'ipi_base_calculo' => $item['ipi_base_calculo'] ?? null,
+                            'ipi_aliquota' => $item['ipi_aliquota'] ?? null,
+                            'ipi_valor' => $item['ipi_valor'] ?? null,
+                            'pis_cst' => $item['pis_cst'] ?? null,
+                            'pis_base_calculo' => $item['pis_base_calculo'] ?? null,
+                            'pis_aliquota' => $item['pis_aliquota'] ?? null,
+                            'pis_valor' => $item['pis_valor'] ?? null,
+                            'cofins_cst' => $item['cofins_cst'] ?? null,
+                            'cofins_base_calculo' => $item['cofins_base_calculo'] ?? null,
+                            'cofins_aliquota' => $item['cofins_aliquota'] ?? null,
+                            'cofins_valor' => $item['cofins_valor'] ?? null,
                             'codigo_servico_municipal' => $item['codigo_servico_municipal'],
                             'unidade' => $item['unidade'],
                             'quantidade' => $item['quantidade'],
@@ -1056,6 +1285,27 @@ try {
                         }
                     }
 
+                    if ($tipoNota === 'nfe' && $dadosNfe !== null) {
+                        $stmtNfe = $dbNotas->prepare(
+                            'INSERT INTO notas_fiscais_nfe (
+                                nota_id, finalidade_emissao, indicador_presenca, nfe_referenciada, modalidade_frete,
+                                transportador_nome, transportador_cnpj_cpf, transportador_ie, transportador_endereco,
+                                transportador_municipio, transportador_uf, veiculo_placa, veiculo_uf, veiculo_rntc,
+                                volumes_quantidade, volumes_especie, volumes_marca, volumes_numeracao, volumes_peso_liquido,
+                                volumes_peso_bruto, forma_pagamento_codigo, indicador_pagamento, valor_pago, valor_troco,
+                                informacoes_complementares
+                             ) VALUES (
+                                :nota_id, :finalidade_emissao, :indicador_presenca, :nfe_referenciada, :modalidade_frete,
+                                :transportador_nome, :transportador_cnpj_cpf, :transportador_ie, :transportador_endereco,
+                                :transportador_municipio, :transportador_uf, :veiculo_placa, :veiculo_uf, :veiculo_rntc,
+                                :volumes_quantidade, :volumes_especie, :volumes_marca, :volumes_numeracao, :volumes_peso_liquido,
+                                :volumes_peso_bruto, :forma_pagamento_codigo, :indicador_pagamento, :valor_pago, :valor_troco,
+                                :informacoes_complementares
+                             )'
+                        );
+                        $stmtNfe->execute(array_merge(['nota_id' => $notaId], $dadosNfe));
+                    }
+
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, $salvandoEdicao ? 'editada' : 'criada', ($salvandoEdicao ? 'Correção salva; nota retornou a rascunho com ' : 'Rascunho criado com ') . count($itensValidos) . ' item(ns).');
 
                     $dbNotas->commit();
@@ -1063,6 +1313,7 @@ try {
                         $sucesso = 'Correções salvas na nota nº ' . $numeroInterno . '. Ela voltou para rascunho e pode ser marcada como pronta para envio.';
                         $notaEmEdicao = null;
                         $nfseEmEdicao = null;
+                        $nfeEmEdicao = null;
                         $itensEmEdicao = [];
                     } else {
                         $sucesso = 'Nota salva como rascunho (nº interno ' . $numeroInterno . '). Veja em "Notas fiscais" para gerar o PDF ou marcar como pronta para envio.';
@@ -1089,6 +1340,7 @@ try {
                         'informacoes_frete' => $informacoesFrete,
                     ],
                     'nfse' => $dadosNfse,
+                    'nfe' => $dadosNfe,
                     'itens' => $itensValidos,
                 ];
             }
@@ -1102,7 +1354,8 @@ try {
     $clientes = $stmt->fetchAll();
 
     $stmt = $dbNotas->query(
-        'SELECT id, empresa_emissora_id, tipo, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade, valor_unitario_padrao
+        'SELECT id, empresa_emissora_id, tipo, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade, valor_unitario_padrao,
+                aliquota_icms, aliquota_pis, aliquota_cofins, aliquota_ipi, ipi_cst, cean
          FROM notas_produtos_servicos WHERE ativo = 1 ORDER BY descricao ASC'
     );
     $catalogo = $stmt->fetchAll();
@@ -1116,7 +1369,7 @@ try {
 $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
 $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
-$edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"itens":[]}';
+$edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'nfe' => $nfeEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"nfe":null,"itens":[]}';
 $restaurarJson = json_encode($dadosRestaurar, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();

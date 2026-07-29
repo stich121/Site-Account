@@ -89,10 +89,39 @@ function prepararTabelaProdutosServicos(PDO $db): void
     );
 }
 
+function colunaExisteProdutosServicos(PDO $db, string $coluna): bool
+{
+    $stmt = $db->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = \'notas_produtos_servicos\'
+           AND COLUMN_NAME = :coluna'
+    );
+    $stmt->execute(['coluna' => $coluna]);
+
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function prepararColunasImpostoProdutosServicos(PDO $db): void
+{
+    $colunas = [
+        'ipi_cst' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER cst_csosn',
+        'aliquota_ipi' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN aliquota_ipi DECIMAL(5,2) NULL AFTER ipi_cst',
+        'cean' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cean VARCHAR(14) NULL AFTER codigo_interno',
+    ];
+    foreach ($colunas as $coluna => $sql) {
+        if (!colunaExisteProdutosServicos($db, $coluna)) {
+            $db->exec($sql);
+        }
+    }
+}
+
 try {
     $db = obterConexaoNotas();
     prepararTabelaEmpresasEmissorasCatalogo($db);
     prepararTabelaProdutosServicos($db);
+    prepararColunasImpostoProdutosServicos($db);
 
     if (empty($_SESSION['csrf_notas_produtos_servicos'])) {
         $_SESSION['csrf_notas_produtos_servicos'] = bin2hex(random_bytes(32));
@@ -116,6 +145,9 @@ try {
             $aliquotaIcms = trim((string) ($_POST['aliquota_icms'] ?? ''));
             $aliquotaPis = trim((string) ($_POST['aliquota_pis'] ?? ''));
             $aliquotaCofins = trim((string) ($_POST['aliquota_cofins'] ?? ''));
+            $ipiCst = trim((string) ($_POST['ipi_cst'] ?? ''));
+            $aliquotaIpi = trim((string) ($_POST['aliquota_ipi'] ?? ''));
+            $cean = trim((string) ($_POST['cean'] ?? ''));
 
             if ($empresaId <= 0 || $descricao === '') {
                 $erro = 'Selecione a empresa emissora e informe a descrição.';
@@ -123,10 +155,12 @@ try {
                 $stmt = $db->prepare(
                     'INSERT INTO notas_produtos_servicos (
                         empresa_emissora_id, tipo, descricao, codigo_interno, ncm, cfop, cst_csosn,
-                        codigo_servico_municipal, unidade, valor_unitario_padrao, aliquota_icms, aliquota_pis, aliquota_cofins, ativo
+                        codigo_servico_municipal, unidade, valor_unitario_padrao, aliquota_icms, aliquota_pis, aliquota_cofins,
+                        ipi_cst, aliquota_ipi, cean, ativo
                      ) VALUES (
                         :empresa_emissora_id, :tipo, :descricao, :codigo_interno, :ncm, :cfop, :cst_csosn,
-                        :codigo_servico_municipal, :unidade, :valor_unitario_padrao, :aliquota_icms, :aliquota_pis, :aliquota_cofins, 1
+                        :codigo_servico_municipal, :unidade, :valor_unitario_padrao, :aliquota_icms, :aliquota_pis, :aliquota_cofins,
+                        :ipi_cst, :aliquota_ipi, :cean, 1
                      )'
                 );
                 $stmt->execute([
@@ -143,6 +177,9 @@ try {
                     'aliquota_icms' => $aliquotaIcms !== '' ? $aliquotaIcms : null,
                     'aliquota_pis' => $aliquotaPis !== '' ? $aliquotaPis : null,
                     'aliquota_cofins' => $aliquotaCofins !== '' ? $aliquotaCofins : null,
+                    'ipi_cst' => $ipiCst !== '' ? $ipiCst : null,
+                    'aliquota_ipi' => $aliquotaIpi !== '' ? $aliquotaIpi : null,
+                    'cean' => $cean !== '' ? $cean : null,
                 ]);
 
                 $sucesso = 'Item cadastrado no catálogo.';
@@ -170,7 +207,7 @@ try {
     $stmt = $db->query(
         'SELECT ps.id, ps.empresa_emissora_id, ps.tipo, ps.descricao, ps.codigo_interno, ps.ncm, ps.cfop,
                 ps.cst_csosn, ps.codigo_servico_municipal, ps.unidade, ps.valor_unitario_padrao,
-                ps.aliquota_icms, ps.aliquota_pis, ps.aliquota_cofins, ps.ativo,
+                ps.aliquota_icms, ps.aliquota_pis, ps.aliquota_cofins, ps.ipi_cst, ps.aliquota_ipi, ps.cean, ps.ativo,
                 e.razao_social AS empresa_razao_social
          FROM notas_produtos_servicos ps
          INNER JOIN empresas_emissoras e ON e.id = ps.empresa_emissora_id
@@ -282,6 +319,18 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                         <div class="field">
                             <label for="aliquota_cofins">Alíquota COFINS (%)</label>
                             <input id="aliquota_cofins" name="aliquota_cofins" type="text">
+                        </div>
+                        <div class="field">
+                            <label for="ipi_cst">IPI - CST</label>
+                            <input id="ipi_cst" name="ipi_cst" type="text" placeholder="Ex.: 50, 99">
+                        </div>
+                        <div class="field">
+                            <label for="aliquota_ipi">Alíquota IPI (%)</label>
+                            <input id="aliquota_ipi" name="aliquota_ipi" type="text">
+                        </div>
+                        <div class="field">
+                            <label for="cean">cEAN (código de barras)</label>
+                            <input id="cean" name="cean" type="text" placeholder="Opcional">
                         </div>
                         <div class="field">
                             <label>&nbsp;</label>

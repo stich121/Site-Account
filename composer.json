@@ -1,18 +1,22 @@
 {
     "name": "account-contabilidade/site",
-    "description": "Dependencias PHP do site - integracao com o Portal Nacional da NFS-e (SEFIN Nacional / ADN).",
+    "description": "Dependencias PHP do site - integracao com o Portal Nacional da NFS-e (SEFIN Nacional / ADN) e com a SEFAZ (NF-e modelo 55).",
     "type": "project",
     "license": "proprietary",
     "require": {
         "php": ">=8.1",
+        "ext-curl": "*",
         "ext-dom": "*",
         "ext-gd": "*",
         "ext-libxml": "*",
         "ext-mbstring": "*",
         "ext-openssl": "*",
+        "ext-soap": "*",
         "ext-zlib": "*",
         "mendesalexandre/php-nfse-nacional": "0.26.13",
-        "nfse-nacional/nfse-php": "1.21.0-beta"
+        "nfse-nacional/nfse-php": "1.21.0-beta",
+        "nfephp-org/sped-nfe": "^5.0",
+        "nfephp-org/sped-da": "^1.1"
     },
     "minimum-stability": "beta",
     "prefer-stable": true,

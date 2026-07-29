@@ -11,6 +11,7 @@ if (!isset($_SESSION['funcionario_id'])) {
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfse-operacoes.php';
+require_once __DIR__ . '/nfe-operacoes.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -330,6 +331,110 @@ function prepararColunasCertificadoEmpresa(PDO $db): void
     }
 }
 
+function prepararColunaSerieNfeEmpresaEmissora(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfe_serie')) {
+        $db->exec("ALTER TABLE empresas_emissoras ADD COLUMN nfe_serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER crt");
+    }
+}
+
+function prepararColunaSerieNotaFiscal(PDO $db): void
+{
+    if (!colunaExisteNotas($db, 'notas_fiscais', 'serie')) {
+        $db->exec("ALTER TABLE notas_fiscais ADD COLUMN serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER numero_interno");
+    }
+}
+
+function prepararTabelaNotasFiscaisNfe(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfe (
+            nota_id BIGINT UNSIGNED NOT NULL,
+            finalidade_emissao ENUM('normal','complementar','ajuste','devolucao') NOT NULL DEFAULT 'normal',
+            indicador_presenca TINYINT UNSIGNED NOT NULL DEFAULT 9,
+            nfe_referenciada VARCHAR(44) NULL,
+            modalidade_frete TINYINT UNSIGNED NOT NULL DEFAULT 9,
+            transportador_nome VARCHAR(180) NULL,
+            transportador_cnpj_cpf VARCHAR(20) NULL,
+            transportador_ie VARCHAR(20) NULL,
+            transportador_endereco VARCHAR(180) NULL,
+            transportador_municipio VARCHAR(120) NULL,
+            transportador_uf CHAR(2) NULL,
+            veiculo_placa VARCHAR(10) NULL,
+            veiculo_uf CHAR(2) NULL,
+            veiculo_rntc VARCHAR(20) NULL,
+            volumes_quantidade INT UNSIGNED NULL,
+            volumes_especie VARCHAR(60) NULL,
+            volumes_marca VARCHAR(60) NULL,
+            volumes_numeracao VARCHAR(60) NULL,
+            volumes_peso_liquido DECIMAL(12,3) NULL,
+            volumes_peso_bruto DECIMAL(12,3) NULL,
+            forma_pagamento_codigo VARCHAR(2) NOT NULL DEFAULT '90',
+            indicador_pagamento TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            valor_pago DECIMAL(12,2) NULL,
+            valor_troco DECIMAL(12,2) NULL,
+            informacoes_complementares TEXT NULL,
+            chave_acesso_evento_cancelamento VARCHAR(60) NULL,
+            PRIMARY KEY (nota_id),
+            CONSTRAINT fk_notas_fiscais_nfe_nota
+                FOREIGN KEY (nota_id) REFERENCES notas_fiscais(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
+function prepararColunasImpostoItensNotas(PDO $db): void
+{
+    $colunas = [
+        'numero_item' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN numero_item SMALLINT UNSIGNED NULL AFTER produto_servico_id',
+        'cean' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cean VARCHAR(14) NULL AFTER ncm',
+        'cean_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cean_tributavel VARCHAR(14) NULL AFTER cean',
+        'unidade_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN unidade_tributavel VARCHAR(10) NULL AFTER unidade',
+        'quantidade_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN quantidade_tributavel DECIMAL(12,3) NULL AFTER unidade_tributavel',
+        'valor_unitario_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN valor_unitario_tributavel DECIMAL(12,4) NULL AFTER quantidade_tributavel',
+        'icms_origem' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_origem TINYINT UNSIGNED NULL AFTER cst_csosn',
+        'icms_modalidade_bc' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_modalidade_bc TINYINT UNSIGNED NULL AFTER icms_origem',
+        'icms_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_base_calculo DECIMAL(12,2) NULL AFTER icms_modalidade_bc',
+        'icms_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_aliquota DECIMAL(6,4) NULL AFTER icms_base_calculo',
+        'icms_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_valor DECIMAL(12,2) NULL AFTER icms_aliquota',
+        'icms_st_modalidade_bc' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_modalidade_bc TINYINT UNSIGNED NULL AFTER icms_valor',
+        'icms_st_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_aliquota DECIMAL(6,4) NULL AFTER icms_st_modalidade_bc',
+        'icms_st_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_base_calculo DECIMAL(12,2) NULL AFTER icms_st_aliquota',
+        'icms_st_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN icms_st_valor DECIMAL(12,2) NULL AFTER icms_st_base_calculo',
+        'ipi_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER icms_st_valor',
+        'ipi_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_base_calculo DECIMAL(12,2) NULL AFTER ipi_cst',
+        'ipi_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_aliquota DECIMAL(6,4) NULL AFTER ipi_base_calculo',
+        'ipi_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ipi_valor DECIMAL(12,2) NULL AFTER ipi_aliquota',
+        'pis_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_cst VARCHAR(2) NULL AFTER ipi_valor',
+        'pis_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_base_calculo DECIMAL(12,2) NULL AFTER pis_cst',
+        'pis_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_aliquota DECIMAL(6,4) NULL AFTER pis_base_calculo',
+        'pis_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN pis_valor DECIMAL(12,2) NULL AFTER pis_aliquota',
+        'cofins_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_cst VARCHAR(2) NULL AFTER pis_valor',
+        'cofins_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_base_calculo DECIMAL(12,2) NULL AFTER cofins_cst',
+        'cofins_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_aliquota DECIMAL(6,4) NULL AFTER cofins_base_calculo',
+        'cofins_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_valor DECIMAL(12,2) NULL AFTER cofins_aliquota',
+    ];
+    foreach ($colunas as $coluna => $sql) {
+        if (!colunaExisteNotas($db, 'notas_fiscais_itens', $coluna)) {
+            $db->exec($sql);
+        }
+    }
+}
+
+function prepararColunasImpostoProdutosServicosNotas(PDO $db): void
+{
+    $colunas = [
+        'ipi_cst' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER cst_csosn',
+        'aliquota_ipi' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN aliquota_ipi DECIMAL(5,2) NULL AFTER ipi_cst',
+        'cean' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cean VARCHAR(14) NULL AFTER codigo_interno',
+    ];
+    foreach ($colunas as $coluna => $sql) {
+        if (!colunaExisteNotas($db, 'notas_produtos_servicos', $coluna)) {
+            $db->exec($sql);
+        }
+    }
+}
+
 function prepararTabelaNotasFiscaisNfse(PDO $db): void
 {
     $db->exec(
@@ -467,7 +572,7 @@ function liberarLockAcaoNota(PDO $db, int $notaId): void
 
 function buscarNotaFiscalCompleta(PDO $db, int $notaId): ?array
 {
-    $stmt = $db->prepare('SELECT n.*, e.razao_social AS empresa_razao_social, e.cnpj AS empresa_cnpj, e.inscricao_estadual AS empresa_ie, e.municipio AS empresa_municipio, e.uf AS empresa_uf, e.certificado_arquivo, e.certificado_senha_cifrada, c.nome_razao_social AS cliente_nome, c.cnpj_cpf AS cliente_documento, c.municipio AS cliente_municipio, c.uf AS cliente_uf FROM notas_fiscais n INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id INNER JOIN notas_clientes c ON c.id = n.cliente_id WHERE n.id = :id LIMIT 1');
+    $stmt = $db->prepare('SELECT n.*, e.razao_social AS empresa_razao_social, e.cnpj AS empresa_cnpj, e.inscricao_estadual AS empresa_ie, e.municipio AS empresa_municipio, e.uf AS empresa_uf, e.crt AS empresa_crt, e.ambiente_emissao AS empresa_ambiente_emissao, e.certificado_arquivo, e.certificado_senha_cifrada, c.nome_razao_social AS cliente_nome, c.cnpj_cpf AS cliente_documento, c.municipio AS cliente_municipio, c.uf AS cliente_uf FROM notas_fiscais n INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id INNER JOIN notas_clientes c ON c.id = n.cliente_id WHERE n.id = :id LIMIT 1');
     $stmt->execute(['id' => $notaId]);
     return $stmt->fetch() ?: null;
 }
@@ -486,6 +591,11 @@ try {
     prepararTabelaNotasFiscaisLog($dbNotas);
     prepararColunasFase2Notas($dbNotas);
     prepararColunasCertificadoEmpresa($dbNotas);
+    prepararColunaSerieNfeEmpresaEmissora($dbNotas);
+    prepararColunaSerieNotaFiscal($dbNotas);
+    prepararTabelaNotasFiscaisNfe($dbNotas);
+    prepararColunasImpostoItensNotas($dbNotas);
+    prepararColunasImpostoProdutosServicosNotas($dbNotas);
 
     prepararColunaPermiteNotasFiscais($db);
 
@@ -500,22 +610,32 @@ try {
     }
 
     // Documentos fiscais: somente notas autorizadas e dentro do escopo do usuário.
-    if (isset($_GET['xml']) || isset($_GET['danfse'])) {
-        $notaId = (int) ($_GET['xml'] ?? $_GET['danfse']);
+    if (isset($_GET['xml']) || isset($_GET['danfse']) || isset($_GET['danfe'])) {
+        $notaId = (int) ($_GET['xml'] ?? $_GET['danfse'] ?? $_GET['danfe']);
         $notaDocumento = buscarNotaFiscalCompleta($dbNotas, $notaId);
         if (!$notaDocumento || (!$podeAdministrar && (int) $notaDocumento['funcionario_id'] !== $funcionarioId)) {
             http_response_code(404);
             echo 'Nota não encontrada.';
             exit;
         }
-        if ($notaDocumento['tipo_nota'] !== 'nfse' || $notaDocumento['status'] !== 'autorizada' || empty($notaDocumento['chave_acesso'])) {
+        if ($notaDocumento['status'] !== 'autorizada' || empty($notaDocumento['chave_acesso'])) {
             http_response_code(409);
-            echo 'Documento fiscal disponível somente para NFS-e autorizada.';
+            echo 'Documento fiscal disponível somente para nota autorizada.';
+            exit;
+        }
+        if (isset($_GET['danfse']) && $notaDocumento['tipo_nota'] !== 'nfse') {
+            http_response_code(409);
+            echo 'DANFSe disponível somente para NFS-e.';
+            exit;
+        }
+        if (isset($_GET['danfe']) && $notaDocumento['tipo_nota'] !== 'nfe') {
+            http_response_code(409);
+            echo 'DANFE disponível somente para NF-e.';
             exit;
         }
 
         try {
-            if (isset($_GET['xml'])) {
+            if (isset($_GET['xml']) && $notaDocumento['tipo_nota'] === 'nfse') {
                 $xml = trim((string) ($notaDocumento['xml_gerado'] ?? ''));
                 if ($xml === '') {
                     $consulta = consultarNfseRemota($notaDocumento, $notaDocumento['ambiente'], $notaDocumento['chave_acesso']);
@@ -526,6 +646,29 @@ try {
                 header('Content-Disposition: attachment; filename="nfse-' . preg_replace('/\D/', '', $notaDocumento['chave_acesso']) . '.xml"');
                 header('X-Content-Type-Options: nosniff');
                 echo $xml;
+                exit;
+            }
+
+            if (isset($_GET['xml']) && $notaDocumento['tipo_nota'] === 'nfe') {
+                $xml = trim((string) ($notaDocumento['xml_gerado'] ?? ''));
+                if ($xml === '') {
+                    http_response_code(409);
+                    echo 'XML da NF-e ainda não disponível; consulte a nota antes de baixar.';
+                    exit;
+                }
+                header('Content-Type: application/xml; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="nfe-' . preg_replace('/\D/', '', $notaDocumento['chave_acesso']) . '.xml"');
+                header('X-Content-Type-Options: nosniff');
+                echo $xml;
+                exit;
+            }
+
+            if (isset($_GET['danfe'])) {
+                $pdf = gerarDanfePdf((string) ($notaDocumento['xml_gerado'] ?? ''));
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="danfe-' . preg_replace('/\D/', '', $notaDocumento['chave_acesso']) . '.pdf"');
+                header('X-Content-Type-Options: nosniff');
+                echo $pdf;
                 exit;
             }
 
@@ -540,7 +683,7 @@ try {
             header('Content-Type: text/plain; charset=UTF-8');
             echo isset($_GET['danfse'])
                 ? 'DANFSe indisponível: o endpoint oficial foi descontinuado em 01/07/2026 e este projeto ainda não possui renderizador local NT 008. Baixe o XML fiscal. Detalhe: ' . $e->getMessage()
-                : 'Não foi possível obter o XML fiscal: ' . $e->getMessage();
+                : 'Não foi possível obter o documento fiscal: ' . $e->getMessage();
             exit;
         }
     }
@@ -650,7 +793,7 @@ try {
         $notaId = (int) ($_POST['nota_id'] ?? 0);
         if (!hash_equals($_SESSION['csrf_notas_fiscais'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
-        } elseif (!in_array($acao, ['marcar_pendente', 'descartar', 'reprocessar', 'consultar', 'cancelar_nfse'], true)) {
+        } elseif (!in_array($acao, ['marcar_pendente', 'descartar', 'reprocessar', 'consultar', 'cancelar_nfse', 'cancelar_nfe'], true)) {
             $erro = 'Ação inválida.';
         } elseif (!obterLockAcaoNota($dbNotas, $notaId)) {
             $erro = 'A nota está sendo processada. Aguarde e tente novamente.';
@@ -674,12 +817,51 @@ try {
                     $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\', motivo_rejeicao = NULL WHERE id = :id AND status = \'rejeitada\'')->execute(['id' => $notaId]);
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, 'reprocessamento_solicitado', 'Nova tentativa solicitada; a fila reconciliará o ID da DPS antes de retransmitir.');
                     $sucesso = 'NFS-e recolocada na fila com reconciliação obrigatória da DPS.';
+                } elseif ($acao === 'reprocessar' && $notaAtual['tipo_nota'] === 'nfe' && $notaAtual['status'] === 'rejeitada') {
+                    $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\', motivo_rejeicao = NULL WHERE id = :id AND status = \'rejeitada\'')->execute(['id' => $notaId]);
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'reprocessamento_solicitado', 'Nova tentativa de transmissão à SEFAZ solicitada.');
+                    $sucesso = 'NF-e recolocada na fila de envio.';
                 } elseif ($acao === 'consultar' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'autorizada') {
                     $consulta = consultarNfseRemota($notaAtual, $notaAtual['ambiente'], (string) $notaAtual['chave_acesso']);
                     $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET chave_acesso = :chave, xml_gerado = :xml, motivo_rejeicao = NULL WHERE id = :id AND status = \'autorizada\'');
                     $stmt->execute(['chave' => $consulta['chave_acesso'], 'xml' => $consulta['xml'], 'id' => $notaId]);
                     registrarLogNota($dbNotas, $notaId, $funcionarioId, 'consultada', 'XML fiscal atualizado a partir do Portal Nacional.');
                     $sucesso = 'NFS-e consultada e XML fiscal atualizado.';
+                } elseif ($acao === 'consultar' && $notaAtual['tipo_nota'] === 'nfe' && $notaAtual['status'] === 'autorizada') {
+                    $empresaParaConsulta = [
+                        'razao_social' => $notaAtual['empresa_razao_social'],
+                        'cnpj' => $notaAtual['empresa_cnpj'],
+                        'uf' => $notaAtual['empresa_uf'],
+                        'crt' => $notaAtual['empresa_crt'],
+                        'ambiente_emissao' => $notaAtual['empresa_ambiente_emissao'],
+                        'certificado_arquivo' => $notaAtual['certificado_arquivo'],
+                        'certificado_senha_cifrada' => $notaAtual['certificado_senha_cifrada'],
+                    ];
+                    $consulta = consultarNfeRemota($empresaParaConsulta, (string) $notaAtual['chave_acesso']);
+                    $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET protocolo_autorizacao = :protocolo, motivo_rejeicao = NULL WHERE id = :id AND status = \'autorizada\'');
+                    $stmt->execute(['protocolo' => $consulta['nProt'] ?? $notaAtual['protocolo_autorizacao'], 'id' => $notaId]);
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'consultada', mb_substr('[' . $consulta['cStat'] . '] ' . $consulta['xMotivo'], 0, 255));
+                    $sucesso = 'NF-e consultada na SEFAZ: ' . $consulta['xMotivo'];
+                } elseif ($acao === 'cancelar_nfe' && $notaAtual['tipo_nota'] === 'nfe' && $notaAtual['status'] === 'autorizada') {
+                    $motivo = trim((string) ($_POST['motivo_cancelamento'] ?? ''));
+                    $empresaParaEvento = [
+                        'razao_social' => $notaAtual['empresa_razao_social'],
+                        'cnpj' => $notaAtual['empresa_cnpj'],
+                        'uf' => $notaAtual['empresa_uf'],
+                        'crt' => $notaAtual['empresa_crt'],
+                        'ambiente_emissao' => $notaAtual['empresa_ambiente_emissao'],
+                        'certificado_arquivo' => $notaAtual['certificado_arquivo'],
+                        'certificado_senha_cifrada' => $notaAtual['certificado_senha_cifrada'],
+                    ];
+                    $evento = cancelarNfeRemota($empresaParaEvento, (string) $notaAtual['chave_acesso'], (string) $notaAtual['protocolo_autorizacao'], $motivo);
+                    $arquivoEvento = salvarDocumentoFiscalPrivado($notaId, 'cancelamento-110111', $evento['xml_evento'], 'xml');
+                    $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET status = \'cancelada\', motivo_rejeicao = NULL WHERE id = :id AND status = \'autorizada\'');
+                    $stmt->execute(['id' => $notaId]);
+                    if ($stmt->rowCount() !== 1) {
+                        throw new RuntimeException('O evento foi aceito, mas o estado local mudou; consulte a nota antes de repetir qualquer ação.');
+                    }
+                    registrarLogNota($dbNotas, $notaId, $funcionarioId, 'cancelamento_fiscal', mb_substr('Evento 110111 confirmado. Arquivo privado: ' . $arquivoEvento . '. Motivo: ' . $motivo, 0, 255));
+                    $sucesso = 'Cancelamento da NF-e confirmado pela SEFAZ.';
                 } elseif ($acao === 'cancelar_nfse' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'autorizada') {
                     $motivo = trim((string) ($_POST['motivo_cancelamento'] ?? ''));
                     $empresaParaEvento = $notaAtual;
@@ -847,16 +1029,15 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php $podeEditarNota = $nota['tipo_nota'] === 'nfse' && ($nota['status'] === 'rascunho' || $nota['status'] === 'rejeitada'); ?>
+                                    <?php $podeEditarNota = in_array($nota['status'], ['rascunho', 'rejeitada'], true); ?>
                                     <?php
-                                        $temMaisAcoes = ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada')
+                                        $temMaisAcoes = $nota['status'] === 'autorizada'
                                             || $nota['status'] === 'rascunho'
-                                            || ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada' && !$podeEditarNota)
                                             || in_array($nota['status'], ['rascunho', 'pendente_envio', 'rejeitada'], true);
                                     ?>
                                     <div class="row-actions">
                                         <?php if ($podeEditarNota): ?>
-                                            <a class="btn btn-outline btn-small" href="notas-emitir-servico?editar=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                                            <a class="btn btn-outline btn-small" href="<?php echo $nota['tipo_nota'] === 'nfse' ? 'notas-emitir-servico' : 'notas-emitir-produto'; ?>?editar=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
                                         <?php endif; ?>
                                         <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Conferência</a>
                                         <?php if ($temMaisAcoes): ?>
@@ -868,14 +1049,22 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                                         <a class="btn btn-outline btn-small" href="notas-fiscais?danfse=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFSe</a>
                                                         <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="consultar"><button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-rotate"></i> Consultar</button></form>
                                                     <?php endif; ?>
+                                                    <?php if ($nota['tipo_nota'] === 'nfe' && $nota['status'] === 'autorizada'): ?>
+                                                        <a class="btn btn-outline btn-small" href="notas-fiscais?xml=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-code"></i> XML fiscal</a>
+                                                        <a class="btn btn-outline btn-small" href="notas-fiscais?danfe=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFE</a>
+                                                        <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="consultar"><button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-rotate"></i> Consultar</button></form>
+                                                    <?php endif; ?>
                                                     <?php if ($nota['status'] === 'rascunho'): ?>
                                                         <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="marcar_pendente"><button class="btn btn-small" type="submit"><i class="fa-solid fa-paper-plane"></i> Pronta p/ envio</button></form>
                                                     <?php endif; ?>
-                                                    <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'rejeitada' && !$podeEditarNota): ?>
+                                                    <?php if ($nota['status'] === 'rejeitada'): ?>
                                                         <form method="post"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="reprocessar"><button class="btn btn-small" type="submit"><i class="fa-solid fa-rotate-right"></i> Reprocessar</button></form>
                                                     <?php endif; ?>
                                                     <?php if ($nota['tipo_nota'] === 'nfse' && $nota['status'] === 'autorizada'): ?>
                                                         <form method="post" onsubmit="return prepararCancelamentoFiscal(this);"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="cancelar_nfse"><input type="hidden" name="motivo_cancelamento" value=""><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar NFS-e</button></form>
+                                                    <?php endif; ?>
+                                                    <?php if ($nota['tipo_nota'] === 'nfe' && $nota['status'] === 'autorizada'): ?>
+                                                        <form method="post" onsubmit="return prepararCancelamentoFiscal(this);"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="cancelar_nfe"><input type="hidden" name="motivo_cancelamento" value=""><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-ban"></i> Cancelar NF-e</button></form>
                                                     <?php endif; ?>
                                                     <?php if (in_array($nota['status'], ['rascunho', 'pendente_envio', 'rejeitada'], true)): ?>
                                                         <form method="post" onsubmit="return confirm('Excluir esta nota do sistema? Ela nunca foi autorizada, então nenhum cancelamento fiscal será enviado — a numeração ficará livre para a próxima nota. Esta ação não pode ser desfeita.');"><input type="hidden" name="csrf" value="<?php echo $csrf; ?>"><input type="hidden" name="nota_id" value="<?php echo h((string) $nota['id']); ?>"><input type="hidden" name="acao" value="descartar"><button class="btn btn-danger btn-small" type="submit"><i class="fa-solid fa-trash"></i> Excluir</button></form>

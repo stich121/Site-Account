@@ -104,6 +104,7 @@ function prepararColunasCertificadoEmpresaEmissoras(PDO $db): void
         'certificado_atualizado_em' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_em TIMESTAMP NULL AFTER certificado_senha_cifrada",
         'certificado_atualizado_por' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em",
         'certificado_validade' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_validade DATE NULL AFTER certificado_atualizado_por",
+        'nfe_serie' => "ALTER TABLE empresas_emissoras ADD COLUMN nfe_serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER crt",
     ];
 
     foreach ($campos as $coluna => $sql) {
@@ -163,6 +164,7 @@ try {
             $codigoIbge = trim($_POST['codigo_ibge_municipio'] ?? '');
             $uf = strtoupper(trim($_POST['uf'] ?? ''));
             $crt = $_POST['crt'] !== '' ? (int) $_POST['crt'] : null;
+            $nfeSerie = trim((string) ($_POST['nfe_serie'] ?? '')) !== '' ? trim((string) $_POST['nfe_serie']) : '1';
             $ambiente = ($_POST['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'producao' : 'homologacao';
             $opcaoSimplesNacional = (int) ($_POST['nfse_opcao_simples_nacional'] ?? 0);
             $regimeApuracaoSn = trim((string) ($_POST['nfse_regime_apuracao_sn'] ?? '')) !== '' ? (int) $_POST['nfse_regime_apuracao_sn'] : null;
@@ -183,6 +185,8 @@ try {
                 $erro = 'Confira CEP (8 dígitos), código IBGE (7 dígitos) e UF.';
             } elseif (!in_array($crt, [1, 2, 3, 4], true)) {
                 $erro = 'Selecione o CRT da empresa.';
+            } elseif (!preg_match('/^[0-9]{1,3}$/D', $nfeSerie)) {
+                $erro = 'A série da NF-e deve conter de 1 a 3 dígitos.';
             } elseif (!in_array($opcaoSimplesNacional, [1, 2, 3], true)) {
                 $erro = 'Informe a opção da empresa pelo Simples Nacional para a NFS-e.';
             } elseif ($opcaoSimplesNacional === 3 && !in_array($regimeApuracaoSn, [1, 2, 3], true)) {
@@ -212,6 +216,7 @@ try {
                         codigo_ibge_municipio = :codigo_ibge_municipio,
                         uf = :uf,
                         crt = :crt,
+                        nfe_serie = :nfe_serie,
                         ambiente_emissao = :ambiente_emissao,
                         nfse_opcao_simples_nacional = :nfse_opcao_simples_nacional,
                         nfse_regime_apuracao_sn = :nfse_regime_apuracao_sn,
@@ -235,6 +240,7 @@ try {
                         'codigo_ibge_municipio' => $codigoIbge !== '' ? $codigoIbge : null,
                         'uf' => $uf !== '' ? $uf : null,
                         'crt' => $crt,
+                        'nfe_serie' => $nfeSerie,
                         'ambiente_emissao' => $ambiente,
                         'nfse_opcao_simples_nacional' => $opcaoSimplesNacional,
                         'nfse_regime_apuracao_sn' => $regimeApuracaoSn,
@@ -253,11 +259,11 @@ try {
                     'INSERT INTO empresas_emissoras (
                         razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
                         logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
-                        crt, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
+                        crt, nfe_serie, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
                      ) VALUES (
                         :razao_social, :nome_fantasia, :cnpj, :inscricao_estadual, :inscricao_municipal,
                         :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :codigo_ibge_municipio, :uf,
-                        :crt, :ambiente_emissao, :nfse_opcao_simples_nacional, :nfse_regime_apuracao_sn, :nfse_tributacao_issqn, :nfse_regime_especial_tributacao, 1
+                        :crt, :nfe_serie, :ambiente_emissao, :nfse_opcao_simples_nacional, :nfse_regime_apuracao_sn, :nfse_tributacao_issqn, :nfse_regime_especial_tributacao, 1
                      )
                      ON DUPLICATE KEY UPDATE
                         nome_fantasia = VALUES(nome_fantasia),
@@ -273,6 +279,7 @@ try {
                         codigo_ibge_municipio = VALUES(codigo_ibge_municipio),
                         uf = VALUES(uf),
                         crt = VALUES(crt),
+                        nfe_serie = VALUES(nfe_serie),
                         ambiente_emissao = VALUES(ambiente_emissao),
                         nfse_opcao_simples_nacional = VALUES(nfse_opcao_simples_nacional),
                         nfse_regime_apuracao_sn = VALUES(nfse_regime_apuracao_sn),
@@ -295,6 +302,7 @@ try {
                     'codigo_ibge_municipio' => $codigoIbge !== '' ? $codigoIbge : null,
                     'uf' => $uf !== '' ? $uf : null,
                     'crt' => $crt,
+                    'nfe_serie' => $nfeSerie,
                     'ambiente_emissao' => $ambiente,
                     'nfse_opcao_simples_nacional' => $opcaoSimplesNacional,
                     'nfse_regime_apuracao_sn' => $regimeApuracaoSn,
@@ -361,7 +369,7 @@ try {
     $stmt = $db->query(
         'SELECT id, razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
                 logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
-                crt, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
+                crt, nfe_serie, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
          FROM empresas_emissoras
          ORDER BY ativo DESC, razao_social ASC'
     );
@@ -473,6 +481,10 @@ function rotuloCrt(?int $crt): string
                             <option value="3" <?php echo $crtAtual === 3 ? 'selected' : ''; ?>>3 - Regime Normal</option>
                             <option value="4" <?php echo $crtAtual === 4 ? 'selected' : ''; ?>>4 - MEI</option>
                         </select>
+                    </div>
+                    <div class="field">
+                        <label for="nfe_serie">Série da NF-e</label>
+                        <input id="nfe_serie" name="nfe_serie" type="text" maxlength="3" value="<?php echo h((string) ($empresaEmEdicao['nfe_serie'] ?? '1')); ?>">
                     </div>
                     <div class="field">
                         <label for="nfse_opcao_simples_nacional">Opção pelo Simples na NFS-e</label>

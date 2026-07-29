@@ -163,12 +163,19 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `nfse-dps-fiscal.php` | Montagem e validação da DPS |
 | `nfse-nacional-integracao.php` | Integração com a NFS-e Nacional |
 | `nfse-operacoes.php` | Operações e persistência |
-| `processar-fila-nfse.php` | Processamento da fila |
+| `processar-fila-nfse.php` | Processamento da fila da NFS-e |
 | `nfse-codigos-tributacao-nacional.php` | Códigos da LC 116 |
 | `nfse-codigos-complementares-bh.php` | Códigos de Belo Horizonte |
 | `nfse-ibs-catalogos.json` | Catálogos IBS/CBS |
 | `nfse-nbs-correlacao.json` | Correlação serviço–NBS |
 | `ibge-municipios.json` | Municípios e códigos IBGE |
+| `cfop-codigos.json` | Catálogo de CFOPs (venda) para autocompletar |
+| `includes/nfe-impostos.php` | Cálculo de ICMS/ICMS-ST/IPI/PIS/COFINS por item da NF-e |
+| `nfe-xml-fiscal.php` | Montagem do XML da NF-e (NFePHP\NFe\Make) |
+| `nfe-sefaz-integracao.php` | Assinatura e transmissão à SEFAZ (nfephp-org/sped-nfe) |
+| `nfe-operacoes.php` | Consulta, cancelamento e DANFE da NF-e |
+| `processar-fila-nfe.php` | Processamento da fila da NF-e |
+| `nfe-diagnostico.php` | Diagnóstico do ambiente (extensões PHP e libs) para NF-e |
 | `notas-fiscais-schema.sql` | Schema fiscal |
 | `seguranca.php` | Sessão, CSRF e segurança |
 
@@ -179,9 +186,13 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 - PHP 8.1 ou superior.
 - MySQL/MariaDB.
 - Composer.
-- Extensões DOM, GD, libxml, mbstring, OpenSSL e zlib.
+- Extensões DOM, GD, libxml, mbstring, OpenSSL e zlib (NFS-e) e também cURL e SOAP (NF-e, comunicação com a SEFAZ estadual).
 - Certificado A1 válido para transmissão.
 - SSH ou terminal da hospedagem.
+
+Rode `nfe-diagnostico.php` (menu > "Diagnóstico NF-e", nível de acesso administrador) para confirmar no
+servidor real que as extensões cURL/SOAP e as bibliotecas `nfephp-org/sped-nfe`/`sped-da` estão disponíveis
+antes de confiar na emissão de NF-e em produção.
 
 ### Composer
 
@@ -219,15 +230,16 @@ Mantenha fora do acesso público direto:
 
 O projeto possui regras `.htaccess` nos diretórios fiscais. Downloads devem usar endpoints autenticados.
 
-### Fila da NFS-e
+### Filas de envio (NFS-e e NF-e)
 
-Pode ser executada pelo painel ou por tarefa agendada:
+Podem ser executadas pelo painel ou por tarefa agendada:
 
 ```bash
 php processar-fila-nfse.php
+php processar-fila-nfe.php
 ```
 
-O cron deve usar a mesma versão do PHP do site.
+O cron deve usar a mesma versão do PHP do site (com as extensões cURL/SOAP habilitadas para a fila de NF-e).
 
 ## Deploy
 
