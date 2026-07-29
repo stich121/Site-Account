@@ -375,6 +375,28 @@ try {
     );
     $empresas = $stmt->fetchAll();
 
+    // Ultima NF-e lancada por empresa (na serie atual dela), para exibir e conferir
+    // a numeracao sem depender de contador separado: sempre reflete o que ja foi gravado
+    // em notas_fiscais, entao acompanha automaticamente cada nova emissao.
+    try {
+        $stmtUltimaNfe = $db->prepare(
+            "SELECT MAX(numero_interno) FROM notas_fiscais WHERE empresa_emissora_id = :empresa_id AND tipo_nota = 'nfe' AND serie = :serie"
+        );
+        foreach ($empresas as &$empresaUltimaNfe) {
+            $stmtUltimaNfe->execute([
+                'empresa_id' => $empresaUltimaNfe['id'],
+                'serie' => (string) ($empresaUltimaNfe['nfe_serie'] ?? '1'),
+            ]);
+            $empresaUltimaNfe['ultima_nfe_numero'] = $stmtUltimaNfe->fetchColumn();
+        }
+        unset($empresaUltimaNfe);
+    } catch (PDOException $e) {
+        foreach ($empresas as &$empresaUltimaNfe) {
+            $empresaUltimaNfe['ultima_nfe_numero'] = null;
+        }
+        unset($empresaUltimaNfe);
+    }
+
     $empresaEmEdicao = null;
     $idEdicao = (int) ($_GET['editar'] ?? 0);
     if ($idEdicao > 0) {
@@ -485,6 +507,13 @@ function rotuloCrt(?int $crt): string
                     <div class="field">
                         <label for="nfe_serie">Série da NF-e</label>
                         <input id="nfe_serie" name="nfe_serie" type="text" maxlength="3" value="<?php echo h((string) ($empresaEmEdicao['nfe_serie'] ?? '1')); ?>">
+                        <?php if ($empresaEmEdicao !== null): ?>
+                            <span class="muted">
+                                Última NF-e lançada nesta série:
+                                <?php echo $empresaEmEdicao['ultima_nfe_numero'] !== null ? 'Nº ' . h((string) $empresaEmEdicao['ultima_nfe_numero']) : 'nenhuma ainda'; ?>
+                                (atualiza automaticamente a cada nova emissão)
+                            </span>
+                        <?php endif; ?>
                     </div>
                     <div class="field">
                         <label for="nfse_opcao_simples_nacional">Opção pelo Simples na NFS-e</label>
@@ -601,6 +630,7 @@ function rotuloCrt(?int $crt): string
                             <th>IE / IM</th>
                             <th>Município/UF</th>
                             <th>CRT</th>
+                            <th>Série NF-e / última emitida</th>
                             <th>Ambiente</th>
                             <th>Status</th>
                             <th>Ação</th>
@@ -614,6 +644,7 @@ function rotuloCrt(?int $crt): string
                                 <td><?php echo h(($empresa['inscricao_estadual'] ?? '—') . ' / ' . ($empresa['inscricao_municipal'] ?? '—')); ?></td>
                                 <td><?php echo h(($empresa['municipio'] ?? '—') . '/' . ($empresa['uf'] ?? '')); ?></td>
                                 <td><?php echo h(rotuloCrt($empresa['crt'] !== null ? (int) $empresa['crt'] : null)); ?></td>
+                                <td><?php echo h((string) ($empresa['nfe_serie'] ?? '1')); ?> / <?php echo $empresa['ultima_nfe_numero'] !== null ? 'Nº ' . h((string) $empresa['ultima_nfe_numero']) : '—'; ?></td>
                                 <td><?php echo h($empresa['ambiente_emissao'] === 'producao' ? 'Produção' : 'Homologação'); ?></td>
                                 <td>
                                     <?php if ((int) $empresa['ativo'] === 1): ?>
