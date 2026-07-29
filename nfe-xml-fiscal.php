@@ -47,7 +47,10 @@ function nfeIndicadorIeDestinatario(array $cliente): int
  */
 function nfeMontarXml(array $nota, array $empresa, array $cliente, array $nfeExtra, array $itens): array
 {
-    $make = new \NFePHP\NFe\Make();
+    // 'PL_010_V1.30' habilita os campos da Reforma Tributaria (NT 2025.002, IBS/CBS) na
+    // montagem local do XML; a transmissao a SEFAZ continua declarando versao="4.00" no
+    // proprio documento (schema aditivo, mesma versao de layout que a SEFAZ ja aceita).
+    $make = new \NFePHP\NFe\Make('PL_010_V1.30');
 
     $ufEmpresa = strtoupper((string) $empresa['uf']);
     $ufCliente = strtoupper((string) ($cliente['uf'] ?? $ufEmpresa));
@@ -251,6 +254,21 @@ function nfeMontarXml(array $nota, array $empresa, array $cliente, array $nfeExt
             $std->vCOFINS = 0;
         }
         $make->tagCOFINS($std);
+
+        if (!empty($item['ibscbs_cclasstrib'])) {
+            $std = new stdClass();
+            $std->item = $numeroItem;
+            $std->CST = (string) ($item['ibscbs_cst'] ?? '000');
+            $std->cClassTrib = (string) $item['ibscbs_cclasstrib'];
+            $std->vBC = (float) ($item['ibscbs_base_calculo'] ?? $valorTotalItem);
+            $std->gIBSUF_pIBSUF = (float) ($item['ibs_uf_aliquota'] ?? 0);
+            $std->gIBSUF_vIBSUF = (float) ($item['ibs_uf_valor'] ?? 0);
+            $std->gIBSMun_pIBSMun = (float) ($item['ibs_mun_aliquota'] ?? 0);
+            $std->gIBSMun_vIBSMun = (float) ($item['ibs_mun_valor'] ?? 0);
+            $std->gCBS_pCBS = (float) ($item['cbs_aliquota'] ?? 0);
+            $std->gCBS_vCBS = (float) ($item['cbs_valor'] ?? 0);
+            $make->tagIBSCBS($std);
+        }
     }
 
     $vProd = array_sum(array_map(fn ($i) => round((float) $i['quantidade'] * (float) $i['valor_unitario'], 2), $itens));

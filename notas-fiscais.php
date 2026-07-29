@@ -417,6 +417,15 @@ function prepararColunasImpostoItensNotas(PDO $db): void
         'cofins_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_base_calculo DECIMAL(12,2) NULL AFTER cofins_cst',
         'cofins_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_aliquota DECIMAL(6,4) NULL AFTER cofins_base_calculo',
         'cofins_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_valor DECIMAL(12,2) NULL AFTER cofins_aliquota',
+        'ibscbs_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibscbs_cst VARCHAR(3) NULL AFTER cofins_valor',
+        'ibscbs_cclasstrib' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibscbs_cclasstrib VARCHAR(6) NULL AFTER ibscbs_cst',
+        'ibscbs_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibscbs_base_calculo DECIMAL(12,2) NULL AFTER ibscbs_cclasstrib',
+        'ibs_uf_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_uf_aliquota DECIMAL(6,4) NULL AFTER ibscbs_base_calculo',
+        'ibs_uf_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_uf_valor DECIMAL(12,2) NULL AFTER ibs_uf_aliquota',
+        'ibs_mun_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_mun_aliquota DECIMAL(6,4) NULL AFTER ibs_uf_valor',
+        'ibs_mun_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_mun_valor DECIMAL(12,2) NULL AFTER ibs_mun_aliquota',
+        'cbs_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cbs_aliquota DECIMAL(6,4) NULL AFTER ibs_mun_valor',
+        'cbs_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cbs_valor DECIMAL(12,2) NULL AFTER cbs_aliquota',
     ];
     foreach ($colunas as $coluna => $sql) {
         if (!colunaExisteNotas($db, 'notas_fiscais_itens', $coluna)) {

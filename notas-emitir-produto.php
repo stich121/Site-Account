@@ -374,6 +374,12 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         };
                         $optCstIcmsHtml = $montarOpcoesHtml($opcoesCstIcms, $cstIcmsPadrao);
                         $optCstPisCofinsHtml = $montarOpcoesHtml($opcoesCstPisCofins, $cstPisCofinsPadrao);
+
+                        $catalogoIbscbsCst = json_decode((string) @file_get_contents(__DIR__ . '/ibscbs-cst-codigos.json'), true) ?: [];
+                        $optIbscbsCstHtml = '<option value="">Não informar IBS/CBS neste item</option>';
+                        foreach ($catalogoIbscbsCst as $cstItem) {
+                            $optIbscbsCstHtml .= '<option value="' . h($cstItem[0]) . '">' . h($cstItem[0] . ' - ' . $cstItem[1]) . '</option>';
+                        }
                     ?>
                     <details class="form-section" id="secaoItens" open>
                         <summary><span class="form-section-titulo"><i class="fa-solid fa-boxes-stacked"></i> Itens (produtos)</span><i class="fa-solid fa-chevron-down"></i></summary>
@@ -640,6 +646,26 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
         const opcoesCstIcmsHtml = <?php echo json_encode($optCstIcmsHtml); ?>;
         const opcoesCstPisCofinsHtml = <?php echo json_encode($optCstPisCofinsHtml); ?>;
         const cstPisCofinsPadrao = <?php echo json_encode($cstPisCofinsPadrao); ?>;
+        const opcoesIbscbsCstHtml = <?php echo json_encode($optIbscbsCstHtml); ?>;
+
+        let catalogoIbscbsCclasstrib = [];
+        fetch('ibscbs-cclass-codigos.json', { cache: 'force-cache' })
+            .then(function (resposta) { return resposta.json(); })
+            .then(function (dados) { catalogoIbscbsCclasstrib = dados; })
+            .catch(function () { catalogoIbscbsCclasstrib = []; });
+
+        function montarOpcoesCclasstrib(cstEscolhido) {
+            if (!cstEscolhido) {
+                return '<option value="">Selecione o CST primeiro</option>';
+            }
+            let opcoes = '<option value="">Selecione</option>';
+            catalogoIbscbsCclasstrib.filter(function (item) {
+                return item[1] === cstEscolhido;
+            }).forEach(function (item) {
+                opcoes += '<option value="' + item[0] + '">' + item[0] + ' - ' + item[2].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</option>';
+            });
+            return opcoes;
+        }
         const corpoItens = document.getElementById('corpoItens');
         const empresaSelect = document.getElementById('empresa_emissora_id');
         const totalNotaEl = document.getElementById('totalNota');
@@ -674,6 +700,15 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
             const cofinsAliq = numeroDoCampo(linha, '.item-cofins-aliquota');
             linha.querySelector('.item-cofins-valor-calc').textContent = formatarValorCalculado(base * cofinsAliq / 100);
+
+            const campoBaseIbscbs = linha.querySelector('.item-ibscbs-base');
+            const baseIbscbs = campoBaseIbscbs && campoBaseIbscbs.value.trim() !== '' ? numeroDoCampo(linha, '.item-ibscbs-base') : base;
+            const ibsUfAliq = numeroDoCampo(linha, '.item-ibs-uf-aliquota');
+            linha.querySelector('.item-ibs-uf-valor-calc').textContent = formatarValorCalculado(baseIbscbs * ibsUfAliq / 100);
+            const ibsMunAliq = numeroDoCampo(linha, '.item-ibs-mun-aliquota');
+            linha.querySelector('.item-ibs-mun-valor-calc').textContent = formatarValorCalculado(baseIbscbs * ibsMunAliq / 100);
+            const cbsAliq = numeroDoCampo(linha, '.item-cbs-aliquota');
+            linha.querySelector('.item-cbs-valor-calc').textContent = formatarValorCalculado(baseIbscbs * cbsAliq / 100);
         }
 
         function recalcularTotal() {
@@ -763,6 +798,10 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '.item-cnpj-fabricante': item.cnpj_fabricante,
                 '.item-indicador-escala-relevante': item.indicador_escala_relevante,
                 '.item-codigo-beneficio-fiscal': item.codigo_beneficio_fiscal,
+                '.item-ibscbs-base': item.ibscbs_base_calculo,
+                '.item-ibs-uf-aliquota': item.ibs_uf_aliquota,
+                '.item-ibs-mun-aliquota': item.ibs_mun_aliquota,
+                '.item-cbs-aliquota': item.cbs_aliquota,
             };
             Object.keys(mapa).forEach(function (seletor) {
                 const campoItem = linha.querySelector(seletor);
@@ -770,6 +809,25 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
             const campoNcm = linha.querySelector('.item-ncm');
             if (campoNcm) campoNcm.value = formatarNcm(campoNcm.value);
+
+            if (item.ibscbs_cst) {
+                const selectCst = linha.querySelector('.item-ibscbs-cst');
+                const selectCclasstrib = linha.querySelector('.item-ibscbs-cclasstrib');
+                const campoCstHidden = linha.querySelector('.item-ibscbs-cst-hidden');
+                if (selectCst) selectCst.value = item.ibscbs_cst;
+                if (campoCstHidden) campoCstHidden.value = item.ibscbs_cst;
+                if (selectCclasstrib) {
+                    const definirCclasstrib = function () {
+                        selectCclasstrib.innerHTML = montarOpcoesCclasstrib(item.ibscbs_cst);
+                        if (item.ibscbs_cclasstrib) selectCclasstrib.value = item.ibscbs_cclasstrib;
+                    };
+                    if (catalogoIbscbsCclasstrib.length > 0) {
+                        definirCclasstrib();
+                    } else {
+                        setTimeout(definirCclasstrib, 400);
+                    }
+                }
+            }
         }
 
         let contadorItens = 0;
@@ -877,6 +935,40 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         '<span class="valor-calculado item-cofins-valor-calc">R$ 0,00</span>' +
                     '</div>' +
                 '</div>' +
+                '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-landmark"></i> IBS/CBS (Reforma Tributária)</h3>' +
+                '<p class="muted" style="font-size:0.78rem;margin-bottom:0.75rem;">Deixe "Situação tributária" em branco se este item ainda não deve informar IBS/CBS.</p>' +
+                '<div class="form-grid">' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>CST do IBS/CBS</label>' +
+                        '<select class="item-ibscbs-cst">' + opcoesIbscbsCstHtml + '</select>' +
+                    '</div>' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>cClassTrib (Código de Classificação Tributária)</label>' +
+                        '<select name="item_ibscbs_cclasstrib[]" class="item-ibscbs-cclasstrib">' +
+                            '<option value="">Selecione o CST primeiro</option>' +
+                        '</select>' +
+                        '<input type="hidden" name="item_ibscbs_cst[]" class="item-ibscbs-cst-hidden">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Base de cálculo</label>' +
+                        '<input type="text" name="item_ibscbs_base_calculo[]" class="item-ibscbs-base" placeholder="Padrão: valor do item">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota IBS Estadual (%)</label>' +
+                        '<input type="text" name="item_ibs_uf_aliquota[]" class="item-ibs-uf-aliquota" value="0">' +
+                        '<span class="valor-calculado item-ibs-uf-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota IBS Municipal (%)</label>' +
+                        '<input type="text" name="item_ibs_mun_aliquota[]" class="item-ibs-mun-aliquota" value="0">' +
+                        '<span class="valor-calculado item-ibs-mun-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota CBS (%)</label>' +
+                        '<input type="text" name="item_cbs_aliquota[]" class="item-cbs-aliquota" value="0">' +
+                        '<span class="valor-calculado item-cbs-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                '</div>' +
                 '<input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
                 '<input type="hidden" name="item_cest[]" class="item-cest">' +
                 '<input type="hidden" name="item_cnpj_fabricante[]" class="item-cnpj-fabricante">' +
@@ -919,7 +1011,14 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 }
                 buscarNcm(campoNcmLinha.value);
             });
-            ['.item-icms-aliquota', '.item-ipi-aliquota', '.item-pis-aliquota', '.item-cofins-aliquota'].forEach(function (seletor) {
+            const selectIbscbsCst = linha.querySelector('.item-ibscbs-cst');
+            const selectIbscbsCclasstrib = linha.querySelector('.item-ibscbs-cclasstrib');
+            const campoIbscbsCstHidden = linha.querySelector('.item-ibscbs-cst-hidden');
+            selectIbscbsCst.addEventListener('change', function () {
+                campoIbscbsCstHidden.value = selectIbscbsCst.value;
+                selectIbscbsCclasstrib.innerHTML = montarOpcoesCclasstrib(selectIbscbsCst.value);
+            });
+            ['.item-icms-aliquota', '.item-ipi-aliquota', '.item-pis-aliquota', '.item-cofins-aliquota', '.item-ibscbs-base', '.item-ibs-uf-aliquota', '.item-ibs-mun-aliquota', '.item-cbs-aliquota'].forEach(function (seletor) {
                 linha.querySelector(seletor).addEventListener('input', function () {
                     recalcularImpostosLinha(linha);
                 });

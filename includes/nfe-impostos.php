@@ -83,6 +83,15 @@ function nfeCalcularImpostosItem(array $itemBruto, array $empresa, string $cfop,
         'cofins_base_calculo' => null,
         'cofins_aliquota' => null,
         'cofins_valor' => null,
+        'ibscbs_cst' => null,
+        'ibscbs_cclasstrib' => null,
+        'ibscbs_base_calculo' => null,
+        'ibs_uf_aliquota' => null,
+        'ibs_uf_valor' => null,
+        'ibs_mun_aliquota' => null,
+        'ibs_mun_valor' => null,
+        'cbs_aliquota' => null,
+        'cbs_valor' => null,
     ];
 
     $temIcmsProprio = $simplesNacional
@@ -133,6 +142,25 @@ function nfeCalcularImpostosItem(array $itemBruto, array $empresa, string $cfop,
     $resultado['cofins_base_calculo'] = $valorTotal;
     $resultado['cofins_aliquota'] = $aliquotaCofins;
     $resultado['cofins_valor'] = round($valorTotal * $aliquotaCofins / 100, 2);
+
+    // Reforma tributaria (LC 214/2025): IBS/CBS. So preenchido quando o item tem um
+    // cClassTrib selecionado - fora isso a nota nao inclui o grupo IBSCBS no XML.
+    $ibscbsCclasstrib = trim((string) ($itemBruto['ibscbs_cclasstrib'] ?? ''));
+    if ($ibscbsCclasstrib !== '') {
+        $baseIbscbs = round((float) ($itemBruto['ibscbs_base_calculo'] ?? $valorTotal), 2);
+        $aliquotaIbsUf = round((float) ($itemBruto['ibs_uf_aliquota'] ?? 0), 4);
+        $aliquotaIbsMun = round((float) ($itemBruto['ibs_mun_aliquota'] ?? 0), 4);
+        $aliquotaCbs = round((float) ($itemBruto['cbs_aliquota'] ?? 0), 4);
+        $resultado['ibscbs_cst'] = trim((string) ($itemBruto['ibscbs_cst'] ?? '')) ?: '000';
+        $resultado['ibscbs_cclasstrib'] = $ibscbsCclasstrib;
+        $resultado['ibscbs_base_calculo'] = $baseIbscbs;
+        $resultado['ibs_uf_aliquota'] = $aliquotaIbsUf;
+        $resultado['ibs_uf_valor'] = round($baseIbscbs * $aliquotaIbsUf / 100, 2);
+        $resultado['ibs_mun_aliquota'] = $aliquotaIbsMun;
+        $resultado['ibs_mun_valor'] = round($baseIbscbs * $aliquotaIbsMun / 100, 2);
+        $resultado['cbs_aliquota'] = $aliquotaCbs;
+        $resultado['cbs_valor'] = round($baseIbscbs * $aliquotaCbs / 100, 2);
+    }
 
     return $resultado;
 }

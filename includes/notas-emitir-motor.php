@@ -491,6 +491,15 @@ function prepararColunasImpostoItensNotas(PDO $db): void
         'cofins_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_base_calculo DECIMAL(12,2) NULL AFTER cofins_cst',
         'cofins_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_aliquota DECIMAL(6,4) NULL AFTER cofins_base_calculo',
         'cofins_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cofins_valor DECIMAL(12,2) NULL AFTER cofins_aliquota',
+        'ibscbs_cst' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibscbs_cst VARCHAR(3) NULL AFTER cofins_valor',
+        'ibscbs_cclasstrib' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibscbs_cclasstrib VARCHAR(6) NULL AFTER ibscbs_cst',
+        'ibscbs_base_calculo' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibscbs_base_calculo DECIMAL(12,2) NULL AFTER ibscbs_cclasstrib',
+        'ibs_uf_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_uf_aliquota DECIMAL(6,4) NULL AFTER ibscbs_base_calculo',
+        'ibs_uf_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_uf_valor DECIMAL(12,2) NULL AFTER ibs_uf_aliquota',
+        'ibs_mun_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_mun_aliquota DECIMAL(6,4) NULL AFTER ibs_uf_valor',
+        'ibs_mun_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN ibs_mun_valor DECIMAL(12,2) NULL AFTER ibs_mun_aliquota',
+        'cbs_aliquota' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cbs_aliquota DECIMAL(6,4) NULL AFTER ibs_mun_valor',
+        'cbs_valor' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cbs_valor DECIMAL(12,2) NULL AFTER cbs_aliquota',
     ];
     foreach ($colunas as $coluna => $sql) {
         if (!colunaExisteNotas($db, 'notas_fiscais_itens', $coluna)) {
@@ -965,6 +974,12 @@ try {
                 $cnpjsFabricante = $_POST['item_cnpj_fabricante'] ?? [];
                 $indicadoresEscalaRelevante = $_POST['item_indicador_escala_relevante'] ?? [];
                 $codigosBeneficioFiscal = $_POST['item_codigo_beneficio_fiscal'] ?? [];
+                $ibscbsCsts = $_POST['item_ibscbs_cst'] ?? [];
+                $ibscbsCclasstribs = $_POST['item_ibscbs_cclasstrib'] ?? [];
+                $ibscbsBases = $_POST['item_ibscbs_base_calculo'] ?? [];
+                $ibsUfAliquotas = $_POST['item_ibs_uf_aliquota'] ?? [];
+                $ibsMunAliquotas = $_POST['item_ibs_mun_aliquota'] ?? [];
+                $cbsAliquotas = $_POST['item_cbs_aliquota'] ?? [];
 
                 foreach ($descricoes as $indice => $descricaoItem) {
                     $descricaoItem = trim((string) $descricaoItem);
@@ -1004,6 +1019,12 @@ try {
                         'cnpj_fabricante' => preg_replace('/\D+/', '', (string) ($cnpjsFabricante[$indice] ?? '')) ?: null,
                         'indicador_escala_relevante' => in_array($indicadoresEscalaRelevante[$indice] ?? '', ['S', 'N'], true) ? $indicadoresEscalaRelevante[$indice] : null,
                         'codigo_beneficio_fiscal' => trim((string) ($codigosBeneficioFiscal[$indice] ?? '')) ?: null,
+                        'ibscbs_cst' => trim((string) ($ibscbsCsts[$indice] ?? '')),
+                        'ibscbs_cclasstrib' => trim((string) ($ibscbsCclasstribs[$indice] ?? '')),
+                        'ibscbs_base_calculo' => $numericoNfe((string) ($ibscbsBases[$indice] ?? '0')),
+                        'ibs_uf_aliquota' => $numericoNfe((string) ($ibsUfAliquotas[$indice] ?? '0')),
+                        'ibs_mun_aliquota' => $numericoNfe((string) ($ibsMunAliquotas[$indice] ?? '0')),
+                        'cbs_aliquota' => $numericoNfe((string) ($cbsAliquotas[$indice] ?? '0')),
                     ];
                 }
 
@@ -1221,14 +1242,18 @@ try {
                             codigo_beneficio_fiscal, icms_origem, icms_modalidade_bc, icms_base_calculo,
                             icms_aliquota, icms_valor, icms_st_modalidade_bc, icms_st_aliquota, icms_st_base_calculo, icms_st_valor,
                             ipi_cst, ipi_base_calculo, ipi_aliquota, ipi_valor, pis_cst, pis_base_calculo, pis_aliquota, pis_valor,
-                            cofins_cst, cofins_base_calculo, cofins_aliquota, cofins_valor
+                            cofins_cst, cofins_base_calculo, cofins_aliquota, cofins_valor,
+                            ibscbs_cst, ibscbs_cclasstrib, ibscbs_base_calculo, ibs_uf_aliquota, ibs_uf_valor,
+                            ibs_mun_aliquota, ibs_mun_valor, cbs_aliquota, cbs_valor
                          ) VALUES (
                             :nota_id, :produto_servico_id, :descricao, :ncm, :cfop, :cst_csosn, :codigo_servico_municipal, :unidade,
                             :quantidade, :valor_unitario, :valor_total, :cean, :cest, :cnpj_fabricante, :indicador_escala_relevante,
                             :codigo_beneficio_fiscal, :icms_origem, :icms_modalidade_bc, :icms_base_calculo,
                             :icms_aliquota, :icms_valor, :icms_st_modalidade_bc, :icms_st_aliquota, :icms_st_base_calculo, :icms_st_valor,
                             :ipi_cst, :ipi_base_calculo, :ipi_aliquota, :ipi_valor, :pis_cst, :pis_base_calculo, :pis_aliquota, :pis_valor,
-                            :cofins_cst, :cofins_base_calculo, :cofins_aliquota, :cofins_valor
+                            :cofins_cst, :cofins_base_calculo, :cofins_aliquota, :cofins_valor,
+                            :ibscbs_cst, :ibscbs_cclasstrib, :ibscbs_base_calculo, :ibs_uf_aliquota, :ibs_uf_valor,
+                            :ibs_mun_aliquota, :ibs_mun_valor, :cbs_aliquota, :cbs_valor
                          )'
                     );
                     foreach ($itensValidos as $item) {
@@ -1265,6 +1290,15 @@ try {
                             'cofins_base_calculo' => $item['cofins_base_calculo'] ?? null,
                             'cofins_aliquota' => $item['cofins_aliquota'] ?? null,
                             'cofins_valor' => $item['cofins_valor'] ?? null,
+                            'ibscbs_cst' => $item['ibscbs_cst'] ?? null,
+                            'ibscbs_cclasstrib' => $item['ibscbs_cclasstrib'] ?? null,
+                            'ibscbs_base_calculo' => $item['ibscbs_base_calculo'] ?? null,
+                            'ibs_uf_aliquota' => $item['ibs_uf_aliquota'] ?? null,
+                            'ibs_uf_valor' => $item['ibs_uf_valor'] ?? null,
+                            'ibs_mun_aliquota' => $item['ibs_mun_aliquota'] ?? null,
+                            'ibs_mun_valor' => $item['ibs_mun_valor'] ?? null,
+                            'cbs_aliquota' => $item['cbs_aliquota'] ?? null,
+                            'cbs_valor' => $item['cbs_valor'] ?? null,
                             'codigo_servico_municipal' => $item['codigo_servico_municipal'],
                             'unidade' => $item['unidade'],
                             'quantidade' => $item['quantidade'],
