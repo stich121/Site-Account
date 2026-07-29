@@ -1368,7 +1368,7 @@ try {
 
 $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
-$catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]');
+$catalogoJson = json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]';
 $edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'nfe' => $nfeEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"nfe":null,"itens":[]}';
 $restaurarJson = json_encode($dadosRestaurar, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();

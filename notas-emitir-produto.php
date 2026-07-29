@@ -496,7 +496,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
         }
 
-        const catalogo = JSON.parse(<?php echo json_encode($catalogoJson); ?>);
+        const catalogo = <?php echo $catalogoJson; ?>;
         const corpoItens = document.getElementById('corpoItens');
         const empresaSelect = document.getElementById('empresa_emissora_id');
         const totalNotaEl = document.getElementById('totalNota');
