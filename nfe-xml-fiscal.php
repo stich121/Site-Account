@@ -47,10 +47,7 @@ function nfeIndicadorIeDestinatario(array $cliente): int
  */
 function nfeMontarXml(array $nota, array $empresa, array $cliente, array $nfeExtra, array $itens): array
 {
-    // 'PL_010_V1.30' habilita os campos da Reforma Tributaria (NT 2025.002, IBS/CBS) na
-    // montagem local do XML; a transmissao a SEFAZ continua declarando versao="4.00" no
-    // proprio documento (schema aditivo, mesma versao de layout que a SEFAZ ja aceita).
-    $make = new \NFePHP\NFe\Make('PL_010_V1.30');
+    $make = new \NFePHP\NFe\Make();
 
     $ufEmpresa = strtoupper((string) $empresa['uf']);
     $ufCliente = strtoupper((string) ($cliente['uf'] ?? $ufEmpresa));
@@ -255,20 +252,13 @@ function nfeMontarXml(array $nota, array $empresa, array $cliente, array $nfeExt
         }
         $make->tagCOFINS($std);
 
-        if (!empty($item['ibscbs_cclasstrib'])) {
-            $std = new stdClass();
-            $std->item = $numeroItem;
-            $std->CST = (string) ($item['ibscbs_cst'] ?? '000');
-            $std->cClassTrib = (string) $item['ibscbs_cclasstrib'];
-            $std->vBC = (float) ($item['ibscbs_base_calculo'] ?? $valorTotalItem);
-            $std->gIBSUF_pIBSUF = (float) ($item['ibs_uf_aliquota'] ?? 0);
-            $std->gIBSUF_vIBSUF = (float) ($item['ibs_uf_valor'] ?? 0);
-            $std->gIBSMun_pIBSMun = (float) ($item['ibs_mun_aliquota'] ?? 0);
-            $std->gIBSMun_vIBSMun = (float) ($item['ibs_mun_valor'] ?? 0);
-            $std->gCBS_pCBS = (float) ($item['cbs_aliquota'] ?? 0);
-            $std->gCBS_vCBS = (float) ($item['cbs_valor'] ?? 0);
-            $make->tagIBSCBS($std);
-        }
+        // IBS/CBS (Reforma Tributaria, NT 2025.002) NAO e incluido no XML transmitido: o
+        // schema oficial ainda aceito pelos webservices da SEFAZ (e o unico XSD que o
+        // sped-nfe traz embutido) e a versao 4.00, que nao possui os elementos IBSCBS/
+        // IBSCBSTot. Enviar esses grupos faz a SEFAZ rejeitar a nota inteira ("Element
+        // IBSCBS: This element is not expected"). Os valores continuam calculados e
+        // gravados em notas_fiscais_itens (para relatorio e para quando a SEFAZ liberar
+        // o novo schema), so nao entram na tag <det> nem no <total>.
     }
 
     $vProd = array_sum(array_map(fn ($i) => round((float) $i['quantidade'] * (float) $i['valor_unitario'], 2), $itens));

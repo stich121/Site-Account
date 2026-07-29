@@ -49,7 +49,7 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 
 - ICMS: CST (regime normal) ou CSOSN (Simples Nacional), escolhido conforme o CRT cadastrado da empresa; alíquota interestadual calculada automaticamente pela regra do Senado (Resolução 22/89 + 13/2012 — 4/7/12%); ICMS-ST com base/alíquota informadas manualmente no item.
 - IPI, PIS e COFINS: CST completo (tabela oficial, ~30 situações para PIS/COFINS) e alíquota, com valor calculado automaticamente (base × alíquota) e mostrado ao vivo no formulário antes mesmo de salvar.
-- IBS/CBS (Reforma Tributária, LC 214/2025): CST (12 situações), cClassTrib (71 códigos oficiais, filtrados pelo CST escolhido), base de cálculo e as três alíquotas (IBS Estadual, IBS Municipal, CBS), com valor calculado ao vivo. Fica em branco por padrão — só entra no XML (`tagIBSCBS`) quando o item tem cClassTrib preenchido.
+- IBS/CBS (Reforma Tributária, LC 214/2025): CST (12 situações), cClassTrib (71 códigos oficiais, filtrados pelo CST escolhido), base de cálculo e as três alíquotas (IBS Estadual, IBS Municipal, CBS), com valor calculado ao vivo e gravado em `notas_fiscais_itens`. **Não é enviado à SEFAZ**: o schema de NF-e ainda aceito pelos webservices (versão 4.00) não tem os elementos `IBSCBS`/`IBSCBSTot` — incluí-los faz a SEFAZ rejeitar a nota inteira. Os campos ficam disponíveis na tela e no banco só para referência, até a SEFAZ liberar o novo schema (NT 2025.002) em produção.
 - O valor gravado e usado no XML é sempre recalculado no servidor a partir do que foi persistido; alíquotas do cadastro/formulário são só sugestão inicial, nunca a fonte de verdade.
 - Fora do escopo por decisão explícita: DIFAL/partilha para consumidor final não contribuinte em outra UF (bloqueado com mensagem clara em vez de calcular errado) e tabela de MVA por NCM/UF para ICMS-ST.
 
@@ -399,6 +399,7 @@ Não versionar:
 - NF-e não calcula DIFAL/partilha (venda interestadual para consumidor final não contribuinte) — a emissão é bloqueada nesse cenário em vez de calcular errado.
 - NF-e não tem Carta de Correção Eletrônica (CC-e) nem contingência offline (SVC-AN/RS, EPEC) implementadas — só o fluxo normal de emissão, consulta e cancelamento.
 - ICMS-ST na NF-e usa base/alíquota informadas manualmente no item; não há tabela de MVA por NCM/UF embutida.
+- IBS/CBS (Reforma Tributária) na NF-e é só cálculo/registro local por enquanto: não é enviado à SEFAZ porque o schema 4.00, único aceito hoje pelos webservices e único XSD embutido na `nfephp-org/sped-nfe`, não tem os elementos `IBSCBS`/`IBSCBSTot`. Enviá-los rejeita a nota inteira (erro de validação de schema). Reavaliar quando a SEFAZ liberar o novo schema (NT 2025.002) em produção/homologação.
 
 ## Referências
 

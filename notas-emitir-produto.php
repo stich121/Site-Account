@@ -936,7 +936,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     '</div>' +
                 '</div>' +
                 '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-landmark"></i> IBS/CBS (Reforma Tributária)</h3>' +
-                '<p class="muted" style="font-size:0.78rem;margin-bottom:0.75rem;">Deixe "Situação tributária" em branco se este item ainda não deve informar IBS/CBS.</p>' +
+                '<p class="muted" style="font-size:0.78rem;margin-bottom:0.75rem;">Deixe "Situação tributária" em branco se este item ainda não deve informar IBS/CBS. Os valores ficam salvos para referência, mas ainda não são enviados à SEFAZ: o schema oficial de NF-e (versão 4.00) aceito hoje pelos webservices não inclui os campos da Reforma Tributária.</p>' +
                 '<div class="form-grid">' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
                         '<label>CST do IBS/CBS</label>' +
