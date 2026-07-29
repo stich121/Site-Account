@@ -13,6 +13,20 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/notas-fiscais.css">
+    <style>
+        .itens-table .valor-calculado {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.72rem;
+            color: var(--primary);
+            white-space: nowrap;
+        }
+        .itens-table select.item-pis-cst,
+        .itens-table select.item-cofins-cst,
+        .itens-table select.item-cst {
+            margin-bottom: 0.35rem;
+        }
+    </style>
 </head>
 <body>
     <div class="shell">
@@ -263,14 +277,94 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         </div>
                     </details>
 
+                    <?php
+                        $empresaCrt = $empresaAtivaSelecionada ? (int) ($empresaAtivaSelecionada['crt'] ?? 0) : 0;
+                        $empresaSimplesNacional = in_array($empresaCrt, [1, 2, 4], true);
+
+                        $opcoesCstIcms = $empresaSimplesNacional ? [
+                            '101' => '101 - Tributada pelo Simples Nacional com permissão de crédito',
+                            '102' => '102 - Tributada pelo Simples Nacional sem permissão de crédito',
+                            '103' => '103 - Isenção do ICMS no Simples Nacional para faixa de receita bruta',
+                            '201' => '201 - Tributada c/ permissão de crédito e cobrança do ICMS por ST',
+                            '202' => '202 - Tributada s/ permissão de crédito e cobrança do ICMS por ST',
+                            '203' => '203 - Isenção para faixa de receita bruta e cobrança do ICMS por ST',
+                            '300' => '300 - Imune',
+                            '400' => '400 - Não tributada pelo Simples Nacional',
+                            '500' => '500 - ICMS cobrado anteriormente por ST ou por antecipação',
+                            '900' => '900 - Outros',
+                        ] : [
+                            '00' => '00 - Tributada integralmente',
+                            '10' => '10 - Tributada e com cobrança do ICMS por substituição tributária',
+                            '20' => '20 - Com redução de base de cálculo',
+                            '30' => '30 - Isenta ou não tributada e com cobrança do ICMS por ST',
+                            '40' => '40 - Isenta',
+                            '41' => '41 - Não tributada',
+                            '50' => '50 - Suspensão',
+                            '51' => '51 - Diferimento',
+                            '60' => '60 - ICMS cobrado anteriormente por substituição tributária',
+                            '61' => '61 - Tributação monofásica sobre combustíveis cobrada anteriormente',
+                            '70' => '70 - Com redução de base de cálculo e cobrança do ICMS por ST',
+                            '90' => '90 - Outras',
+                        ];
+
+                        $opcoesCstPisCofins = [
+                            '01' => '01 - Tributável (alíquota normal, cumulativo/não cumulativo)',
+                            '02' => '02 - Tributável (alíquota diferenciada)',
+                            '03' => '03 - Tributável (qtd. vendida x alíquota por unidade)',
+                            '04' => '04 - Tributável (tributação monofásica, alíquota zero)',
+                            '05' => '05 - Tributável por substituição tributária',
+                            '06' => '06 - Tributável (alíquota zero)',
+                            '07' => '07 - Isenta da contribuição',
+                            '08' => '08 - Sem incidência da contribuição',
+                            '09' => '09 - Com suspensão da contribuição',
+                            '49' => '49 - Outras operações de saída',
+                            '50' => '50 - Direito a crédito - receita tributada no mercado interno',
+                            '51' => '51 - Direito a crédito - receita não tributada no mercado interno',
+                            '52' => '52 - Direito a crédito - receita de exportação',
+                            '53' => '53 - Direito a crédito - tributadas e não tributadas no mercado interno',
+                            '54' => '54 - Direito a crédito - tributadas no mercado interno e de exportação',
+                            '55' => '55 - Direito a crédito - não tributadas no mercado interno e de exportação',
+                            '56' => '56 - Direito a crédito - tributadas e não tributadas no interno, e exportação',
+                            '60' => '60 - Crédito presumido - receita tributada no mercado interno',
+                            '61' => '61 - Crédito presumido - receita não tributada no mercado interno',
+                            '62' => '62 - Crédito presumido - receita de exportação',
+                            '63' => '63 - Crédito presumido - tributadas e não tributadas no mercado interno',
+                            '64' => '64 - Crédito presumido - tributadas no mercado interno e de exportação',
+                            '65' => '65 - Crédito presumido - não tributadas no mercado interno e de exportação',
+                            '66' => '66 - Crédito presumido - tributadas e não tributadas no interno, e exportação',
+                            '67' => '67 - Crédito presumido - outras operações',
+                            '70' => '70 - Aquisição sem direito a crédito',
+                            '71' => '71 - Aquisição com isenção',
+                            '72' => '72 - Aquisição com suspensão',
+                            '73' => '73 - Aquisição a alíquota zero',
+                            '74' => '74 - Aquisição sem incidência da contribuição',
+                            '75' => '75 - Aquisição por substituição tributária',
+                            '98' => '98 - Outras operações de entrada',
+                            '99' => '99 - Outras operações',
+                        ];
+
+                        $cstIcmsPadrao = $empresaSimplesNacional ? '102' : '00';
+                        $cstPisCofinsPadrao = $empresaSimplesNacional ? '99' : '01';
+
+                        $montarOpcoesHtml = static function (array $opcoes, string $padrao) {
+                            $html = '';
+                            foreach ($opcoes as $codigo => $rotulo) {
+                                $selected = $codigo === $padrao ? ' selected' : '';
+                                $html .= '<option value="' . h($codigo) . '"' . $selected . '>' . h($rotulo) . '</option>';
+                            }
+                            return $html;
+                        };
+                        $optCstIcmsHtml = $montarOpcoesHtml($opcoesCstIcms, $cstIcmsPadrao);
+                        $optCstPisCofinsHtml = $montarOpcoesHtml($opcoesCstPisCofins, $cstPisCofinsPadrao);
+                    ?>
                     <details class="form-section" id="secaoItens" open>
                         <summary><span class="form-section-titulo"><i class="fa-solid fa-boxes-stacked"></i> Itens (produtos)</span><i class="fa-solid fa-chevron-down"></i></summary>
                         <div class="form-section-corpo">
                             <?php if ($empresaAtivaSelecionada): ?>
                                 <p class="muted" style="font-size:0.78rem;margin-bottom:0.75rem;">
-                                    Regime tributário da empresa (CRT): <?php echo h((string) ($empresaAtivaSelecionada['crt'] ?? '?')); ?>
-                                    — use CSOSN (101, 102, 103, 201, 202, 203, 300, 400, 500, 900) se Simples Nacional (CRT 1),
-                                    ou CST (00, 10, 20, 30, 40, 41, 50, 51, 60, 61, 70, 90) nos demais regimes.
+                                    Regime tributário da empresa (CRT <?php echo h((string) $empresaCrt); ?>):
+                                    <strong><?php echo $empresaSimplesNacional ? 'Simples Nacional (usa CSOSN)' : 'Regime Normal / Lucro Real ou Presumido (usa CST)'; ?></strong>.
+                                    As listas de situação tributária abaixo já refletem esse regime.
                                 </p>
                             <?php endif; ?>
                             <div class="table-wrap">
@@ -281,17 +375,17 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                             <th style="min-width: 180px;">Descrição</th>
                                             <th style="min-width: 100px;">NCM</th>
                                             <th style="min-width: 140px;">CFOP</th>
-                                            <th style="min-width: 90px;">CST/CSOSN</th>
+                                            <th style="min-width: 240px;">Situação tributária ICMS</th>
                                             <th style="min-width: 80px;">Orig.</th>
-                                            <th style="min-width: 90px;">Alíq. ICMS %</th>
+                                            <th style="min-width: 110px;">ICMS</th>
                                             <th style="min-width: 110px;">cEAN</th>
                                             <th style="min-width: 70px;">Unid.</th>
                                             <th style="min-width: 70px;">Qtd.</th>
                                             <th style="min-width: 100px;">Valor unit.</th>
                                             <th style="min-width: 70px;">IPI CST</th>
-                                            <th style="min-width: 90px;">Alíq. IPI %</th>
-                                            <th style="min-width: 90px;">Alíq. PIS %</th>
-                                            <th style="min-width: 100px;">Alíq. COFINS %</th>
+                                            <th style="min-width: 110px;">IPI</th>
+                                            <th style="min-width: 240px;">PIS</th>
+                                            <th style="min-width: 240px;">COFINS</th>
                                             <th></th>
                                         </tr>
                                     </thead>
@@ -498,6 +592,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
         }
 
         const catalogo = <?php echo $catalogoJson; ?>;
+        const opcoesCstIcmsHtml = <?php echo json_encode($optCstIcmsHtml); ?>;
+        const opcoesCstPisCofinsHtml = <?php echo json_encode($optCstPisCofinsHtml); ?>;
+        const cstPisCofinsPadrao = <?php echo json_encode($cstPisCofinsPadrao); ?>;
         const corpoItens = document.getElementById('corpoItens');
         const empresaSelect = document.getElementById('empresa_emissora_id');
         const totalNotaEl = document.getElementById('totalNota');
@@ -506,12 +603,41 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             return 'Total estimado: R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function formatarValorCalculado(valor) {
+            return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function numeroDoCampo(linha, seletor) {
+            const campo = linha.querySelector(seletor);
+            if (!campo) return 0;
+            return parseFloat((campo.value || '0').replace(',', '.')) || 0;
+        }
+
+        function recalcularImpostosLinha(linha) {
+            const qtd = numeroDoCampo(linha, '.item-quantidade');
+            const valorUnit = numeroDoCampo(linha, '.item-valor');
+            const base = qtd * valorUnit;
+
+            const icmsAliq = numeroDoCampo(linha, '.item-icms-aliquota');
+            linha.querySelector('.item-icms-valor-calc').textContent = formatarValorCalculado(base * icmsAliq / 100);
+
+            const ipiAliq = numeroDoCampo(linha, '.item-ipi-aliquota');
+            linha.querySelector('.item-ipi-valor-calc').textContent = formatarValorCalculado(base * ipiAliq / 100);
+
+            const pisAliq = numeroDoCampo(linha, '.item-pis-aliquota');
+            linha.querySelector('.item-pis-valor-calc').textContent = formatarValorCalculado(base * pisAliq / 100);
+
+            const cofinsAliq = numeroDoCampo(linha, '.item-cofins-aliquota');
+            linha.querySelector('.item-cofins-valor-calc').textContent = formatarValorCalculado(base * cofinsAliq / 100);
+        }
+
         function recalcularTotal() {
             let total = 0;
             corpoItens.querySelectorAll('tr').forEach(function (linha) {
-                const qtd = parseFloat((linha.querySelector('.item-quantidade').value || '0').replace(',', '.')) || 0;
-                const valorUnit = parseFloat((linha.querySelector('.item-valor').value || '0').replace(',', '.')) || 0;
+                const qtd = numeroDoCampo(linha, '.item-quantidade');
+                const valorUnit = numeroDoCampo(linha, '.item-valor');
                 total += qtd * valorUnit;
+                recalcularImpostosLinha(linha);
             });
             totalNotaEl.textContent = formatarMoeda(total);
             const campoValorPago = document.getElementById('nfe_valor_pago');
@@ -584,7 +710,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '.item-valor': item.valor_unitario,
                 '.item-ipi-cst': item.ipi_cst,
                 '.item-ipi-aliquota': item.ipi_aliquota,
+                '.item-pis-cst': item.pis_cst,
                 '.item-pis-aliquota': item.pis_aliquota,
+                '.item-cofins-cst': item.cofins_cst,
                 '.item-cofins-aliquota': item.cofins_aliquota,
                 '.item-cest': item.cest,
                 '.item-cnpj-fabricante': item.cnpj_fabricante,
@@ -605,7 +733,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '<td><input type="text" name="item_descricao[]" class="item-descricao" list="datalistItensDescricao" autocomplete="off" required></td>' +
                 '<td><input type="text" name="item_ncm[]" class="item-ncm" maxlength="8" placeholder="8 dígitos"></td>' +
                 '<td><input type="text" name="item_cfop[]" class="item-cfop" list="datalistCfop" autocomplete="off" placeholder="Ex.: 5102"></td>' +
-                '<td><input type="text" name="item_cst[]" class="item-cst" placeholder="102 ou 00"></td>' +
+                '<td><select name="item_cst[]" class="item-cst">' + opcoesCstIcmsHtml + '</select></td>' +
                 '<td><select name="item_icms_origem[]" class="item-icms-origem">' +
                     '<option value="0" selected>0 Nacional</option>' +
                     '<option value="1">1 Estrangeira - importação direta</option>' +
@@ -617,15 +745,29 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     '<option value="7">7 Estrangeira, mercado interno s/similar</option>' +
                     '<option value="8">8 Nacional, imp. &gt;70%</option>' +
                 '</select></td>' +
-                '<td><input type="text" name="item_icms_aliquota[]" class="item-icms-aliquota" value="0"></td>' +
+                '<td>' +
+                    '<input type="text" name="item_icms_aliquota[]" class="item-icms-aliquota" value="0" placeholder="% ICMS">' +
+                    '<span class="valor-calculado item-icms-valor-calc">R$ 0,00</span>' +
+                '</td>' +
                 '<td><input type="text" name="item_cean[]" class="item-cean" placeholder="Opcional"></td>' +
                 '<td><input type="text" name="item_unidade[]" class="item-unidade" value="UN"></td>' +
                 '<td><input type="text" name="item_quantidade[]" class="item-quantidade" value="1"></td>' +
                 '<td><input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00"></td>' +
                 '<td><input type="text" name="item_ipi_cst[]" class="item-ipi-cst" placeholder="Opcional"></td>' +
-                '<td><input type="text" name="item_ipi_aliquota[]" class="item-ipi-aliquota" value="0"></td>' +
-                '<td><input type="text" name="item_pis_aliquota[]" class="item-pis-aliquota" value="0"></td>' +
-                '<td><input type="text" name="item_cofins_aliquota[]" class="item-cofins-aliquota" value="0"></td>' +
+                '<td>' +
+                    '<input type="text" name="item_ipi_aliquota[]" class="item-ipi-aliquota" value="0" placeholder="% IPI">' +
+                    '<span class="valor-calculado item-ipi-valor-calc">R$ 0,00</span>' +
+                '</td>' +
+                '<td>' +
+                    '<select name="item_pis_cst[]" class="item-pis-cst">' + opcoesCstPisCofinsHtml + '</select>' +
+                    '<input type="text" name="item_pis_aliquota[]" class="item-pis-aliquota" value="0" placeholder="% PIS">' +
+                    '<span class="valor-calculado item-pis-valor-calc">R$ 0,00</span>' +
+                '</td>' +
+                '<td>' +
+                    '<select name="item_cofins_cst[]" class="item-cofins-cst">' + opcoesCstPisCofinsHtml + '</select>' +
+                    '<input type="text" name="item_cofins_aliquota[]" class="item-cofins-aliquota" value="0" placeholder="% COFINS">' +
+                    '<span class="valor-calculado item-cofins-valor-calc">R$ 0,00</span>' +
+                '</td>' +
                 '<td>' +
                     '<input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
                     '<input type="hidden" name="item_cest[]" class="item-cest">' +
@@ -664,6 +806,11 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
             linha.querySelector('.item-quantidade').addEventListener('input', recalcularTotal);
             linha.querySelector('.item-valor').addEventListener('input', recalcularTotal);
+            ['.item-icms-aliquota', '.item-ipi-aliquota', '.item-pis-aliquota', '.item-cofins-aliquota'].forEach(function (seletor) {
+                linha.querySelector(seletor).addEventListener('input', function () {
+                    recalcularImpostosLinha(linha);
+                });
+            });
             linha.querySelector('.btn-remover-item').addEventListener('click', function () {
                 linha.remove();
                 recalcularTotal();

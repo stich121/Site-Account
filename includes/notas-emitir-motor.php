@@ -954,6 +954,8 @@ try {
                 $ipiAliquotas = $_POST['item_ipi_aliquota'] ?? [];
                 $pisAliquotas = $_POST['item_pis_aliquota'] ?? [];
                 $cofinsAliquotas = $_POST['item_cofins_aliquota'] ?? [];
+                $pisCsts = $_POST['item_pis_cst'] ?? [];
+                $cofinsCsts = $_POST['item_cofins_cst'] ?? [];
                 $cests = $_POST['item_cest'] ?? [];
                 $cnpjsFabricante = $_POST['item_cnpj_fabricante'] ?? [];
                 $indicadoresEscalaRelevante = $_POST['item_indicador_escala_relevante'] ?? [];
@@ -991,6 +993,8 @@ try {
                         'icms_aliquota' => $numericoNfe((string) ($_POST['item_icms_aliquota'][$indice] ?? '0')),
                         'pis_aliquota' => $numericoNfe((string) ($pisAliquotas[$indice] ?? '0')),
                         'cofins_aliquota' => $numericoNfe((string) ($cofinsAliquotas[$indice] ?? '0')),
+                        'pis_cst' => trim((string) ($pisCsts[$indice] ?? '')),
+                        'cofins_cst' => trim((string) ($cofinsCsts[$indice] ?? '')),
                         'cest' => trim((string) ($cests[$indice] ?? '')) ?: null,
                         'cnpj_fabricante' => preg_replace('/\D+/', '', (string) ($cnpjsFabricante[$indice] ?? '')) ?: null,
                         'indicador_escala_relevante' => in_array($indicadoresEscalaRelevante[$indice] ?? '', ['S', 'N'], true) ? $indicadoresEscalaRelevante[$indice] : null,

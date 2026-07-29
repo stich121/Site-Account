@@ -36,7 +36,10 @@ function nfeAliquotaIcmsInterestadual(string $ufOrigem, string $ufDestino, bool 
 
 function nfeEmpresaSimplesNacional(array $empresa): bool
 {
-    return (int) ($empresa['crt'] ?? 0) === 1;
+    // CRT 1 (Simples Nacional) e 2 (Simples Nacional - excesso de sublimite) usam CSOSN.
+    // CRT 4 (MEI) e' legado, mas ainda cadastravel neste sistema e tambem opera sob o
+    // guarda-chuva do Simples Nacional, entao usa CSOSN. So o CRT 3 (Regime Normal) usa CST.
+    return in_array((int) ($empresa['crt'] ?? 0), [1, 2, 4], true);
 }
 
 /**
@@ -120,21 +123,16 @@ function nfeCalcularImpostosItem(array $itemBruto, array $empresa, string $cfop,
         }
     }
 
-    if ($simplesNacional) {
-        $resultado['pis_cst'] = '99';
-        $resultado['cofins_cst'] = '99';
-    } else {
-        $aliquotaPis = round((float) ($itemBruto['pis_aliquota'] ?? 0), 4);
-        $aliquotaCofins = round((float) ($itemBruto['cofins_aliquota'] ?? 0), 4);
-        $resultado['pis_cst'] = '01';
-        $resultado['pis_base_calculo'] = $valorTotal;
-        $resultado['pis_aliquota'] = $aliquotaPis;
-        $resultado['pis_valor'] = round($valorTotal * $aliquotaPis / 100, 2);
-        $resultado['cofins_cst'] = '01';
-        $resultado['cofins_base_calculo'] = $valorTotal;
-        $resultado['cofins_aliquota'] = $aliquotaCofins;
-        $resultado['cofins_valor'] = round($valorTotal * $aliquotaCofins / 100, 2);
-    }
+    $aliquotaPis = round((float) ($itemBruto['pis_aliquota'] ?? 0), 4);
+    $aliquotaCofins = round((float) ($itemBruto['cofins_aliquota'] ?? 0), 4);
+    $resultado['pis_cst'] = trim((string) ($itemBruto['pis_cst'] ?? '')) ?: ($simplesNacional ? '99' : '01');
+    $resultado['pis_base_calculo'] = $valorTotal;
+    $resultado['pis_aliquota'] = $aliquotaPis;
+    $resultado['pis_valor'] = round($valorTotal * $aliquotaPis / 100, 2);
+    $resultado['cofins_cst'] = trim((string) ($itemBruto['cofins_cst'] ?? '')) ?: ($simplesNacional ? '99' : '01');
+    $resultado['cofins_base_calculo'] = $valorTotal;
+    $resultado['cofins_aliquota'] = $aliquotaCofins;
+    $resultado['cofins_valor'] = round($valorTotal * $aliquotaCofins / 100, 2);
 
     return $resultado;
 }
