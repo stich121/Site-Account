@@ -41,7 +41,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             </div>
 
             <section class="panel">
-                <h2>Nova nota (rascunho)</h2>
+                <h2><i class="fa-solid fa-box"></i> Nova nota (rascunho)</h2>
                 <form method="post" id="formNota">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="acao" value="criar_nota">
@@ -77,7 +77,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <span class="muted" id="statusBuscaClienteDocumento" style="font-size: 0.78rem;"></span>
                         </div>
                         <div class="field">
-                            <label for="cliente_id">Cliente destinatário</label>
+                            <label for="cliente_id">Cliente destinatário <span class="marca-obrigatoria">*</span></label>
                             <select id="cliente_id" name="cliente_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($clientes as $cliente): ?>
@@ -86,7 +86,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field">
-                            <label for="natureza_operacao">Natureza da operação</label>
+                            <label for="natureza_operacao">Natureza da operação <span class="marca-obrigatoria">*</span></label>
                             <input id="natureza_operacao" name="natureza_operacao" type="text" placeholder="Ex.: Venda de mercadoria" required>
                         </div>
                         <div class="field">
@@ -132,8 +132,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         </div>
                     </details>
 
-                    <div style="margin-top: 1.5rem;">
+                    <div style="margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Salvar rascunho</button>
+                        <span class="muted" style="font-size: 0.78rem;">Campos com <span class="marca-obrigatoria">*</span> são obrigatórios.</span>
                     </div>
                 </form>
             </section>

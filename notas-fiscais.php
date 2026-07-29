@@ -783,18 +783,30 @@ $usuario = h(nomeExibicao($usuarioRaw));
             <strong>Documentos:</strong> “Conferência” gera apenas relatório interno. Para NFS-e autorizada, use “XML fiscal”. O endpoint governamental do DANFSe foi descontinuado em 01/07/2026 e o botão pode ficar indisponível até a implantação do renderizador local NT 008.
         </div>
 
-        <section class="panel">
-            <div class="row-actions">
-                <a class="btn" href="notas-emitir-produto"><i class="fa-solid fa-box"></i> Emitir NF-e (produto)</a>
-                <a class="btn" href="notas-emitir-servico"><i class="fa-solid fa-file-circle-plus"></i> Emitir NFS-e (serviço)</a>
-            </div>
+        <section class="quick-actions">
+            <a class="quick-action-card" href="notas-emitir-produto">
+                <span class="quick-action-icon"><i class="fa-solid fa-box"></i></span>
+                <span class="quick-action-texto">
+                    <strong>Emitir NF-e</strong>
+                    <span class="muted">Venda de produtos</span>
+                </span>
+                <i class="fa-solid fa-chevron-right quick-action-seta"></i>
+            </a>
+            <a class="quick-action-card" href="notas-emitir-servico">
+                <span class="quick-action-icon"><i class="fa-solid fa-file-circle-plus"></i></span>
+                <span class="quick-action-texto">
+                    <strong>Emitir NFS-e</strong>
+                    <span class="muted">Prestação de serviço</span>
+                </span>
+                <i class="fa-solid fa-chevron-right quick-action-seta"></i>
+            </a>
         </section>
 
         <section class="panel">
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-                <h2 style="margin-bottom:0;"><?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?></h2>
+                <h2 style="margin-bottom:0;"><i class="fa-solid fa-list-check"></i> <?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?></h2>
                 <form method="get" class="row-actions">
-                    <select name="status" onchange="this.form.submit()">
+                    <select class="select-filtro" name="status" onchange="this.form.submit()">
                         <option value="">Todos os status</option>
                         <?php foreach (['rascunho', 'pendente_envio', 'autorizada', 'rejeitada', 'cancelada'] as $statusOpcao): ?>
                             <option value="<?php echo h($statusOpcao); ?>" <?php echo $filtroStatus === $statusOpcao ? 'selected' : ''; ?>><?php echo h(rotuloStatusNota($statusOpcao)); ?></option>

@@ -41,7 +41,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             </div>
 
             <section class="panel">
-                <h2><?php echo $notaEmEdicao ? 'Corrigir NFS-e nº ' . h((string) $notaEmEdicao['numero_interno']) : 'Nova nota (rascunho)'; ?></h2>
+                <h2><i class="fa-solid <?php echo $notaEmEdicao ? 'fa-pen-to-square' : 'fa-file-invoice'; ?>"></i> <?php echo $notaEmEdicao ? 'Corrigir NFS-e nº ' . h((string) $notaEmEdicao['numero_interno']) : 'Nova nota (rascunho)'; ?></h2>
                 <form method="post" id="formNota">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="acao" value="<?php echo $notaEmEdicao ? 'salvar_edicao' : 'criar_nota'; ?>">
@@ -82,7 +82,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <span class="muted" id="statusBuscaClienteDocumento" style="font-size: 0.78rem;"></span>
                         </div>
                         <div class="field">
-                            <label for="cliente_id">Cliente destinatário (tomador)</label>
+                            <label for="cliente_id">Cliente destinatário (tomador) <span class="marca-obrigatoria">*</span></label>
                             <select id="cliente_id" name="cliente_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($clientes as $cliente): ?>
@@ -91,7 +91,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field">
-                            <label for="natureza_operacao">Natureza da operação</label>
+                            <label for="natureza_operacao">Natureza da operação <span class="marca-obrigatoria">*</span></label>
                             <input id="natureza_operacao" name="natureza_operacao" type="text" placeholder="Ex.: Prestação de serviço" required>
                         </div>
                         <div class="field">
@@ -213,7 +213,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <input id="nfse_pais_prestacao" name="nfse_pais_prestacao" type="text" value="Brasil">
                         </div>
                         <div class="field municipio-autocomplete">
-                            <label for="nfse_municipio_prestacao_busca">Município</label>
+                            <label for="nfse_municipio_prestacao_busca">Município <span class="marca-obrigatoria">*</span></label>
                             <input id="nfse_municipio_prestacao_busca" type="search" required placeholder="Digite o início do município" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_municipio_prestacao_opcoes" aria-expanded="false">
                             <input id="nfse_municipio_prestacao" name="nfse_municipio_prestacao" type="hidden">
                             <div id="nfse_municipio_prestacao_opcoes" class="municipio-sugestoes" role="listbox"></div>
@@ -228,7 +228,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116)</label>
+                            <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116) <span class="marca-obrigatoria">*</span></label>
                             <input id="nfse_codigo_tributacao_nacional" name="nfse_codigo_tributacao_nacional" type="text" required placeholder="Digite para buscar. Ex.: 17.19.01" list="datalistCodigosNacionais" autocomplete="off">
                             <datalist id="datalistCodigosNacionais">
                                 <?php foreach ($codigosTributacaoNacionalNfse as $codigoNacional): ?>
@@ -252,11 +252,11 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <span class="muted" id="nfse_item_nbs_status" style="font-size: 0.78rem;">A NBS será definida conforme a correlação oficial da NFS-e.</span>
                         </div>
                         <div class="field">
-                            <label for="nfse_codigo_interno_contribuinte">Código interno do contribuinte</label>
+                            <label for="nfse_codigo_interno_contribuinte">Código interno do contribuinte <span class="marca-obrigatoria">*</span></label>
                             <input id="nfse_codigo_interno_contribuinte" name="nfse_codigo_interno_contribuinte" type="text" required placeholder="Seu código de controle interno para este serviço">
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="nfse_descricao_servico">Descrição do serviço</label>
+                            <label for="nfse_descricao_servico">Descrição do serviço <span class="marca-obrigatoria">*</span></label>
                             <textarea id="nfse_descricao_servico" name="nfse_descricao_servico" maxlength="2000" required placeholder="Descreva o serviço prestado"></textarea>
                         </div>
                     </div>
@@ -319,7 +319,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_valor_servico">Valor do serviço prestado</label>
+                            <label for="nfse_valor_servico">Valor do serviço prestado <span class="marca-obrigatoria">*</span></label>
                             <input id="nfse_valor_servico" name="nfse_valor_servico" type="text" required value="0,00">
                         </div>
                         <div class="field">
@@ -467,8 +467,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         </div>
                     </details>
 
-                    <div style="margin-top: 1.5rem;">
+                    <div style="margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> <?php echo $notaEmEdicao ? 'Salvar correções' : 'Salvar rascunho'; ?></button>
+                        <span class="muted" style="font-size: 0.78rem;">Campos com <span class="marca-obrigatoria">*</span> são obrigatórios.</span>
                     </div>
                 </form>
             </section>
@@ -806,7 +807,8 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
         const empresaSelect = document.getElementById('empresa_emissora_id');
 
-        document.querySelectorAll('[data-form-jump]').forEach(function (botao) {
+        const botoesFormJump = Array.from(document.querySelectorAll('[data-form-jump]'));
+        botoesFormJump.forEach(function (botao) {
             botao.addEventListener('click', function () {
                 const alvo = document.getElementById(botao.dataset.formJump);
                 if (!alvo) return;
@@ -814,6 +816,22 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         });
+
+        // Destaca no menu de atalhos a seção que está visível na tela.
+        if (botoesFormJump.length && 'IntersectionObserver' in window) {
+            const secoesFormJump = botoesFormJump
+                .map(function (botao) { return document.getElementById(botao.dataset.formJump); })
+                .filter(Boolean);
+            const observadorSecoes = new IntersectionObserver(function (entradas) {
+                entradas.forEach(function (entrada) {
+                    if (!entrada.isIntersecting) return;
+                    botoesFormJump.forEach(function (botao) {
+                        botao.classList.toggle('ativo', botao.dataset.formJump === entrada.target.id);
+                    });
+                });
+            }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+            secoesFormJump.forEach(function (secao) { observadorSecoes.observe(secao); });
+        }
 
         const selectTomadorLocal = document.getElementById('nfse_tomador_local');
         const campoTomadorInscricaoMunicipal = document.getElementById('nfse_tomador_inscricao_municipal');
