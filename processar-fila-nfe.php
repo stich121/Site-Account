@@ -424,7 +424,7 @@ $csrf = h($_SESSION['csrf_processar_fila_nfe'] ?? '');
                                     <td class="<?php echo $linha['resultado']['sucesso'] ? 'ok' : 'falhou'; ?>">
                                         <?php echo $linha['resultado']['sucesso'] ? 'Autorizada' : 'Falhou'; ?>
                                     </td>
-                                    <td><?php echo h((string) ($linha['resultado']['chave_acesso'] ?? $linha['resultado']['motivo_rejeicao'] ?? '')); ?></td>
+                                    <td><?php echo h((string) ($linha['resultado']['sucesso'] ? ($linha['resultado']['chave_acesso'] ?? '') : ($linha['resultado']['motivo_rejeicao'] ?? ''))); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
