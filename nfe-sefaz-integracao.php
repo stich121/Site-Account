@@ -55,7 +55,12 @@ function montarToolsNfe(array $empresa): array
             'razaosocial' => (string) $empresa['razao_social'],
             'cnpj' => preg_replace('/\D+/', '', (string) $empresa['cnpj']),
             'siglaUF' => strtoupper((string) $empresa['uf']),
-            'schemes' => 'PL_009_V4',
+            // PL_010_V1.30 e o schema aditivo que inclui os elementos IBSCBS/IBSCBSTot da
+            // Reforma Tributaria (NT 2025.002); precisa ficar em sincronia com o hint passado
+            // a \NFePHP\NFe\Make() em nfeMontarXml() (nfe-xml-fiscal.php). A tag <infNFe
+            // versao="4.00"> continua igual - so o schema local usado para validar antes de
+            // enviar e mais novo.
+            'schemes' => 'PL_010_V1.30',
             'versao' => '4.00',
             'tokenIBPT' => '',
             'CSC' => '',
