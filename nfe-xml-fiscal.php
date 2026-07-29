@@ -161,7 +161,23 @@ function nfeMontarXml(array $nota, array $empresa, array $cliente, array $nfeExt
         $std->qTrib = (float) ($item['quantidade_tributavel'] ?: $item['quantidade']);
         $std->vUnTrib = (float) ($item['valor_unitario_tributavel'] ?: $item['valor_unitario']);
         $std->indTot = 1;
+        if (!empty($item['codigo_beneficio_fiscal'])) {
+            $std->cBenef = (string) $item['codigo_beneficio_fiscal'];
+        }
         $make->tagprod($std);
+
+        if (!empty($item['cest'])) {
+            $std = new stdClass();
+            $std->item = $numeroItem;
+            $std->CEST = nfeSomenteNumeros($item['cest']);
+            if (!empty($item['indicador_escala_relevante'])) {
+                $std->indEscala = (string) $item['indicador_escala_relevante'];
+            }
+            if (!empty($item['cnpj_fabricante'])) {
+                $std->CNPJFab = nfeSomenteNumeros($item['cnpj_fabricante']);
+            }
+            $make->tagCEST($std);
+        }
 
         $cstCsosn = trim((string) ($item['cst_csosn'] ?? ''));
         $std = new stdClass();

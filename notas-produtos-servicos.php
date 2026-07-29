@@ -109,6 +109,11 @@ function prepararColunasImpostoProdutosServicos(PDO $db): void
         'ipi_cst' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER cst_csosn',
         'aliquota_ipi' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN aliquota_ipi DECIMAL(5,2) NULL AFTER ipi_cst',
         'cean' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cean VARCHAR(14) NULL AFTER codigo_interno',
+        'icms_origem' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN icms_origem TINYINT UNSIGNED NULL AFTER cst_csosn',
+        'cest' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cest VARCHAR(7) NULL AFTER ncm',
+        'cnpj_fabricante' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cnpj_fabricante VARCHAR(20) NULL AFTER cest',
+        'indicador_escala_relevante' => "ALTER TABLE notas_produtos_servicos ADD COLUMN indicador_escala_relevante ENUM('S','N') NULL AFTER cnpj_fabricante",
+        'codigo_beneficio_fiscal' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN codigo_beneficio_fiscal VARCHAR(10) NULL AFTER indicador_escala_relevante',
     ];
     foreach ($colunas as $coluna => $sql) {
         if (!colunaExisteProdutosServicos($db, $coluna)) {
@@ -148,6 +153,11 @@ try {
             $ipiCst = trim((string) ($_POST['ipi_cst'] ?? ''));
             $aliquotaIpi = trim((string) ($_POST['aliquota_ipi'] ?? ''));
             $cean = trim((string) ($_POST['cean'] ?? ''));
+            $icmsOrigem = trim((string) ($_POST['icms_origem'] ?? ''));
+            $cest = trim((string) ($_POST['cest'] ?? ''));
+            $cnpjFabricante = preg_replace('/\D+/', '', (string) ($_POST['cnpj_fabricante'] ?? ''));
+            $indicadorEscalaRelevante = in_array($_POST['indicador_escala_relevante'] ?? '', ['S', 'N'], true) ? $_POST['indicador_escala_relevante'] : null;
+            $codigoBeneficioFiscal = trim((string) ($_POST['codigo_beneficio_fiscal'] ?? ''));
 
             if ($empresaId <= 0 || $descricao === '') {
                 $erro = 'Selecione a empresa emissora e informe a descrição.';
@@ -156,11 +166,13 @@ try {
                     'INSERT INTO notas_produtos_servicos (
                         empresa_emissora_id, tipo, descricao, codigo_interno, ncm, cfop, cst_csosn,
                         codigo_servico_municipal, unidade, valor_unitario_padrao, aliquota_icms, aliquota_pis, aliquota_cofins,
-                        ipi_cst, aliquota_ipi, cean, ativo
+                        ipi_cst, aliquota_ipi, cean, icms_origem, cest, cnpj_fabricante, indicador_escala_relevante,
+                        codigo_beneficio_fiscal, ativo
                      ) VALUES (
                         :empresa_emissora_id, :tipo, :descricao, :codigo_interno, :ncm, :cfop, :cst_csosn,
                         :codigo_servico_municipal, :unidade, :valor_unitario_padrao, :aliquota_icms, :aliquota_pis, :aliquota_cofins,
-                        :ipi_cst, :aliquota_ipi, :cean, 1
+                        :ipi_cst, :aliquota_ipi, :cean, :icms_origem, :cest, :cnpj_fabricante, :indicador_escala_relevante,
+                        :codigo_beneficio_fiscal, 1
                      )'
                 );
                 $stmt->execute([
@@ -180,6 +192,11 @@ try {
                     'ipi_cst' => $ipiCst !== '' ? $ipiCst : null,
                     'aliquota_ipi' => $aliquotaIpi !== '' ? $aliquotaIpi : null,
                     'cean' => $cean !== '' ? $cean : null,
+                    'icms_origem' => $icmsOrigem !== '' ? $icmsOrigem : null,
+                    'cest' => $cest !== '' ? $cest : null,
+                    'cnpj_fabricante' => $cnpjFabricante !== '' ? $cnpjFabricante : null,
+                    'indicador_escala_relevante' => $indicadorEscalaRelevante,
+                    'codigo_beneficio_fiscal' => $codigoBeneficioFiscal !== '' ? $codigoBeneficioFiscal : null,
                 ]);
 
                 $sucesso = 'Item cadastrado no catálogo.';
@@ -201,6 +218,11 @@ try {
             $ipiCst = trim((string) ($_POST['ipi_cst'] ?? ''));
             $aliquotaIpi = trim((string) ($_POST['aliquota_ipi'] ?? ''));
             $cean = trim((string) ($_POST['cean'] ?? ''));
+            $icmsOrigem = trim((string) ($_POST['icms_origem'] ?? ''));
+            $cest = trim((string) ($_POST['cest'] ?? ''));
+            $cnpjFabricante = preg_replace('/\D+/', '', (string) ($_POST['cnpj_fabricante'] ?? ''));
+            $indicadorEscalaRelevante = in_array($_POST['indicador_escala_relevante'] ?? '', ['S', 'N'], true) ? $_POST['indicador_escala_relevante'] : null;
+            $codigoBeneficioFiscal = trim((string) ($_POST['codigo_beneficio_fiscal'] ?? ''));
 
             if ($itemId <= 0 || $descricao === '') {
                 $erro = 'Item inválido ou descrição em branco.';
@@ -210,7 +232,9 @@ try {
                         tipo = :tipo, descricao = :descricao, codigo_interno = :codigo_interno, ncm = :ncm, cfop = :cfop,
                         cst_csosn = :cst_csosn, codigo_servico_municipal = :codigo_servico_municipal, unidade = :unidade,
                         valor_unitario_padrao = :valor_unitario_padrao, aliquota_icms = :aliquota_icms, aliquota_pis = :aliquota_pis,
-                        aliquota_cofins = :aliquota_cofins, ipi_cst = :ipi_cst, aliquota_ipi = :aliquota_ipi, cean = :cean
+                        aliquota_cofins = :aliquota_cofins, ipi_cst = :ipi_cst, aliquota_ipi = :aliquota_ipi, cean = :cean,
+                        icms_origem = :icms_origem, cest = :cest, cnpj_fabricante = :cnpj_fabricante,
+                        indicador_escala_relevante = :indicador_escala_relevante, codigo_beneficio_fiscal = :codigo_beneficio_fiscal
                      WHERE id = :id'
                 );
                 $stmt->execute([
@@ -229,6 +253,11 @@ try {
                     'ipi_cst' => $ipiCst !== '' ? $ipiCst : null,
                     'aliquota_ipi' => $aliquotaIpi !== '' ? $aliquotaIpi : null,
                     'cean' => $cean !== '' ? $cean : null,
+                    'icms_origem' => $icmsOrigem !== '' ? $icmsOrigem : null,
+                    'cest' => $cest !== '' ? $cest : null,
+                    'cnpj_fabricante' => $cnpjFabricante !== '' ? $cnpjFabricante : null,
+                    'indicador_escala_relevante' => $indicadorEscalaRelevante,
+                    'codigo_beneficio_fiscal' => $codigoBeneficioFiscal !== '' ? $codigoBeneficioFiscal : null,
                     'id' => $itemId,
                 ]);
 
@@ -258,6 +287,7 @@ try {
         'SELECT ps.id, ps.empresa_emissora_id, ps.tipo, ps.descricao, ps.codigo_interno, ps.ncm, ps.cfop,
                 ps.cst_csosn, ps.codigo_servico_municipal, ps.unidade, ps.valor_unitario_padrao,
                 ps.aliquota_icms, ps.aliquota_pis, ps.aliquota_cofins, ps.ipi_cst, ps.aliquota_ipi, ps.cean, ps.ativo,
+                ps.icms_origem, ps.cest, ps.cnpj_fabricante, ps.indicador_escala_relevante, ps.codigo_beneficio_fiscal,
                 e.razao_social AS empresa_razao_social
          FROM notas_produtos_servicos ps
          INNER JOIN empresas_emissoras e ON e.id = ps.empresa_emissora_id
@@ -324,6 +354,7 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                     <?php if ($itemEmEdicao): ?>
                         <input type="hidden" name="item_id_edicao" value="<?php echo h((string) $itemEmEdicao['id']); ?>">
                     <?php endif; ?>
+                    <h3><i class="fa-solid fa-tag"></i> Identificação</h3>
                     <div class="form-grid">
                         <div class="field">
                             <label for="empresa_emissora_id">Empresa emissora</label>
@@ -346,7 +377,7 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                                 <option value="servico" <?php echo ($itemEmEdicao['tipo'] ?? '') === 'servico' ? 'selected' : ''; ?>>Serviço (NFS-e)</option>
                             </select>
                         </div>
-                        <div class="field">
+                        <div class="field" style="grid-column: 1 / -1;">
                             <label for="descricao">Descrição</label>
                             <input id="descricao" name="descricao" type="text" required value="<?php echo h($itemEmEdicao['descricao'] ?? ''); ?>">
                         </div>
@@ -355,27 +386,79 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                             <input id="codigo_interno" name="codigo_interno" type="text" value="<?php echo h($itemEmEdicao['codigo_interno'] ?? ''); ?>">
                         </div>
                         <div class="field">
+                            <label for="cean">GTIN/EAN (código de barras)</label>
+                            <input id="cean" name="cean" type="text" placeholder="Opcional" value="<?php echo h($itemEmEdicao['cean'] ?? ''); ?>">
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 1.5rem;"><i class="fa-solid fa-file-invoice"></i> Fiscal — produto (NF-e)</h3>
+                    <div class="form-grid">
+                        <div class="field">
                             <label for="ncm">NCM</label>
-                            <input id="ncm" name="ncm" type="text" placeholder="Só para produto" value="<?php echo h($itemEmEdicao['ncm'] ?? ''); ?>">
+                            <input id="ncm" name="ncm" type="text" value="<?php echo h($itemEmEdicao['ncm'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="cfop">CFOP</label>
-                            <input id="cfop" name="cfop" type="text" placeholder="Só para produto" value="<?php echo h($itemEmEdicao['cfop'] ?? ''); ?>">
+                            <input id="cfop" name="cfop" type="text" value="<?php echo h($itemEmEdicao['cfop'] ?? ''); ?>">
                         </div>
                         <div class="field">
                             <label for="cst_csosn">CST/CSOSN</label>
-                            <input id="cst_csosn" name="cst_csosn" type="text" placeholder="Só para produto" value="<?php echo h($itemEmEdicao['cst_csosn'] ?? ''); ?>">
+                            <input id="cst_csosn" name="cst_csosn" type="text" value="<?php echo h($itemEmEdicao['cst_csosn'] ?? ''); ?>">
                         </div>
+                        <div class="field">
+                            <label for="icms_origem">Origem da mercadoria</label>
+                            <?php $origemAtual = $itemEmEdicao !== null && $itemEmEdicao['icms_origem'] !== null ? (int) $itemEmEdicao['icms_origem'] : 0; ?>
+                            <select id="icms_origem" name="icms_origem">
+                                <option value="0" <?php echo $origemAtual === 0 ? 'selected' : ''; ?>>0 - Nacional</option>
+                                <option value="1" <?php echo $origemAtual === 1 ? 'selected' : ''; ?>>1 - Estrangeira, importação direta</option>
+                                <option value="2" <?php echo $origemAtual === 2 ? 'selected' : ''; ?>>2 - Estrangeira, mercado interno</option>
+                                <option value="3" <?php echo $origemAtual === 3 ? 'selected' : ''; ?>>3 - Nacional, conteúdo import. &gt;40%</option>
+                                <option value="4" <?php echo $origemAtual === 4 ? 'selected' : ''; ?>>4 - Nacional, PPB</option>
+                                <option value="5" <?php echo $origemAtual === 5 ? 'selected' : ''; ?>>5 - Nacional, conteúdo import. &lt;=40%</option>
+                                <option value="6" <?php echo $origemAtual === 6 ? 'selected' : ''; ?>>6 - Estrangeira, imp. direta s/ similar</option>
+                                <option value="7" <?php echo $origemAtual === 7 ? 'selected' : ''; ?>>7 - Estrangeira, mercado interno s/ similar</option>
+                                <option value="8" <?php echo $origemAtual === 8 ? 'selected' : ''; ?>>8 - Nacional, conteúdo import. &gt;70%</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="cest">CEST</label>
+                            <input id="cest" name="cest" type="text" maxlength="7" placeholder="Só se houver ICMS-ST" value="<?php echo h($itemEmEdicao['cest'] ?? ''); ?>">
+                        </div>
+                        <div class="field">
+                            <label for="indicador_escala_relevante">Indicador de escala relevante</label>
+                            <?php $escalaAtual = $itemEmEdicao['indicador_escala_relevante'] ?? ''; ?>
+                            <select id="indicador_escala_relevante" name="indicador_escala_relevante">
+                                <option value="">Não se aplica</option>
+                                <option value="S" <?php echo $escalaAtual === 'S' ? 'selected' : ''; ?>>Sim, fabricante em escala relevante</option>
+                                <option value="N" <?php echo $escalaAtual === 'N' ? 'selected' : ''; ?>>Não</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="cnpj_fabricante">CNPJ do fabricante da mercadoria</label>
+                            <input id="cnpj_fabricante" name="cnpj_fabricante" type="text" placeholder="Só se diferente do emitente" value="<?php echo h($itemEmEdicao['cnpj_fabricante'] ?? ''); ?>">
+                        </div>
+                        <div class="field">
+                            <label for="codigo_beneficio_fiscal">Código de benefício fiscal na UF</label>
+                            <input id="codigo_beneficio_fiscal" name="codigo_beneficio_fiscal" type="text" placeholder="Opcional" value="<?php echo h($itemEmEdicao['codigo_beneficio_fiscal'] ?? ''); ?>">
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 1.5rem;"><i class="fa-solid fa-briefcase"></i> Fiscal — serviço (NFS-e)</h3>
+                    <div class="form-grid">
                         <div class="field">
                             <label for="codigo_servico_municipal">Código de serviço (LC 116)</label>
-                            <input id="codigo_servico_municipal" name="codigo_servico_municipal" type="text" placeholder="Só para serviço" value="<?php echo h($itemEmEdicao['codigo_servico_municipal'] ?? ''); ?>">
+                            <input id="codigo_servico_municipal" name="codigo_servico_municipal" type="text" value="<?php echo h($itemEmEdicao['codigo_servico_municipal'] ?? ''); ?>">
                         </div>
+                    </div>
+
+                    <h3 style="margin-top: 1.5rem;"><i class="fa-solid fa-sack-dollar"></i> Preço e impostos</h3>
+                    <div class="form-grid">
                         <div class="field">
-                            <label for="unidade">Unidade</label>
+                            <label for="unidade">Unidade comercial</label>
                             <input id="unidade" name="unidade" type="text" value="<?php echo h($itemEmEdicao['unidade'] ?? 'UN'); ?>">
                         </div>
                         <div class="field">
-                            <label for="valor_unitario_padrao">Valor unitário padrão</label>
+                            <label for="valor_unitario_padrao">Preço de venda</label>
                             <input id="valor_unitario_padrao" name="valor_unitario_padrao" type="text" placeholder="0,00" value="<?php echo $itemEmEdicao ? h(number_format((float) $itemEmEdicao['valor_unitario_padrao'], 2, ',', '')) : ''; ?>">
                         </div>
                         <div class="field">
@@ -398,19 +481,13 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                             <label for="aliquota_ipi">Alíquota IPI (%)</label>
                             <input id="aliquota_ipi" name="aliquota_ipi" type="text" value="<?php echo h((string) ($itemEmEdicao['aliquota_ipi'] ?? '')); ?>">
                         </div>
-                        <div class="field">
-                            <label for="cean">cEAN (código de barras)</label>
-                            <input id="cean" name="cean" type="text" placeholder="Opcional" value="<?php echo h($itemEmEdicao['cean'] ?? ''); ?>">
-                        </div>
-                        <div class="field">
-                            <label>&nbsp;</label>
-                            <div class="row-actions">
-                                <button class="btn" type="submit"><i class="fa-solid <?php echo $itemEmEdicao ? 'fa-floppy-disk' : 'fa-plus'; ?>"></i> <?php echo $itemEmEdicao ? 'Salvar alterações' : 'Adicionar ao catálogo'; ?></button>
-                                <?php if ($itemEmEdicao): ?>
-                                    <a class="btn btn-outline" href="notas-produtos-servicos">Cancelar edição</a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.5rem;" class="row-actions">
+                        <button class="btn" type="submit"><i class="fa-solid <?php echo $itemEmEdicao ? 'fa-floppy-disk' : 'fa-plus'; ?>"></i> <?php echo $itemEmEdicao ? 'Salvar alterações' : 'Adicionar ao catálogo'; ?></button>
+                        <?php if ($itemEmEdicao): ?>
+                            <a class="btn btn-outline" href="notas-produtos-servicos">Cancelar edição</a>
+                        <?php endif; ?>
                     </div>
                 </form>
             </section>

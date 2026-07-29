@@ -558,11 +558,16 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             linha.querySelector('.item-produto-id').value = item.id;
             linha.querySelector('.item-catalogo').value = item.id;
             linha.querySelector('.item-cean').value = item.cean || '';
+            linha.querySelector('.item-icms-origem').value = item.icms_origem != null ? item.icms_origem : '0';
             linha.querySelector('.item-icms-aliquota').value = item.aliquota_icms != null ? item.aliquota_icms : '0';
             linha.querySelector('.item-ipi-cst').value = item.ipi_cst || '';
             linha.querySelector('.item-ipi-aliquota').value = item.aliquota_ipi != null ? item.aliquota_ipi : '0';
             linha.querySelector('.item-pis-aliquota').value = item.aliquota_pis != null ? item.aliquota_pis : '0';
             linha.querySelector('.item-cofins-aliquota').value = item.aliquota_cofins != null ? item.aliquota_cofins : '0';
+            linha.querySelector('.item-cest').value = item.cest || '';
+            linha.querySelector('.item-cnpj-fabricante').value = item.cnpj_fabricante || '';
+            linha.querySelector('.item-indicador-escala-relevante').value = item.indicador_escala_relevante || '';
+            linha.querySelector('.item-codigo-beneficio-fiscal').value = item.codigo_beneficio_fiscal || '';
         }
 
         function preencherLinhaItem(linha, item) {
@@ -581,6 +586,10 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '.item-ipi-aliquota': item.ipi_aliquota,
                 '.item-pis-aliquota': item.pis_aliquota,
                 '.item-cofins-aliquota': item.cofins_aliquota,
+                '.item-cest': item.cest,
+                '.item-cnpj-fabricante': item.cnpj_fabricante,
+                '.item-indicador-escala-relevante': item.indicador_escala_relevante,
+                '.item-codigo-beneficio-fiscal': item.codigo_beneficio_fiscal,
             };
             Object.keys(mapa).forEach(function (seletor) {
                 const campoItem = linha.querySelector(seletor);
@@ -617,8 +626,14 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '<td><input type="text" name="item_ipi_aliquota[]" class="item-ipi-aliquota" value="0"></td>' +
                 '<td><input type="text" name="item_pis_aliquota[]" class="item-pis-aliquota" value="0"></td>' +
                 '<td><input type="text" name="item_cofins_aliquota[]" class="item-cofins-aliquota" value="0"></td>' +
-                '<td><input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
-                '<button type="button" class="btn btn-danger btn-small btn-remover-item"><i class="fa-solid fa-trash"></i></button></td>';
+                '<td>' +
+                    '<input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
+                    '<input type="hidden" name="item_cest[]" class="item-cest">' +
+                    '<input type="hidden" name="item_cnpj_fabricante[]" class="item-cnpj-fabricante">' +
+                    '<input type="hidden" name="item_indicador_escala_relevante[]" class="item-indicador-escala-relevante">' +
+                    '<input type="hidden" name="item_codigo_beneficio_fiscal[]" class="item-codigo-beneficio-fiscal">' +
+                    '<button type="button" class="btn btn-danger btn-small btn-remover-item"><i class="fa-solid fa-trash"></i></button>' +
+                '</td>';
 
             corpoItens.appendChild(linha);
 

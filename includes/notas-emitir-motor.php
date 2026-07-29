@@ -463,6 +463,10 @@ function prepararColunasImpostoItensNotas(PDO $db): void
         'numero_item' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN numero_item SMALLINT UNSIGNED NULL AFTER produto_servico_id',
         'cean' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cean VARCHAR(14) NULL AFTER ncm',
         'cean_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cean_tributavel VARCHAR(14) NULL AFTER cean',
+        'cest' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cest VARCHAR(7) NULL AFTER cean_tributavel',
+        'cnpj_fabricante' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN cnpj_fabricante VARCHAR(20) NULL AFTER cest',
+        'indicador_escala_relevante' => "ALTER TABLE notas_fiscais_itens ADD COLUMN indicador_escala_relevante ENUM('S','N') NULL AFTER cnpj_fabricante",
+        'codigo_beneficio_fiscal' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN codigo_beneficio_fiscal VARCHAR(10) NULL AFTER indicador_escala_relevante',
         'unidade_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN unidade_tributavel VARCHAR(10) NULL AFTER unidade',
         'quantidade_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN quantidade_tributavel DECIMAL(12,3) NULL AFTER unidade_tributavel',
         'valor_unitario_tributavel' => 'ALTER TABLE notas_fiscais_itens ADD COLUMN valor_unitario_tributavel DECIMAL(12,4) NULL AFTER quantidade_tributavel',
@@ -950,6 +954,10 @@ try {
                 $ipiAliquotas = $_POST['item_ipi_aliquota'] ?? [];
                 $pisAliquotas = $_POST['item_pis_aliquota'] ?? [];
                 $cofinsAliquotas = $_POST['item_cofins_aliquota'] ?? [];
+                $cests = $_POST['item_cest'] ?? [];
+                $cnpjsFabricante = $_POST['item_cnpj_fabricante'] ?? [];
+                $indicadoresEscalaRelevante = $_POST['item_indicador_escala_relevante'] ?? [];
+                $codigosBeneficioFiscal = $_POST['item_codigo_beneficio_fiscal'] ?? [];
 
                 foreach ($descricoes as $indice => $descricaoItem) {
                     $descricaoItem = trim((string) $descricaoItem);
@@ -983,6 +991,10 @@ try {
                         'icms_aliquota' => $numericoNfe((string) ($_POST['item_icms_aliquota'][$indice] ?? '0')),
                         'pis_aliquota' => $numericoNfe((string) ($pisAliquotas[$indice] ?? '0')),
                         'cofins_aliquota' => $numericoNfe((string) ($cofinsAliquotas[$indice] ?? '0')),
+                        'cest' => trim((string) ($cests[$indice] ?? '')) ?: null,
+                        'cnpj_fabricante' => preg_replace('/\D+/', '', (string) ($cnpjsFabricante[$indice] ?? '')) ?: null,
+                        'indicador_escala_relevante' => in_array($indicadoresEscalaRelevante[$indice] ?? '', ['S', 'N'], true) ? $indicadoresEscalaRelevante[$indice] : null,
+                        'codigo_beneficio_fiscal' => trim((string) ($codigosBeneficioFiscal[$indice] ?? '')) ?: null,
                     ];
                 }
 
@@ -1194,13 +1206,15 @@ try {
                     $stmtItem = $dbNotas->prepare(
                         'INSERT INTO notas_fiscais_itens (
                             nota_id, produto_servico_id, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade,
-                            quantidade, valor_unitario, valor_total, cean, icms_origem, icms_modalidade_bc, icms_base_calculo,
+                            quantidade, valor_unitario, valor_total, cean, cest, cnpj_fabricante, indicador_escala_relevante,
+                            codigo_beneficio_fiscal, icms_origem, icms_modalidade_bc, icms_base_calculo,
                             icms_aliquota, icms_valor, icms_st_modalidade_bc, icms_st_aliquota, icms_st_base_calculo, icms_st_valor,
                             ipi_cst, ipi_base_calculo, ipi_aliquota, ipi_valor, pis_cst, pis_base_calculo, pis_aliquota, pis_valor,
                             cofins_cst, cofins_base_calculo, cofins_aliquota, cofins_valor
                          ) VALUES (
                             :nota_id, :produto_servico_id, :descricao, :ncm, :cfop, :cst_csosn, :codigo_servico_municipal, :unidade,
-                            :quantidade, :valor_unitario, :valor_total, :cean, :icms_origem, :icms_modalidade_bc, :icms_base_calculo,
+                            :quantidade, :valor_unitario, :valor_total, :cean, :cest, :cnpj_fabricante, :indicador_escala_relevante,
+                            :codigo_beneficio_fiscal, :icms_origem, :icms_modalidade_bc, :icms_base_calculo,
                             :icms_aliquota, :icms_valor, :icms_st_modalidade_bc, :icms_st_aliquota, :icms_st_base_calculo, :icms_st_valor,
                             :ipi_cst, :ipi_base_calculo, :ipi_aliquota, :ipi_valor, :pis_cst, :pis_base_calculo, :pis_aliquota, :pis_valor,
                             :cofins_cst, :cofins_base_calculo, :cofins_aliquota, :cofins_valor
@@ -1215,6 +1229,10 @@ try {
                             'cfop' => $item['cfop'],
                             'cst_csosn' => $item['cst_csosn'],
                             'cean' => $item['cean'] ?? null,
+                            'cest' => $item['cest'] ?? null,
+                            'cnpj_fabricante' => $item['cnpj_fabricante'] ?? null,
+                            'indicador_escala_relevante' => $item['indicador_escala_relevante'] ?? null,
+                            'codigo_beneficio_fiscal' => $item['codigo_beneficio_fiscal'] ?? null,
                             'icms_origem' => $item['icms_origem'] ?? null,
                             'icms_modalidade_bc' => $item['icms_modalidade_bc'] ?? null,
                             'icms_base_calculo' => $item['icms_base_calculo'] ?? null,
@@ -1355,7 +1373,8 @@ try {
 
     $stmt = $dbNotas->query(
         'SELECT id, empresa_emissora_id, tipo, descricao, ncm, cfop, cst_csosn, codigo_servico_municipal, unidade, valor_unitario_padrao,
-                aliquota_icms, aliquota_pis, aliquota_cofins, aliquota_ipi, ipi_cst, cean
+                aliquota_icms, aliquota_pis, aliquota_cofins, aliquota_ipi, ipi_cst, cean,
+                icms_origem, cest, cnpj_fabricante, indicador_escala_relevante, codigo_beneficio_fiscal
          FROM notas_produtos_servicos WHERE ativo = 1 ORDER BY descricao ASC'
     );
     $catalogo = $stmt->fetchAll();
