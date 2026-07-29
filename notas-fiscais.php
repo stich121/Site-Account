@@ -606,9 +606,9 @@ function paginasVisiveisNotas(int $paginaAtual, int $totalPaginas): array
     return $paginas;
 }
 
-function linkFiltroNotas(array $sobrescrever, string $filtroStatus, int $filtroEmpresaId, string $filtroMes): string
+function linkFiltroNotas(array $sobrescrever, string $filtroStatus, int $filtroEmpresaId, string $filtroDataInicio, string $filtroDataFim): string
 {
-    $params = ['mes' => $filtroMes];
+    $params = ['data_inicio' => $filtroDataInicio, 'data_fim' => $filtroDataFim];
     if ($filtroStatus !== '') {
         $params['status'] = $filtroStatus;
     }
@@ -616,8 +616,9 @@ function linkFiltroNotas(array $sobrescrever, string $filtroStatus, int $filtroE
         $params['empresa_emissora_id'] = $filtroEmpresaId;
     }
     $params = array_merge($params, $sobrescrever);
+    $manterMesmoVazio = ['data_inicio', 'data_fim'];
     foreach ($params as $chave => $valor) {
-        if ($chave !== 'mes' && ($valor === '' || $valor === 0)) {
+        if (!in_array($chave, $manterMesmoVazio, true) && ($valor === '' || $valor === 0)) {
             unset($params[$chave]);
         }
     }
@@ -874,13 +875,18 @@ try {
         exit;
     }
 
-    // ZIP com todos os XMLs e PDFs de um mes (so notas autorizadas tem documento fiscal de verdade).
-    if (isset($_GET['zip_mes'])) {
-        $mesZip = trim((string) $_GET['zip_mes']);
-        if (!preg_match('/^\d{4}-\d{2}$/', $mesZip)) {
+    // ZIP com todos os XMLs e PDFs de um periodo (so notas autorizadas tem documento fiscal de verdade).
+    if (isset($_GET['zip_data_inicio']) || isset($_GET['zip_data_fim'])) {
+        $dataInicioZip = trim((string) ($_GET['zip_data_inicio'] ?? ''));
+        $dataFimZip = trim((string) ($_GET['zip_data_fim'] ?? ''));
+        $dataValida = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1 && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+        if (!$dataValida($dataInicioZip) || !$dataValida($dataFimZip)) {
             http_response_code(400);
-            echo 'Mês inválido para o ZIP.';
+            echo 'Informe uma data inicial e final válidas para o ZIP.';
             exit;
+        }
+        if ($dataFimZip < $dataInicioZip) {
+            [$dataInicioZip, $dataFimZip] = [$dataFimZip, $dataInicioZip];
         }
         if (!class_exists('ZipArchive')) {
             http_response_code(500);
@@ -889,11 +895,9 @@ try {
         }
 
         $empresaZipId = (int) ($_GET['empresa_emissora_id'] ?? 0);
-        $inicioMesZip = $mesZip . '-01';
-        $fimMesZip = date('Y-m-t', strtotime($inicioMesZip));
 
         $whereZip = ["n.status = 'autorizada'", 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim'];
-        $bindZip = ['mes_inicio' => $inicioMesZip, 'mes_fim' => $fimMesZip];
+        $bindZip = ['mes_inicio' => $dataInicioZip, 'mes_fim' => $dataFimZip];
         if (!$podeAdministrar) {
             $whereZip[] = 'n.funcionario_id = :funcionario_id';
             $bindZip['funcionario_id'] = $funcionarioId;
@@ -969,7 +973,7 @@ try {
         }
 
         header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="notas-fiscais-' . $mesZip . '.zip"');
+        header('Content-Disposition: attachment; filename="notas-fiscais-' . $dataInicioZip . '_a_' . $dataFimZip . '.zip"');
         header('Content-Length: ' . filesize($arquivoZipTemp));
         readfile($arquivoZipTemp);
         unlink($arquivoZipTemp);
@@ -1080,10 +1084,24 @@ try {
     }
     $filtroStatus = trim($_GET['status'] ?? '');
     $filtroEmpresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
-    // Sem "mes" na URL: mes atual por padrao. Com "mes" vazio (link "Ver todos os meses"): sem filtro de periodo.
-    $filtroMes = isset($_GET['mes']) ? trim((string) $_GET['mes']) : date('Y-m');
-    if ($filtroMes !== '' && !preg_match('/^\d{4}-\d{2}$/', $filtroMes)) {
-        $filtroMes = date('Y-m');
+    $dataValidaFiltro = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1 && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+    // Sem "data_inicio"/"data_fim" na URL: mes atual por padrao. Com os dois vazios
+    // (link "Ver todos os períodos"): sem filtro de data.
+    if (!isset($_GET['data_inicio']) && !isset($_GET['data_fim'])) {
+        $filtroDataInicio = date('Y-m-01');
+        $filtroDataFim = date('Y-m-t');
+    } else {
+        $filtroDataInicio = trim((string) ($_GET['data_inicio'] ?? ''));
+        $filtroDataFim = trim((string) ($_GET['data_fim'] ?? ''));
+        if ($filtroDataInicio !== '' && !$dataValidaFiltro($filtroDataInicio)) {
+            $filtroDataInicio = '';
+        }
+        if ($filtroDataFim !== '' && !$dataValidaFiltro($filtroDataFim)) {
+            $filtroDataFim = '';
+        }
+        if ($filtroDataInicio !== '' && $filtroDataFim !== '' && $filtroDataFim < $filtroDataInicio) {
+            [$filtroDataInicio, $filtroDataFim] = [$filtroDataFim, $filtroDataInicio];
+        }
     }
     $where = [];
     $bind = [];
@@ -1099,11 +1117,16 @@ try {
         $where[] = 'n.empresa_emissora_id = :empresa_emissora_id';
         $bind['empresa_emissora_id'] = $filtroEmpresaId;
     }
-    if ($filtroMes !== '') {
-        $inicioMesFiltro = $filtroMes . '-01';
-        $where[] = 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim';
-        $bind['mes_inicio'] = $inicioMesFiltro;
-        $bind['mes_fim'] = date('Y-m-t', strtotime($inicioMesFiltro));
+    if ($filtroDataInicio !== '' && $filtroDataFim !== '') {
+        $where[] = 'n.data_emissao BETWEEN :data_inicio AND :data_fim';
+        $bind['data_inicio'] = $filtroDataInicio;
+        $bind['data_fim'] = $filtroDataFim;
+    } elseif ($filtroDataInicio !== '') {
+        $where[] = 'n.data_emissao >= :data_inicio';
+        $bind['data_inicio'] = $filtroDataInicio;
+    } elseif ($filtroDataFim !== '') {
+        $where[] = 'n.data_emissao <= :data_fim';
+        $bind['data_fim'] = $filtroDataFim;
     }
     $sqlWhere = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
@@ -1216,7 +1239,9 @@ $usuario = h(nomeExibicao($usuarioRaw));
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                 <h2 style="margin-bottom:0;"><i class="fa-solid fa-list-check"></i> <?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?></h2>
                 <form method="get" class="row-actions">
-                    <input class="select-filtro" type="month" name="mes" value="<?php echo h($filtroMes); ?>" onchange="this.form.submit()">
+                    <input class="select-filtro" type="date" name="data_inicio" value="<?php echo h($filtroDataInicio); ?>" onchange="this.form.submit()" aria-label="Data inicial">
+                    <span class="muted">até</span>
+                    <input class="select-filtro" type="date" name="data_fim" value="<?php echo h($filtroDataFim); ?>" onchange="this.form.submit()" aria-label="Data final">
                     <select class="select-filtro" name="empresa_emissora_id" onchange="this.form.submit()">
                         <option value="">Todas as empresas</option>
                         <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
@@ -1232,12 +1257,16 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 </form>
             </div>
             <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap;">
-                <?php if ($filtroMes !== ''): ?>
-                    <span class="muted">Exibindo notas emitidas em <?php echo h(date('m/Y', strtotime($filtroMes . '-01'))); ?>.</span>
-                    <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['mes' => '', 'pagina' => 1], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>">Ver todos os meses</a>
-                    <a class="btn btn-outline btn-small" href="notas-fiscais?zip_mes=<?php echo h($filtroMes); ?><?php echo $filtroEmpresaId > 0 ? '&empresa_emissora_id=' . $filtroEmpresaId : ''; ?>"><i class="fa-solid fa-file-zipper"></i> Baixar ZIP do mês (XML + PDF)</a>
+                <?php if ($filtroDataInicio !== '' && $filtroDataFim !== ''): ?>
+                    <span class="muted">Exibindo notas emitidas de <?php echo h(date('d/m/Y', strtotime($filtroDataInicio))); ?> a <?php echo h(date('d/m/Y', strtotime($filtroDataFim))); ?>.</span>
+                    <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['data_inicio' => '', 'data_fim' => '', 'pagina' => 1], $filtroStatus, $filtroEmpresaId, $filtroDataInicio, $filtroDataFim)); ?>">Ver todos os períodos</a>
+                    <a class="btn btn-outline btn-small" href="notas-fiscais?zip_data_inicio=<?php echo h($filtroDataInicio); ?>&zip_data_fim=<?php echo h($filtroDataFim); ?><?php echo $filtroEmpresaId > 0 ? '&empresa_emissora_id=' . $filtroEmpresaId : ''; ?>"><i class="fa-solid fa-file-zipper"></i> Baixar ZIP do período (XML + PDF)</a>
+                <?php elseif ($filtroDataInicio !== ''): ?>
+                    <span class="muted">Exibindo notas emitidas a partir de <?php echo h(date('d/m/Y', strtotime($filtroDataInicio))); ?>. Informe também a data final para poder baixar o ZIP.</span>
+                <?php elseif ($filtroDataFim !== ''): ?>
+                    <span class="muted">Exibindo notas emitidas até <?php echo h(date('d/m/Y', strtotime($filtroDataFim))); ?>. Informe também a data inicial para poder baixar o ZIP.</span>
                 <?php else: ?>
-                    <span class="muted">Exibindo notas de todos os meses. Selecione um mês para poder baixar o ZIP com XML/PDF.</span>
+                    <span class="muted">Exibindo notas de todos os períodos. Escolha uma data inicial e final para poder baixar o ZIP com XML/PDF.</span>
                 <?php endif; ?>
             </div>
             <div class="table-wrap">
@@ -1330,7 +1359,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 <div class="row-actions" style="margin-top:1rem; flex-wrap:wrap; align-items:center;">
                     <span class="muted">Página <?php echo $paginaAtualNotas; ?> de <?php echo $totalPaginasNotas; ?> (<?php echo $totalNotasFiltradas; ?> notas no total).</span>
                     <?php if ($paginaAtualNotas > 1): ?>
-                        <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $paginaAtualNotas - 1], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>"><i class="fa-solid fa-chevron-left"></i> Anterior</a>
+                        <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $paginaAtualNotas - 1], $filtroStatus, $filtroEmpresaId, $filtroDataInicio, $filtroDataFim)); ?>"><i class="fa-solid fa-chevron-left"></i> Anterior</a>
                     <?php endif; ?>
                     <?php
                         $paginasVisiveis = paginasVisiveisNotas($paginaAtualNotas, $totalPaginasNotas);
@@ -1343,14 +1372,14 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         <?php if ($numeroPagina === $paginaAtualNotas): ?>
                             <span class="btn btn-small" style="cursor:default;"><?php echo $numeroPagina; ?></span>
                         <?php else: ?>
-                            <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $numeroPagina], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>"><?php echo $numeroPagina; ?></a>
+                            <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $numeroPagina], $filtroStatus, $filtroEmpresaId, $filtroDataInicio, $filtroDataFim)); ?>"><?php echo $numeroPagina; ?></a>
                         <?php endif; ?>
                     <?php
                             $paginaAnteriorRenderizada = $numeroPagina;
                         endforeach;
                     ?>
                     <?php if ($paginaAtualNotas < $totalPaginasNotas): ?>
-                        <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $paginaAtualNotas + 1], $filtroStatus, $filtroEmpresaId, $filtroMes)); ?>">Próxima <i class="fa-solid fa-chevron-right"></i></a>
+                        <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['pagina' => $paginaAtualNotas + 1], $filtroStatus, $filtroEmpresaId, $filtroDataInicio, $filtroDataFim)); ?>">Próxima <i class="fa-solid fa-chevron-right"></i></a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
