@@ -302,6 +302,9 @@ Não versionar:
 - Correção do identificador da DPS.
 - Edição e reprocessamento de NFS-e rejeitada.
 - NBS automática ou filtrada pelo serviço.
+- Correção do grupo `pTotTrib`/`vTotTrib`: quando só parte dos tributos aproximados (federal/estadual/municipal) era informada, o campo faltante era omitido do XML em vez de enviado como zero, quebrando o schema (erro E1235).
+- Inclusão da Inscrição Municipal (`IM`) do prestador na DPS, exigida pelo Sefin Nacional quando o CNC NFS-e do município emissor está vinculado a ela (erro E0116); validação no servidor passou a exigir a IM cadastrada na empresa emissora antes de montar a DPS.
+- Diagnóstico do erro E0312 (código de tributação não administrado pelo município na data de competência): a causa mais provável não é o código LC 116 em si nem a adesão do município ao Sistema Nacional, e sim o campo "Município da prestação" (`cLocPrestacao`) estar apontando para uma cidade diferente da do prestador em serviços cujo ISSQN é devido no local do estabelecimento prestador (como contabilidade, fora das exceções do art. 3º da LC 116).
 
 ## Limites e cuidados
 
@@ -319,4 +322,4 @@ Não versionar:
 
 ---
 
-Última consolidação: 28 de julho de 2026.
+Última consolidação: 28 de julho de 2026 (correções de emissão NFS-e: `pTotTrib`/`vTotTrib` incompletos e IM do prestador ausente).
