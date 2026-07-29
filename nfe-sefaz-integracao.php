@@ -10,6 +10,7 @@
 // criptografarSegredo/descriptografarSegredo de config_app_key.php.
 
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/config_app_key.php';
 require_once __DIR__ . '/nfse-nacional-integracao.php';
 require_once __DIR__ . '/nfe-xml-fiscal.php';
 
