@@ -1138,6 +1138,8 @@ try {
                 $erro = 'Configure o regime tributário (CRT) da empresa emissora antes de emitir NF-e.';
             } elseif ($tipoNota === 'nfe' && empty($clienteSelecionado['uf'])) {
                 $erro = 'Informe a UF do cliente destinatário antes de emitir NF-e.';
+            } elseif ($tipoNota === 'nfe' && (empty($clienteSelecionado['logradouro']) || empty($clienteSelecionado['numero']) || empty($clienteSelecionado['bairro']) || empty($clienteSelecionado['municipio']) || !preg_match('/^\d{7}$/', (string) ($clienteSelecionado['codigo_ibge_municipio'] ?? '')) || empty($clienteSelecionado['cep']))) {
+                $erro = 'Complete o endereço do cliente destinatário (logradouro, número, bairro, município, código IBGE e CEP) antes de emitir NF-e.';
             } elseif ($tipoNota === 'nfe' && $erroDifalNfe !== null) {
                 $erro = $erroDifalNfe;
             } elseif (empty($itensValidos)) {

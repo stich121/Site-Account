@@ -733,9 +733,46 @@ try {
             $nfseNota = $stmt->fetch() ?: null;
         }
 
+        if ($nota['tipo_nota'] === 'nfe') {
+            try {
+                $stmt = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $nota['empresa_emissora_id']]);
+                $empresaPreview = $stmt->fetch();
+                $stmt = $dbNotas->prepare('SELECT * FROM notas_clientes WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $nota['cliente_id']]);
+                $clientePreview = $stmt->fetch();
+                $stmt = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfe WHERE nota_id = :nota_id LIMIT 1');
+                $stmt->execute(['nota_id' => $notaId]);
+                $nfeExtraPreview = $stmt->fetch() ?: [];
+
+                if (!$empresaPreview || !$clientePreview || empty($itensNota)) {
+                    throw new RuntimeException('Faltam dados da empresa, do cliente ou dos itens para montar a prévia.');
+                }
+
+                $notaPreview = $nota;
+                $notaPreview['serie'] = $nota['serie'] ?? '1';
+                $montagem = nfeMontarXml($notaPreview, $empresaPreview, $clientePreview, $nfeExtraPreview, $itensNota);
+                if (!empty($montagem['erros'])) {
+                    throw new RuntimeException(implode(' ', array_map('strval', $montagem['erros'])));
+                }
+
+                $pdf = gerarDanfePdf($montagem['xml']);
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="conferencia-nfe-' . $notaId . '.pdf"');
+                echo $pdf;
+                exit;
+            } catch (Throwable $e) {
+                // Se a previa do DANFE nao puder ser montada (dados incompletos demais para
+                // um rascunho bem no inicio, por exemplo), cai para o resumo simples abaixo
+                // em vez de quebrar a conferencia por completo.
+                $avisoPreviewIndisponivel = 'Prévia em formato DANFE indisponível (' . $e->getMessage() . '); exibindo resumo simples.';
+            }
+        }
+
         $linhas = [
             '*** RASCUNHO - SEM VALOR FISCAL ***',
             'Documento interno de conferencia. Nao e uma nota fiscal emitida.',
+            $avisoPreviewIndisponivel ?? '',
             '',
             'Tipo: ' . ($nota['tipo_nota'] === 'nfse' ? 'NFS-e (servico)' : 'NF-e (produto)'),
             'Numero interno: ' . $nota['numero_interno'] . ' | Status: ' . rotuloStatusNota($nota['status']),
