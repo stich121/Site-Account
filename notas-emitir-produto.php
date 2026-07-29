@@ -14,17 +14,35 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/notas-fiscais.css">
     <style>
-        .itens-table .valor-calculado {
+        .item-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .item-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .item-card-header strong {
+            font-family: var(--font-titles);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+        .item-card .valor-calculado {
             display: block;
-            margin-top: 0.25rem;
-            font-size: 0.72rem;
+            margin-top: 0.35rem;
+            font-size: 0.78rem;
             color: var(--primary);
             white-space: nowrap;
         }
-        .itens-table select.item-pis-cst,
-        .itens-table select.item-cofins-cst,
-        .itens-table select.item-cst {
-            margin-bottom: 0.35rem;
+        .item-card select.item-pis-cst,
+        .item-card select.item-cofins-cst {
+            margin-bottom: 0.5rem;
         }
     </style>
 </head>
@@ -367,31 +385,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     As listas de situação tributária abaixo já refletem esse regime.
                                 </p>
                             <?php endif; ?>
-                            <div class="table-wrap">
-                                <table class="itens-table" id="tabelaItens">
-                                    <thead>
-                                        <tr>
-                                            <th style="min-width: 200px;">Catálogo (opcional)</th>
-                                            <th style="min-width: 180px;">Descrição</th>
-                                            <th style="min-width: 100px;">NCM</th>
-                                            <th style="min-width: 140px;">CFOP</th>
-                                            <th style="min-width: 240px;">Situação tributária ICMS</th>
-                                            <th style="min-width: 80px;">Orig.</th>
-                                            <th style="min-width: 110px;">ICMS</th>
-                                            <th style="min-width: 110px;">cEAN</th>
-                                            <th style="min-width: 70px;">Unid.</th>
-                                            <th style="min-width: 70px;">Qtd.</th>
-                                            <th style="min-width: 100px;">Valor unit.</th>
-                                            <th style="min-width: 70px;">IPI CST</th>
-                                            <th style="min-width: 110px;">IPI</th>
-                                            <th style="min-width: 240px;">PIS</th>
-                                            <th style="min-width: 240px;">COFINS</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="corpoItens"></tbody>
-                                </table>
-                            </div>
+                            <div id="corpoItens"></div>
                             <button class="btn btn-outline btn-small" type="button" id="btnAddItem"><i class="fa-solid fa-plus"></i> Adicionar item</button>
 
                             <datalist id="datalistCfop">
@@ -633,7 +627,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
         function recalcularTotal() {
             let total = 0;
-            corpoItens.querySelectorAll('tr').forEach(function (linha) {
+            corpoItens.querySelectorAll('.item-card').forEach(function (linha) {
                 const qtd = numeroDoCampo(linha, '.item-quantidade');
                 const valorUnit = numeroDoCampo(linha, '.item-valor');
                 total += qtd * valorUnit;
@@ -725,57 +719,116 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
         }
 
+        let contadorItens = 0;
+
         function adicionarLinhaItem() {
+            contadorItens++;
             const empresaId = empresaSelect ? empresaSelect.value : '';
-            const linha = document.createElement('tr');
+            const linha = document.createElement('div');
+            linha.className = 'item-card';
             linha.innerHTML =
-                '<td><select class="item-catalogo">' + montarOpcoesCatalogo(empresaId) + '</select></td>' +
-                '<td><input type="text" name="item_descricao[]" class="item-descricao" list="datalistItensDescricao" autocomplete="off" required></td>' +
-                '<td><input type="text" name="item_ncm[]" class="item-ncm" maxlength="8" placeholder="8 dígitos"></td>' +
-                '<td><input type="text" name="item_cfop[]" class="item-cfop" list="datalistCfop" autocomplete="off" placeholder="Ex.: 5102"></td>' +
-                '<td><select name="item_cst[]" class="item-cst">' + opcoesCstIcmsHtml + '</select></td>' +
-                '<td><select name="item_icms_origem[]" class="item-icms-origem">' +
-                    '<option value="0" selected>0 Nacional</option>' +
-                    '<option value="1">1 Estrangeira - importação direta</option>' +
-                    '<option value="2">2 Estrangeira - mercado interno</option>' +
-                    '<option value="3">3 Nacional, imp. &gt;40%</option>' +
-                    '<option value="4">4 Nacional, PPB</option>' +
-                    '<option value="5">5 Nacional, imp. &lt;=40%</option>' +
-                    '<option value="6">6 Estrangeira, imp. direta s/similar</option>' +
-                    '<option value="7">7 Estrangeira, mercado interno s/similar</option>' +
-                    '<option value="8">8 Nacional, imp. &gt;70%</option>' +
-                '</select></td>' +
-                '<td>' +
-                    '<input type="text" name="item_icms_aliquota[]" class="item-icms-aliquota" value="0" placeholder="% ICMS">' +
-                    '<span class="valor-calculado item-icms-valor-calc">R$ 0,00</span>' +
-                '</td>' +
-                '<td><input type="text" name="item_cean[]" class="item-cean" placeholder="Opcional"></td>' +
-                '<td><input type="text" name="item_unidade[]" class="item-unidade" value="UN"></td>' +
-                '<td><input type="text" name="item_quantidade[]" class="item-quantidade" value="1"></td>' +
-                '<td><input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00"></td>' +
-                '<td><input type="text" name="item_ipi_cst[]" class="item-ipi-cst" placeholder="Opcional"></td>' +
-                '<td>' +
-                    '<input type="text" name="item_ipi_aliquota[]" class="item-ipi-aliquota" value="0" placeholder="% IPI">' +
-                    '<span class="valor-calculado item-ipi-valor-calc">R$ 0,00</span>' +
-                '</td>' +
-                '<td>' +
-                    '<select name="item_pis_cst[]" class="item-pis-cst">' + opcoesCstPisCofinsHtml + '</select>' +
-                    '<input type="text" name="item_pis_aliquota[]" class="item-pis-aliquota" value="0" placeholder="% PIS">' +
-                    '<span class="valor-calculado item-pis-valor-calc">R$ 0,00</span>' +
-                '</td>' +
-                '<td>' +
-                    '<select name="item_cofins_cst[]" class="item-cofins-cst">' + opcoesCstPisCofinsHtml + '</select>' +
-                    '<input type="text" name="item_cofins_aliquota[]" class="item-cofins-aliquota" value="0" placeholder="% COFINS">' +
-                    '<span class="valor-calculado item-cofins-valor-calc">R$ 0,00</span>' +
-                '</td>' +
-                '<td>' +
-                    '<input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
-                    '<input type="hidden" name="item_cest[]" class="item-cest">' +
-                    '<input type="hidden" name="item_cnpj_fabricante[]" class="item-cnpj-fabricante">' +
-                    '<input type="hidden" name="item_indicador_escala_relevante[]" class="item-indicador-escala-relevante">' +
-                    '<input type="hidden" name="item_codigo_beneficio_fiscal[]" class="item-codigo-beneficio-fiscal">' +
-                    '<button type="button" class="btn btn-danger btn-small btn-remover-item"><i class="fa-solid fa-trash"></i></button>' +
-                '</td>';
+                '<div class="item-card-header">' +
+                    '<strong>Item #' + contadorItens + '</strong>' +
+                    '<button type="button" class="btn btn-danger btn-small btn-remover-item"><i class="fa-solid fa-trash"></i> Remover item</button>' +
+                '</div>' +
+                '<div class="form-grid">' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>Catálogo (opcional)</label>' +
+                        '<select class="item-catalogo">' + montarOpcoesCatalogo(empresaId) + '</select>' +
+                    '</div>' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>Descrição <span class="marca-obrigatoria">*</span></label>' +
+                        '<input type="text" name="item_descricao[]" class="item-descricao" list="datalistItensDescricao" autocomplete="off" required>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>NCM</label>' +
+                        '<input type="text" name="item_ncm[]" class="item-ncm" maxlength="8" placeholder="8 dígitos">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>CFOP</label>' +
+                        '<input type="text" name="item_cfop[]" class="item-cfop" list="datalistCfop" autocomplete="off" placeholder="Ex.: 5102">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>cEAN</label>' +
+                        '<input type="text" name="item_cean[]" class="item-cean" placeholder="Opcional">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Unidade</label>' +
+                        '<input type="text" name="item_unidade[]" class="item-unidade" value="UN">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Quantidade</label>' +
+                        '<input type="text" name="item_quantidade[]" class="item-quantidade" value="1">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Valor unitário</label>' +
+                        '<input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00">' +
+                    '</div>' +
+                '</div>' +
+                '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-scale-balanced"></i> ICMS</h3>' +
+                '<div class="form-grid">' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>Situação tributária</label>' +
+                        '<select name="item_cst[]" class="item-cst">' + opcoesCstIcmsHtml + '</select>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Origem da mercadoria</label>' +
+                        '<select name="item_icms_origem[]" class="item-icms-origem">' +
+                            '<option value="0" selected>0 Nacional</option>' +
+                            '<option value="1">1 Estrangeira - importação direta</option>' +
+                            '<option value="2">2 Estrangeira - mercado interno</option>' +
+                            '<option value="3">3 Nacional, imp. &gt;40%</option>' +
+                            '<option value="4">4 Nacional, PPB</option>' +
+                            '<option value="5">5 Nacional, imp. &lt;=40%</option>' +
+                            '<option value="6">6 Estrangeira, imp. direta s/similar</option>' +
+                            '<option value="7">7 Estrangeira, mercado interno s/similar</option>' +
+                            '<option value="8">8 Nacional, imp. &gt;70%</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota ICMS (%)</label>' +
+                        '<input type="text" name="item_icms_aliquota[]" class="item-icms-aliquota" value="0">' +
+                        '<span class="valor-calculado item-icms-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                '</div>' +
+                '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-industry"></i> IPI</h3>' +
+                '<div class="form-grid">' +
+                    '<div class="field">' +
+                        '<label>IPI - CST</label>' +
+                        '<input type="text" name="item_ipi_cst[]" class="item-ipi-cst" placeholder="Opcional">' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota IPI (%)</label>' +
+                        '<input type="text" name="item_ipi_aliquota[]" class="item-ipi-aliquota" value="0">' +
+                        '<span class="valor-calculado item-ipi-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                '</div>' +
+                '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-sack-dollar"></i> PIS e COFINS</h3>' +
+                '<div class="form-grid">' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>Situação tributária do PIS</label>' +
+                        '<select name="item_pis_cst[]" class="item-pis-cst">' + opcoesCstPisCofinsHtml + '</select>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota PIS (%)</label>' +
+                        '<input type="text" name="item_pis_aliquota[]" class="item-pis-aliquota" value="0">' +
+                        '<span class="valor-calculado item-pis-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                    '<div class="field" style="grid-column: 1 / -1;">' +
+                        '<label>Situação tributária do COFINS</label>' +
+                        '<select name="item_cofins_cst[]" class="item-cofins-cst">' + opcoesCstPisCofinsHtml + '</select>' +
+                    '</div>' +
+                    '<div class="field">' +
+                        '<label>Alíquota COFINS (%)</label>' +
+                        '<input type="text" name="item_cofins_aliquota[]" class="item-cofins-aliquota" value="0">' +
+                        '<span class="valor-calculado item-cofins-valor-calc">R$ 0,00</span>' +
+                    '</div>' +
+                '</div>' +
+                '<input type="hidden" name="item_produto_id[]" class="item-produto-id" value="0">' +
+                '<input type="hidden" name="item_cest[]" class="item-cest">' +
+                '<input type="hidden" name="item_cnpj_fabricante[]" class="item-cnpj-fabricante">' +
+                '<input type="hidden" name="item_indicador_escala_relevante[]" class="item-indicador-escala-relevante">' +
+                '<input type="hidden" name="item_codigo_beneficio_fiscal[]" class="item-codigo-beneficio-fiscal">';
 
             corpoItens.appendChild(linha);
 
