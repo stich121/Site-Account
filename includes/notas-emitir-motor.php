@@ -505,6 +505,11 @@ function prepararColunasImpostoProdutosServicosNotas(PDO $db): void
         'ipi_cst' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN ipi_cst VARCHAR(2) NULL AFTER cst_csosn',
         'aliquota_ipi' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN aliquota_ipi DECIMAL(5,2) NULL AFTER ipi_cst',
         'cean' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cean VARCHAR(14) NULL AFTER codigo_interno',
+        'icms_origem' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN icms_origem TINYINT UNSIGNED NULL AFTER cst_csosn',
+        'cest' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cest VARCHAR(7) NULL AFTER ncm',
+        'cnpj_fabricante' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN cnpj_fabricante VARCHAR(20) NULL AFTER cest',
+        'indicador_escala_relevante' => "ALTER TABLE notas_produtos_servicos ADD COLUMN indicador_escala_relevante ENUM('S','N') NULL AFTER cnpj_fabricante",
+        'codigo_beneficio_fiscal' => 'ALTER TABLE notas_produtos_servicos ADD COLUMN codigo_beneficio_fiscal VARCHAR(10) NULL AFTER indicador_escala_relevante',
     ];
     foreach ($colunas as $coluna => $sql) {
         if (!colunaExisteNotas($db, 'notas_produtos_servicos', $coluna)) {
