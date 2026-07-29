@@ -682,7 +682,9 @@ try {
                     $sucesso = 'NFS-e consultada e XML fiscal atualizado.';
                 } elseif ($acao === 'cancelar_nfse' && $notaAtual['tipo_nota'] === 'nfse' && $notaAtual['status'] === 'autorizada') {
                     $motivo = trim((string) ($_POST['motivo_cancelamento'] ?? ''));
-                    $evento = cancelarNfseRemota($notaAtual, $notaAtual['ambiente'], (string) $notaAtual['chave_acesso'], $motivo, 1);
+                    $empresaParaEvento = $notaAtual;
+                    $empresaParaEvento['cnpj'] = $notaAtual['empresa_cnpj'];
+                    $evento = cancelarNfseRemota($empresaParaEvento, $notaAtual['ambiente'], (string) $notaAtual['chave_acesso'], $motivo, 1);
                     $arquivoEvento = salvarDocumentoFiscalPrivado($notaId, 'cancelamento-101101', $evento['xml_evento'], 'xml');
                     $stmt = $dbNotas->prepare('UPDATE notas_fiscais SET status = \'cancelada\', motivo_rejeicao = NULL WHERE id = :id AND status = \'autorizada\'');
                     $stmt->execute(['id' => $notaId]);
