@@ -84,7 +84,8 @@ $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ??
 
 <nav class="notas-nav" aria-label="Navegação da área fiscal">
     <a class="<?php echo $abaClasse('notas'); ?>" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-    <a class="<?php echo $abaClasse('emitir'); ?>" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota</a>
+    <a class="<?php echo $abaClasse('emitir_produto'); ?>" href="notas-emitir-produto"><i class="fa-solid fa-box"></i> Emitir NF-e</a>
+    <a class="<?php echo $abaClasse('emitir_servico'); ?>" href="notas-emitir-servico"><i class="fa-solid fa-file-circle-plus"></i> Emitir NFS-e</a>
     <a class="<?php echo $abaClasse('clientes'); ?>" href="notas-clientes"><i class="fa-solid fa-users"></i> Clientes</a>
     <a class="<?php echo $abaClasse('certificados'); ?>" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
     <?php if ($podeAdministrar): ?>

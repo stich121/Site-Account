@@ -416,7 +416,7 @@ $csrf = h($_SESSION['csrf_processar_fila_nfse'] ?? '');
                 </button>
                 <div class="menu-dropdown" id="menuDropdown">
                     <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                    <a class="btn btn-outline" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Emitir nota fiscal</a>
+                    <a class="btn btn-outline" href="notas-emitir-servico"><i class="fa-solid fa-file-circle-plus"></i> Emitir NFS-e</a>
                     <a class="btn btn-outline" href="notas-clientes"><i class="fa-solid fa-user-plus"></i> Clientes</a>
                     <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
                     <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>

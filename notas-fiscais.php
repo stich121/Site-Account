@@ -784,7 +784,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
         </div>
 
         <section class="panel">
-            <a class="btn" href="notas-emitir"><i class="fa-solid fa-file-circle-plus"></i> Nova nota (emitir)</a>
+            <div class="row-actions">
+                <a class="btn" href="notas-emitir-produto"><i class="fa-solid fa-box"></i> Emitir NF-e (produto)</a>
+                <a class="btn" href="notas-emitir-servico"><i class="fa-solid fa-file-circle-plus"></i> Emitir NFS-e (serviço)</a>
+            </div>
         </section>
 
         <section class="panel">
@@ -841,7 +844,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                     ?>
                                     <div class="row-actions">
                                         <?php if ($podeEditarNota): ?>
-                                            <a class="btn btn-outline btn-small" href="notas-emitir?editar=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                                            <a class="btn btn-outline btn-small" href="notas-emitir-servico?editar=<?php echo h((string) $nota['id']); ?>"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
                                         <?php endif; ?>
                                         <a class="btn btn-outline btn-small" href="notas-fiscais?pdf=<?php echo h((string) $nota['id']); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Conferência</a>
                                         <?php if ($temMaisAcoes): ?>

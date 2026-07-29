@@ -153,7 +153,10 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | Arquivo | Finalidade |
 |---|---|
 | `notas-fiscais.php` | Painel e listagem de notas |
-| `notas-emitir.php` | Criação e correção de notas |
+| `notas-emitir-produto.php` | Emissão de NF-e (produto) |
+| `notas-emitir-servico.php` | Emissão e correção de NFS-e (serviço) |
+| `includes/notas-emitir-motor.php` | Validação e persistência compartilhadas por NF-e e NFS-e |
+| `notas-emitir.php` | Redireciona links antigos para a tela correta (NF-e ou NFS-e) |
 | `notas-empresas-emissoras.php` | Empresas prestadoras |
 | `notas-certificados.php` | Certificados A1 |
 | `notas-produtos-servicos.php` | Produtos e serviços |
