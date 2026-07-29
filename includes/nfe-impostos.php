@@ -151,6 +151,19 @@ function nfeCalcularImpostosItem(array $itemBruto, array $empresa, string $cfop,
         $aliquotaIbsUf = round((float) ($itemBruto['ibs_uf_aliquota'] ?? 0), 4);
         $aliquotaIbsMun = round((float) ($itemBruto['ibs_mun_aliquota'] ?? 0), 4);
         $aliquotaCbs = round((float) ($itemBruto['cbs_aliquota'] ?? 0), 4);
+
+        // Ano-teste da Reforma Tributaria (LC 214/2025 art. 346, NT 2025.002 v1.20): para
+        // NF-e/NFC-e emitidas em 2026 a SEFAZ exige pIBSUF EXATAMENTE 0,1% (rejeicao 1026),
+        // pIBSMun EXATAMENTE 0% (rejeicao 321/1036) e pCBS EXATAMENTE 0,9% (rejeicao 1037) -
+        // qualquer outro valor, mesmo por arredondamento, rejeita a nota. Nao confiamos no
+        // valor digitado no formulario para esses tres campos neste periodo - a sugestao da
+        // tela e so um placeholder. Revisar quando a proxima fase da reforma (2027+) definir
+        // novas aliquotas-teste.
+        if ((int) date('Y') === 2026) {
+            $aliquotaIbsUf = 0.1;
+            $aliquotaIbsMun = 0.0;
+            $aliquotaCbs = 0.9;
+        }
         $resultado['ibscbs_cst'] = trim((string) ($itemBruto['ibscbs_cst'] ?? '')) ?: '000';
         $resultado['ibscbs_cclasstrib'] = $ibscbsCclasstrib;
         $resultado['ibscbs_base_calculo'] = $baseIbscbs;
