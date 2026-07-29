@@ -3180,6 +3180,55 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             color: var(--primary);
         }
 
+        .admin-menu-group {
+            display: grid;
+            gap: 0.2rem;
+        }
+
+        .admin-menu-group-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            width: 100%;
+            margin: 0.75rem 0 0.15rem;
+            padding: 0.2rem 0.1rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .admin-menu-group-toggle:hover,
+        .admin-menu-group-toggle:focus {
+            color: var(--primary);
+            outline: none;
+        }
+
+        .admin-menu-group-toggle i {
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+        }
+
+        .admin-menu-group.open .admin-menu-group-toggle i {
+            transform: rotate(180deg);
+        }
+
+        .admin-menu-group-links {
+            display: none;
+            flex-direction: column;
+            gap: 0.35rem;
+            overflow: hidden;
+        }
+
+        .admin-menu-group.open .admin-menu-group-links {
+            display: flex;
+        }
+
         .admin-content {
             display: grid;
             gap: 1.25rem;
@@ -3594,10 +3643,24 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             <button class="admin-sidebar-close" type="button" id="adminSidebarClose" aria-label="Fechar menu">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-            <div class="admin-sidebar-title">Notas Fiscais</div>
-            <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
-            <div class="admin-sidebar-title">Programas internos</div>
-            <a class="admin-menu-link active" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
+            <div class="admin-menu-group" id="grpFuncNotas">
+                <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpFuncNotasLinks">
+                    <span>Notas Fiscais</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="admin-menu-group-links" id="grpFuncNotasLinks">
+                    <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
+                </div>
+            </div>
+            <div class="admin-menu-group" id="grpFuncProgramas">
+                <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpFuncProgramasLinks">
+                    <span>Programas internos</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="admin-menu-group-links" id="grpFuncProgramasLinks">
+                    <a class="admin-menu-link active" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
+                </div>
+            </div>
         </aside>
     <?php endif; ?>
     <?php if ($podeAdministrar): ?>
@@ -3622,21 +3685,49 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                 <i class="fa-solid fa-xmark"></i>
             </button>
             <a class="admin-menu-link active" href="#painel-geral"><i class="fa-solid fa-chart-column"></i> Dashboard</a>
-            <div class="admin-sidebar-title">Gestão de ponto</div>
-            <a class="admin-menu-link" href="#solicitacoes-ajuste-admin"><i class="fa-solid fa-clipboard-check"></i> Solicitações</a>
-            <a class="admin-menu-link" href="apuracao-ponto"><i class="fa-regular fa-clock"></i> Apuração de ponto</a>
-            <a class="admin-menu-link" href="banco-horas"><i class="fa-solid fa-scale-balanced"></i> Banco de Horas</a>
-            <a class="admin-menu-link" href="afastamentos"><i class="fa-regular fa-calendar-xmark"></i> Afastamentos</a>
-            <a class="admin-menu-link" href="tipos-afastamentos"><i class="fa-solid fa-sliders"></i> Tipos de afastamento</a>
-            <div class="admin-sidebar-title">Notas Fiscais</div>
-            <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
-            <div class="admin-sidebar-title">Programas internos</div>
-            <a class="admin-menu-link" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
-            <div class="admin-sidebar-title">Relatórios</div>
-            <a class="admin-menu-link" href="historico-espelho"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de espelho</a>
-            <a class="admin-menu-link" href="historico-download"><i class="fa-solid fa-download"></i> Histórico de download</a>
-            <a class="admin-menu-link" href="<?php echo h($csvAdminUrl); ?>"><i class="fa-solid fa-file-csv"></i> Exportar CSV</a>
-            <a class="admin-menu-link" href="<?php echo h($pdfAdminUrl); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</a>
+            <div class="admin-menu-group" id="grpAdminPonto">
+                <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpAdminPontoLinks">
+                    <span>Gestão de ponto</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="admin-menu-group-links" id="grpAdminPontoLinks">
+                    <a class="admin-menu-link" href="#solicitacoes-ajuste-admin"><i class="fa-solid fa-clipboard-check"></i> Solicitações</a>
+                    <a class="admin-menu-link" href="apuracao-ponto"><i class="fa-regular fa-clock"></i> Apuração de ponto</a>
+                    <a class="admin-menu-link" href="banco-horas"><i class="fa-solid fa-scale-balanced"></i> Banco de Horas</a>
+                    <a class="admin-menu-link" href="afastamentos"><i class="fa-regular fa-calendar-xmark"></i> Afastamentos</a>
+                    <a class="admin-menu-link" href="tipos-afastamentos"><i class="fa-solid fa-sliders"></i> Tipos de afastamento</a>
+                </div>
+            </div>
+            <div class="admin-menu-group" id="grpAdminNotas">
+                <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpAdminNotasLinks">
+                    <span>Notas Fiscais</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="admin-menu-group-links" id="grpAdminNotasLinks">
+                    <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
+                </div>
+            </div>
+            <div class="admin-menu-group" id="grpAdminProgramas">
+                <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpAdminProgramasLinks">
+                    <span>Programas internos</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="admin-menu-group-links" id="grpAdminProgramasLinks">
+                    <a class="admin-menu-link" href="programas-funcionarios"><i class="fa-solid fa-laptop-code"></i> Fiscal e Contábil</a>
+                </div>
+            </div>
+            <div class="admin-menu-group" id="grpAdminRelatorios">
+                <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpAdminRelatoriosLinks">
+                    <span>Relatórios</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="admin-menu-group-links" id="grpAdminRelatoriosLinks">
+                    <a class="admin-menu-link" href="historico-espelho"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de espelho</a>
+                    <a class="admin-menu-link" href="historico-download"><i class="fa-solid fa-download"></i> Histórico de download</a>
+                    <a class="admin-menu-link" href="<?php echo h($csvAdminUrl); ?>"><i class="fa-solid fa-file-csv"></i> Exportar CSV</a>
+                    <a class="admin-menu-link" href="<?php echo h($pdfAdminUrl); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</a>
+                </div>
+            </div>
         </aside>
     <?php endif; ?>
     <div class="shell">
@@ -4389,6 +4480,15 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
 
         adminSidebar?.querySelectorAll('a[href^="#"]').forEach(link => {
             link.addEventListener('click', () => setAdminSidebar(false));
+        });
+
+        adminSidebar?.querySelectorAll('[data-menu-group-toggle]').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                const group = toggle.closest('.admin-menu-group');
+                if (!group) return;
+                const isOpen = group.classList.toggle('open');
+                toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            });
         });
 
         const toggleSolicitacoesAjuste = document.getElementById('toggleSolicitacoesAjuste');
