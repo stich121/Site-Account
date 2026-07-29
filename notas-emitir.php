@@ -1139,10 +1139,12 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                             <label for="empresa_emissora_id">Empresa emissora</label>
                             <select id="empresa_emissora_id" name="empresa_emissora_id" required>
                                 <option value="">Selecione</option>
+                                <?php $empresaEmissoraPadrao = (int) ($_SESSION['nfse_empresa_emissora_ativa_id'] ?? 0); ?>
                                 <?php foreach ($empresasAtivas as $empresa): ?>
-                                    <option value="<?php echo h((string) $empresa['id']); ?>" data-ibge="<?php echo h($empresa['codigo_ibge_municipio'] ?? ''); ?>" data-ambiente="<?php echo h($empresa['ambiente_emissao'] ?? 'homologacao'); ?>"><?php echo h($empresa['razao_social']); ?> (<?php echo h(($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)</option>
+                                    <option value="<?php echo h((string) $empresa['id']); ?>" data-ibge="<?php echo h($empresa['codigo_ibge_municipio'] ?? ''); ?>" data-ambiente="<?php echo h($empresa['ambiente_emissao'] ?? 'homologacao'); ?>" <?php echo (!$notaEmEdicao && $empresaEmissoraPadrao === (int) $empresa['id']) ? 'selected' : ''; ?>><?php echo h($empresa['razao_social']); ?> (<?php echo h(($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'); ?>)</option>
                                 <?php endforeach; ?>
                             </select>
+                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">Definida pela seleção "Emitindo por" no topo da página. <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
                         </div>
                         <div class="field">
                             <label for="tipo_nota">Tipo de nota</label>
@@ -2031,6 +2033,9 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                 const opcao = empresaSelect.options[empresaSelect.selectedIndex];
                 if (opcao && opcao.dataset.ibge) selecionarMunicipioPorCodigo(opcao.dataset.ibge);
             });
+            if (empresaSelect.value && !(dadosEdicaoNota && dadosEdicaoNota.nota)) {
+                empresaSelect.dispatchEvent(new Event('change'));
+            }
         }
 
         document.querySelectorAll('[data-form-jump]').forEach(function (botao) {

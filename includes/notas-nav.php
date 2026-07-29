@@ -16,11 +16,57 @@ $podeAdministrar = $podeAdministrar ?? false;
 $abaClasse = static function (string $chave) use ($paginaAtivaNotas): string {
     return $chave === $paginaAtivaNotas ? 'ativo' : '';
 };
+
+$empresasEmissorasNav = [];
+$dbNotasNav = null;
+if (isset($dbNotas) && $dbNotas instanceof PDO) {
+    $dbNotasNav = $dbNotas;
+} elseif (isset($db) && $db instanceof PDO) {
+    $dbNotasNav = $db;
+}
+if ($dbNotasNav !== null) {
+    try {
+        $empresasEmissorasNav = $dbNotasNav->query(
+            'SELECT id, razao_social, ambiente_emissao FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
+        )->fetchAll();
+    } catch (PDOException $e) {
+        $empresasEmissorasNav = [];
+    }
+}
+
+if (empty($_SESSION['csrf_notas_empresa_ativa'])) {
+    $_SESSION['csrf_notas_empresa_ativa'] = bin2hex(random_bytes(32));
+}
+$csrfEmpresaAtiva = htmlspecialchars($_SESSION['csrf_notas_empresa_ativa'], ENT_QUOTES, 'UTF-8');
+
+$idsEmpresasNav = array_map(static fn(array $empresa): int => (int) $empresa['id'], $empresasEmissorasNav);
+if (
+    empty($_SESSION['nfse_empresa_emissora_ativa_id'])
+    || !in_array((int) $_SESSION['nfse_empresa_emissora_ativa_id'], $idsEmpresasNav, true)
+) {
+    $_SESSION['nfse_empresa_emissora_ativa_id'] = $idsEmpresasNav[0] ?? 0;
+}
+$empresaEmissoraAtivaId = (int) $_SESSION['nfse_empresa_emissora_ativa_id'];
+$redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ?? 'notas-fiscais'), ENT_QUOTES, 'UTF-8');
 ?>
 <header class="topbar">
     <a class="brand" href="painel" aria-label="Voltar para o painel">
         <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
     </a>
+    <?php if (!empty($empresasEmissorasNav)): ?>
+        <form class="empresa-ativa-form" method="post" action="notas-selecionar-empresa" aria-label="Selecionar empresa prestadora para emissão">
+            <input type="hidden" name="csrf" value="<?php echo $csrfEmpresaAtiva; ?>">
+            <input type="hidden" name="redirecionar_para" value="<?php echo $redirecionarEmpresaAtiva; ?>">
+            <label for="empresaEmissoraAtiva" class="empresa-ativa-label"><i class="fa-solid fa-building"></i> Emitindo por</label>
+            <select id="empresaEmissoraAtiva" name="empresa_emissora_id" onchange="this.form.submit()">
+                <?php foreach ($empresasEmissorasNav as $empresaNav): ?>
+                    <option value="<?php echo (int) $empresaNav['id']; ?>" <?php echo $empresaEmissoraAtivaId === (int) $empresaNav['id'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($empresaNav['razao_social'], ENT_QUOTES, 'UTF-8'); ?> (<?php echo ($empresaNav['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'; ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    <?php endif; ?>
     <div class="menu-hamburguer">
         <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
             <i class="fa-solid fa-bars"></i> Menu
