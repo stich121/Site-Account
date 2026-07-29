@@ -941,6 +941,7 @@ try {
         }
     }
     $filtroStatus = trim($_GET['status'] ?? '');
+    $filtroEmpresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
     $where = [];
     $bind = [];
     if (!$podeAdministrar) {
@@ -951,7 +952,14 @@ try {
         $where[] = 'n.status = :status';
         $bind['status'] = $filtroStatus;
     }
+    if ($filtroEmpresaId > 0) {
+        $where[] = 'n.empresa_emissora_id = :empresa_emissora_id';
+        $bind['empresa_emissora_id'] = $filtroEmpresaId;
+    }
     $sqlWhere = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+    $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
+    $empresasEmissorasFiltro = $stmt->fetchAll();
 
     $stmt = $dbNotas->prepare(
         'SELECT n.id, n.tipo_nota, n.numero_interno, n.status, n.valor_total, n.data_emissao, n.criado_em, n.funcionario_id,
@@ -1043,6 +1051,12 @@ $usuario = h(nomeExibicao($usuarioRaw));
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                 <h2 style="margin-bottom:0;"><i class="fa-solid fa-list-check"></i> <?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?></h2>
                 <form method="get" class="row-actions">
+                    <select class="select-filtro" name="empresa_emissora_id" onchange="this.form.submit()">
+                        <option value="">Todas as empresas</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $filtroEmpresaId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                     <select class="select-filtro" name="status" onchange="this.form.submit()">
                         <option value="">Todos os status</option>
                         <?php foreach (['rascunho', 'pendente_envio', 'autorizada', 'rejeitada', 'cancelada'] as $statusOpcao): ?>

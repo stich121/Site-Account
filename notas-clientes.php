@@ -267,12 +267,32 @@ try {
         }
     }
 
-    $stmt = $dbNotas->query(
-        'SELECT id, tipo_pessoa, nome_razao_social, cnpj_cpf, inscricao_estadual, inscricao_municipal, email,
-                logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, codigo_pais,
-                nif, motivo_nao_nif, uf, indicador_consumidor_final
-         FROM notas_clientes ORDER BY nome_razao_social ASC'
-    );
+    $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
+    $empresasEmissorasFiltro = $stmt->fetchAll();
+
+    $filtroEmpresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
+
+    if ($filtroEmpresaId > 0) {
+        $stmt = $dbNotas->prepare(
+            'SELECT c.id, c.tipo_pessoa, c.nome_razao_social, c.cnpj_cpf, c.inscricao_estadual, c.inscricao_municipal, c.email,
+                    c.logradouro, c.numero, c.complemento, c.bairro, c.cep, c.municipio, c.codigo_ibge_municipio, c.codigo_pais,
+                    c.nif, c.motivo_nao_nif, c.uf, c.indicador_consumidor_final
+             FROM notas_clientes c
+             WHERE EXISTS (
+                 SELECT 1 FROM notas_fiscais n
+                 WHERE n.cliente_id = c.id AND n.empresa_emissora_id = :empresa_emissora_id
+             )
+             ORDER BY c.nome_razao_social ASC'
+        );
+        $stmt->execute(['empresa_emissora_id' => $filtroEmpresaId]);
+    } else {
+        $stmt = $dbNotas->query(
+            'SELECT id, tipo_pessoa, nome_razao_social, cnpj_cpf, inscricao_estadual, inscricao_municipal, email,
+                    logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, codigo_pais,
+                    nif, motivo_nao_nif, uf, indicador_consumidor_final
+             FROM notas_clientes ORDER BY nome_razao_social ASC'
+        );
+    }
     $clientes = $stmt->fetchAll();
 } catch (PDOException $e) {
     $erro = 'Erro ao carregar clientes: ' . $e->getMessage();
@@ -408,7 +428,17 @@ $usuario = h(nomeExibicao($usuarioRaw));
         </section>
 
         <section class="panel">
-            <h2>Clientes cadastrados</h2>
+            <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <h2 style="margin-bottom:0;">Clientes cadastrados</h2>
+                <form method="get" class="row-actions">
+                    <select class="select-filtro" name="empresa_emissora_id" onchange="this.form.submit()">
+                        <option value="">Todas as empresas</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $filtroEmpresaId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+            </div>
             <div class="table-wrap">
                 <table>
                     <thead>
