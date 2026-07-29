@@ -11,7 +11,6 @@ if (!isset($_SESSION['funcionario_id'])) {
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfse-codigos-tributacao-nacional.php';
-require_once __DIR__ . '/nfse-codigos-complementares-bh.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -1086,7 +1085,6 @@ $catalogoJson = h(json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS 
 $edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"itens":[]}';
 $restaurarJson = json_encode($dadosRestaurar, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
-$variacoesComplementarBH = obterVariacoesCodigoComplementarBH();
 $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
 ?>
 <!DOCTYPE html>
@@ -1345,9 +1343,11 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                                 </datalist>
                             </div>
                             <div class="field">
-                                <label for="nfse_codigo_tributacao_municipal_opcoes">Código Complementar Municipal</label>
-                                <select id="nfse_codigo_tributacao_municipal_opcoes" style="display:none;"></select>
-                                <input id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal" type="hidden">
+                                <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
+                                <select id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal">
+                                    <option value="">Escolha primeiro o código de tributação nacional</option>
+                                </select>
+                                <span class="muted" id="nfse_codigo_tributacao_municipal_status" style="font-size: 0.78rem;"></span>
                             </div>
 
                             <div class="field">
@@ -1809,13 +1809,17 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
         codigosTributacaoNacional.forEach(function (item) {
             mapaCodigosTributacaoNacional[item.codigo] = item.descricao;
         });
-        const variacoesComplementarBH = <?php echo json_encode($variacoesComplementarBH, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         const correlacaoNbsPorItemLc116 = <?php echo json_encode($correlacaoNbsNfse['itens'] ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
         const campoCodigoTributacaoNacional = document.getElementById('nfse_codigo_tributacao_nacional');
         const campoDescricaoServico = document.getElementById('nfse_descricao_servico');
         const campoCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal');
-        const selectCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal_opcoes');
+        const statusCodigoTributacaoMunicipal = document.getElementById('nfse_codigo_tributacao_municipal_status');
+        const codigoMunicipalSalvoEdicao = String(
+            (dadosEdicaoNota && dadosEdicaoNota.nfse && dadosEdicaoNota.nfse.codigo_tributacao_municipal)
+            || (dadosRestaurar && dadosRestaurar.nfse && dadosRestaurar.nfse.codigo_tributacao_municipal)
+            || ''
+        ).replace(/\D/g, '');
         const campoNbs = document.getElementById('nfse_item_nbs');
         const statusNbs = document.getElementById('nfse_item_nbs_status');
         const nbsSalvaEdicao = String(
@@ -1863,28 +1867,38 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                 statusNbs.textContent = 'Este item não possui NBS aplicável no Anexo VIII oficial.';
             }
         }
-        function preencherVariacoesComplementarBH(codigo) {
-            if (!selectCodigoTributacaoMunicipal) return;
-            const partes = codigo.split('.');
-            const subitem = partes.length >= 2 ? partes[0] + '.' + partes[1] : null;
-            const variacoes = subitem ? variacoesComplementarBH[subitem] : null;
-            selectCodigoTributacaoMunicipal.innerHTML = '';
-            if (campoCodigoTributacaoMunicipal) campoCodigoTributacaoMunicipal.value = '';
-            if (!variacoes || variacoes.length === 0) {
-                selectCodigoTributacaoMunicipal.style.display = 'none';
+        function atualizarCodigoComplementarMunicipal() {
+            if (!campoCodigoTributacaoMunicipal || !campoCodigoTributacaoNacional) return;
+            const codigo = campoCodigoTributacaoNacional.value.trim();
+            const descricaoPadrao = mapaCodigosTributacaoNacional[codigo];
+            const valorAtual = campoCodigoTributacaoMunicipal.value || codigoMunicipalSalvoEdicao;
+
+            campoCodigoTributacaoMunicipal.innerHTML = '';
+            if (!codigo || !descricaoPadrao) {
+                const vazio = document.createElement('option');
+                vazio.value = '';
+                vazio.textContent = 'Escolha primeiro o código de tributação nacional';
+                campoCodigoTributacaoMunicipal.appendChild(vazio);
+                if (statusCodigoTributacaoMunicipal) statusCodigoTributacaoMunicipal.textContent = '';
                 return;
             }
-            const inicial = document.createElement('option');
-            inicial.value = '';
-            inicial.textContent = 'Catálogo BH: escolha uma descrição para preencher o serviço';
-            selectCodigoTributacaoMunicipal.appendChild(inicial);
-            variacoes.forEach(function (descricao) {
-                const opcao = document.createElement('option');
-                opcao.value = descricao;
-                opcao.textContent = descricao;
-                selectCodigoTributacaoMunicipal.appendChild(opcao);
-            });
-            selectCodigoTributacaoMunicipal.style.display = '';
+
+            const opcaoPadrao = document.createElement('option');
+            opcaoPadrao.value = '001';
+            opcaoPadrao.textContent = codigo + '.001 - ' + descricaoPadrao;
+            campoCodigoTributacaoMunicipal.appendChild(opcaoPadrao);
+
+            if (valorAtual && valorAtual !== '001') {
+                const opcaoSalva = document.createElement('option');
+                opcaoSalva.value = valorAtual;
+                opcaoSalva.textContent = codigo + '.' + valorAtual + ' - ' + descricaoPadrao + ' (valor salvo)';
+                campoCodigoTributacaoMunicipal.appendChild(opcaoSalva);
+            }
+
+            campoCodigoTributacaoMunicipal.value = valorAtual && valorAtual !== '001' ? valorAtual : '001';
+            if (statusCodigoTributacaoMunicipal) {
+                statusCodigoTributacaoMunicipal.textContent = 'Preenchido automaticamente com o padrão nacional (001). Se sua prefeitura exigir um código próprio, consulte o site da prefeitura e ajuste aqui.';
+            }
         }
 
         if (campoCodigoTributacaoNacional && campoDescricaoServico) {
@@ -1896,29 +1910,11 @@ $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
                     campoDescricaoServico.value = descricaoPadrao;
                 }
 
-                if (descricaoPadrao) {
-                    preencherVariacoesComplementarBH(codigo);
-                } else if (selectCodigoTributacaoMunicipal) {
-                    selectCodigoTributacaoMunicipal.style.display = 'none';
-                    selectCodigoTributacaoMunicipal.innerHTML = '';
-            if (campoCodigoTributacaoMunicipal) campoCodigoTributacaoMunicipal.value = '';
-                }
+                atualizarCodigoComplementarMunicipal();
                 atualizarNbsPorServico();
             });
+            atualizarCodigoComplementarMunicipal();
             atualizarNbsPorServico();
-        }
-
-        if (selectCodigoTributacaoMunicipal && campoDescricaoServico) {
-            selectCodigoTributacaoMunicipal.addEventListener('change', function () {
-                const selecao = selectCodigoTributacaoMunicipal.value;
-                const codigoSelecionado = selecao.match(/^([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3})(?:\s*-|$)/);
-                if (campoCodigoTributacaoMunicipal) {
-                    campoCodigoTributacaoMunicipal.value = codigoSelecionado ? codigoSelecionado[1] : '';
-                }
-                if (selecao && campoDescricaoServico.value.trim() === '') {
-                    campoDescricaoServico.value = selecao.replace(/^[0-9.]+\s*-\s*/, '');
-                }
-            });
         }
 
         const corpoItens = document.getElementById('corpoItens');
