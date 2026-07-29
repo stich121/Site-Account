@@ -3645,7 +3645,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             </button>
             <div class="admin-menu-group" id="grpFuncNotas">
                 <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpFuncNotasLinks">
-                    <span>Notas Fiscais</span>
+                    <span>Área Fiscal</span>
                     <i class="fa-solid fa-chevron-down"></i>
                 </button>
                 <div class="admin-menu-group-links" id="grpFuncNotasLinks">
@@ -3700,7 +3700,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             </div>
             <div class="admin-menu-group" id="grpAdminNotas">
                 <button type="button" class="admin-menu-group-toggle" data-menu-group-toggle aria-expanded="false" aria-controls="grpAdminNotasLinks">
-                    <span>Notas Fiscais</span>
+                    <span>Área Fiscal</span>
                     <i class="fa-solid fa-chevron-down"></i>
                 </button>
                 <div class="admin-menu-group-links" id="grpAdminNotasLinks">
