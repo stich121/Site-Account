@@ -128,6 +128,12 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </table>
                             <button class="btn btn-outline btn-small" type="button" id="btnAddItem"><i class="fa-solid fa-plus"></i> Adicionar item</button>
 
+                            <datalist id="datalistCfop">
+                                <?php foreach ($cfopCodigosNfe as $cfopItem): ?>
+                                    <option value="<?php echo h($cfopItem['codigo']); ?>"><?php echo h($cfopItem['codigo'] . ' - ' . $cfopItem['descricao']); ?></option>
+                                <?php endforeach; ?>
+                            </datalist>
+
                             <div class="totais" id="totalNota" style="margin-top: 1rem;">Total estimado: R$ 0,00</div>
                         </div>
                     </details>
@@ -276,7 +282,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '<td><select class="item-catalogo">' + montarOpcoesCatalogo(empresaId) + '</select></td>' +
                 '<td><input type="text" name="item_descricao[]" class="item-descricao" required></td>' +
                 '<td><input type="text" name="item_ncm[]" class="item-ncm"></td>' +
-                '<td><input type="text" name="item_cfop[]" class="item-cfop"></td>' +
+                '<td><input type="text" name="item_cfop[]" class="item-cfop" list="datalistCfop" autocomplete="off" placeholder="Ex.: 5102"></td>' +
                 '<td><input type="text" name="item_cst[]" class="item-cst"></td>' +
                 '<td><input type="text" name="item_unidade[]" class="item-unidade" value="UN"></td>' +
                 '<td><input type="text" name="item_quantidade[]" class="item-quantidade" value="1"></td>' +

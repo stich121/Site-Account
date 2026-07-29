@@ -9,7 +9,7 @@
  * Ao final da inclusão, ficam disponíveis para a página: $erro, $sucesso, $notaEmEdicao,
  * $nfseEmEdicao, $itensEmEdicao, $dadosRestaurar, $empresasAtivas, $clientes, $catalogo,
  * $csrf, $usuario, $catalogoJson, $edicaoJson, $restaurarJson, $codigosTributacaoNacionalNfse,
- * $correlacaoNbsNfse, $db, $dbNotas, $funcionarioId, $usuarioRaw, $nivelAcesso, $podeAdministrar.
+ * $correlacaoNbsNfse, $cfopCodigosNfe, $db, $dbNotas, $funcionarioId, $usuarioRaw, $nivelAcesso, $podeAdministrar.
  */
 
 require_once __DIR__ . '/../seguranca.php';
@@ -62,6 +62,18 @@ function catalogoIbsCbsNfse(): array
     static $catalogo = null;
     if ($catalogo === null) {
         $arquivo = __DIR__ . '/../nfse-ibs-catalogos.json';
+        $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
+        $catalogo = is_array($conteudo) ? $conteudo : [];
+    }
+
+    return $catalogo;
+}
+
+function catalogoCfopNfe(): array
+{
+    static $catalogo = null;
+    if ($catalogo === null) {
+        $arquivo = __DIR__ . '/../cfop-codigos.json';
         $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
         $catalogo = is_array($conteudo) ? $conteudo : [];
     }
@@ -1108,3 +1120,4 @@ $edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'it
 $restaurarJson = json_encode($dadosRestaurar, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
+$cfopCodigosNfe = catalogoCfopNfe();
