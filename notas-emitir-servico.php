@@ -806,10 +806,6 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
         const empresaSelect = document.getElementById('empresa_emissora_id');
 
-        if (empresaSelect && empresaSelect.dataset.ibge && !(dadosEdicaoNota && dadosEdicaoNota.nota)) {
-            selecionarMunicipioPorCodigo(empresaSelect.dataset.ibge);
-        }
-
         document.querySelectorAll('[data-form-jump]').forEach(function (botao) {
             botao.addEventListener('click', function () {
                 const alvo = document.getElementById(botao.dataset.formJump);
@@ -837,6 +833,10 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
         const municipioOpcoes = document.getElementById('nfse_municipio_prestacao_opcoes');
         const municipioStatus = document.getElementById('nfse_municipio_prestacao_status');
         let municipiosIbge = [];
+
+        if (empresaSelect && empresaSelect.dataset.ibge && !(dadosEdicaoNota && dadosEdicaoNota.nota)) {
+            selecionarMunicipioPorCodigo(empresaSelect.dataset.ibge);
+        }
 
         function normalizarMunicipio(valor) {
             return String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
