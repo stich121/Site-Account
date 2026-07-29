@@ -701,6 +701,24 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             const cofinsAliq = numeroDoCampo(linha, '.item-cofins-aliquota');
             linha.querySelector('.item-cofins-valor-calc').textContent = formatarValorCalculado(base * cofinsAliq / 100);
 
+            // Aliquotas-teste fixas de 2026 (LC 214/2025 art. 346, NT 2025.002 v1.20): a SEFAZ so
+            // aceita 0,1% IBS Estadual / 0% IBS Municipal / 0,9% CBS. O servidor ja forca esses
+            // valores em nfeCalcularImpostosItem() - aqui so mantemos a tela em sincronia,
+            // inclusive sobrescrevendo valor antigo restaurado de um rascunho salvo antes dessa
+            // regra existir.
+            const campoIbsUfAliq = linha.querySelector('.item-ibs-uf-aliquota');
+            if (campoIbsUfAliq && campoIbsUfAliq.value !== '0.1') {
+                campoIbsUfAliq.value = '0.1';
+            }
+            const campoIbsMunAliq = linha.querySelector('.item-ibs-mun-aliquota');
+            if (campoIbsMunAliq && campoIbsMunAliq.value !== '0') {
+                campoIbsMunAliq.value = '0';
+            }
+            const campoCbsAliq = linha.querySelector('.item-cbs-aliquota');
+            if (campoCbsAliq && campoCbsAliq.value !== '0.9') {
+                campoCbsAliq.value = '0.9';
+            }
+
             const campoBaseIbscbs = linha.querySelector('.item-ibscbs-base');
             const baseIbscbs = campoBaseIbscbs && campoBaseIbscbs.value.trim() !== '' ? numeroDoCampo(linha, '.item-ibscbs-base') : base;
             const ibsUfAliq = numeroDoCampo(linha, '.item-ibs-uf-aliquota');
