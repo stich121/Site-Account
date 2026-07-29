@@ -94,13 +94,22 @@ function prepararTabelaHistoricoDownloads(PDO $db): void
             $db->exec($sql);
         }
     }
+}
 
+function limparHistoricoDownloadsAntigos(PDO $db): void
+{
     $db->exec("DELETE FROM historico_downloads WHERE criado_em < DATE_SUB(NOW(), INTERVAL 1 MONTH)");
 }
 
 try {
     $db = obterConexao();
-    prepararTabelaHistoricoDownloads($db);
+    if (!schemaJaPreparada('historico_download')) {
+        prepararTabelaHistoricoDownloads($db);
+        marcarSchemaPreparada('historico_download');
+    }
+    if (mt_rand(1, 50) === 1) {
+        limparHistoricoDownloadsAntigos($db);
+    }
 
     $stmt = $db->prepare('SELECT nivel_acesso FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

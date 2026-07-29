@@ -266,7 +266,10 @@ $sucesso = '';
 try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
-    prepararColunasCertificadoPagina($dbNotas);
+    if (!schemaJaPreparada('notas_certificados')) {
+        prepararColunasCertificadoPagina($dbNotas);
+        marcarSchemaPreparada('notas_certificados');
+    }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

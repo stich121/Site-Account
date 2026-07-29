@@ -134,9 +134,12 @@ function prepararColunasImpostoProdutosServicos(PDO $db): void
 
 try {
     $db = obterConexaoNotas();
-    prepararTabelaEmpresasEmissorasCatalogo($db);
-    prepararTabelaProdutosServicos($db);
-    prepararColunasImpostoProdutosServicos($db);
+    if (!schemaJaPreparada('notas_produtos_servicos')) {
+        prepararTabelaEmpresasEmissorasCatalogo($db);
+        prepararTabelaProdutosServicos($db);
+        prepararColunasImpostoProdutosServicos($db);
+        marcarSchemaPreparada('notas_produtos_servicos');
+    }
 
     if (empty($_SESSION['csrf_notas_produtos_servicos'])) {
         $_SESSION['csrf_notas_produtos_servicos'] = bin2hex(random_bytes(32));

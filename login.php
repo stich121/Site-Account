@@ -217,7 +217,12 @@ try {
     set_time_limit(10);
     $db = obterConexao();
     error_log('[login.php] Conexao bem-sucedida');
-    garantirTabelaAntiBruteforceLogin($db);
+    if (!schemaJaPreparada('login')) {
+        garantirTabelaAntiBruteforceLogin($db);
+        garantirCamposFuncionarios($db);
+        garantirTabelaAfastamentos($db);
+        marcarSchemaPreparada('login');
+    }
 
     $estadoLogin = obterEstadoLogin($db, $chaveLogin);
     $bloqueadoAte = $estadoLogin['bloqueado_ate'];
@@ -241,9 +246,6 @@ try {
             ]);
         }
     }
-
-    garantirCamposFuncionarios($db);
-    garantirTabelaAfastamentos($db);
 
     $stmt = $db->prepare(
         'SELECT id, usuario, email, senha, empresa_nome, empresa_cnpj, cpf, cargo, nivel_acesso, permite_ponto

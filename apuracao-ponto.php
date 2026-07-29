@@ -204,7 +204,10 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
 
 try {
     $db = obterConexao();
-    prepararTabelaAjustesManuaisPonto($db);
+    if (!schemaJaPreparada('apuracao_ponto')) {
+        prepararTabelaAjustesManuaisPonto($db);
+        marcarSchemaPreparada('apuracao_ponto');
+    }
 
     $stmt = $db->prepare('SELECT nivel_acesso FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

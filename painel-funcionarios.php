@@ -883,7 +883,10 @@ function prepararTabelaHistoricoDownloads(PDO $db): void
             $db->exec($sql);
         }
     }
+}
 
+function limparHistoricoDownloadsAntigos(PDO $db): void
+{
     $db->exec("DELETE FROM historico_downloads WHERE criado_em < DATE_SUB(NOW(), INTERVAL 1 MONTH)");
 }
 
@@ -1240,15 +1243,21 @@ function exportarPontoDireto(PDO $db, int $funcionarioId, bool $podeAdministrar)
 
 try {
     $db = obterConexao();
-    prepararCamposFuncionarios($db);
-    prepararFotoPonto($db);
-    prepararTabelaAfastamentos($db);
-    prepararTabelaSolicitacoesAjuste($db);
-    prepararTabelaAjustesManuaisPonto($db);
-    prepararTabelaHistoricoDownloads($db);
-    prepararIndicesPerformance($db);
-    if (function_exists('prepararTabelaSaldosIniciaisBancoHoras')) {
-        prepararTabelaSaldosIniciaisBancoHoras($db);
+    if (!schemaJaPreparada('painel')) {
+        prepararCamposFuncionarios($db);
+        prepararFotoPonto($db);
+        prepararTabelaAfastamentos($db);
+        prepararTabelaSolicitacoesAjuste($db);
+        prepararTabelaAjustesManuaisPonto($db);
+        prepararTabelaHistoricoDownloads($db);
+        prepararIndicesPerformance($db);
+        if (function_exists('prepararTabelaSaldosIniciaisBancoHoras')) {
+            prepararTabelaSaldosIniciaisBancoHoras($db);
+        }
+        marcarSchemaPreparada('painel');
+    }
+    if (mt_rand(1, 50) === 1) {
+        limparHistoricoDownloadsAntigos($db);
     }
 
     $stmt = $db->prepare('SELECT empresa_nome, empresa_cnpj, cpf, cargo, nivel_acesso, permite_ponto FROM funcionarios WHERE id = :id LIMIT 1');

@@ -349,8 +349,11 @@ $totais = [
 
 try {
     $db = obterConexao();
-    prepararCamposFuncionarios($db);
-    prepararTabelaSaldosIniciaisBanco($db);
+    if (!schemaJaPreparada('banco_horas')) {
+        prepararCamposFuncionarios($db);
+        prepararTabelaSaldosIniciaisBanco($db);
+        marcarSchemaPreparada('banco_horas');
+    }
 
     $stmt = $db->prepare('SELECT nivel_acesso FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

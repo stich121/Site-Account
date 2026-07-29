@@ -88,7 +88,10 @@ function nomeExibicao(?string $usuario): string
 
 try {
     $db = obterConexao();
-    prepararCamposFuncionarios($db);
+    if (!schemaJaPreparada('gerenciar_funcionarios')) {
+        prepararCamposFuncionarios($db);
+        marcarSchemaPreparada('gerenciar_funcionarios');
+    }
 
     if (empty($_SESSION['csrf_gerenciar_funcionarios'])) {
         $_SESSION['csrf_gerenciar_funcionarios'] = bin2hex(random_bytes(32));

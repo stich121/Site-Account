@@ -138,9 +138,12 @@ try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
 
-    prepararColunaPermiteNotasFiscais($db);
-    prepararTabelaNotasClientes($dbNotas);
-    prepararColunaInscricaoMunicipalClientes($dbNotas);
+    if (!schemaJaPreparada('notas_clientes')) {
+        prepararColunaPermiteNotasFiscais($db);
+        prepararTabelaNotasClientes($dbNotas);
+        prepararColunaInscricaoMunicipalClientes($dbNotas);
+        marcarSchemaPreparada('notas_clientes');
+    }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

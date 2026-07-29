@@ -634,25 +634,27 @@ function buscarNotaFiscalCompleta(PDO $db, int $notaId): ?array
 try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
-    prepararTabelaEmpresasEmissorasNotas($dbNotas);
+    if (!schemaJaPreparada('notas_fiscais')) {
+        prepararTabelaEmpresasEmissorasNotas($dbNotas);
+        prepararTabelaNotasProdutosServicosNotas($dbNotas);
+        prepararTabelaNotasClientes($dbNotas);
+        prepararTabelaNotasFiscais($dbNotas);
+        prepararTabelaNotasFiscaisItens($dbNotas);
+        prepararTabelaNotasFiscaisNfse($dbNotas);
+        prepararColunasFase3bNotasFiscaisNfse($dbNotas);
+        prepararColunaInscricaoMunicipalClientes($dbNotas);
+        prepararTabelaNotasFiscaisLog($dbNotas);
+        prepararColunasFase2Notas($dbNotas);
+        prepararColunasCertificadoEmpresa($dbNotas);
+        prepararColunaSerieNfeEmpresaEmissora($dbNotas);
+        prepararColunaSerieNotaFiscal($dbNotas);
+        prepararTabelaNotasFiscaisNfe($dbNotas);
+        prepararColunasImpostoItensNotas($dbNotas);
+        prepararColunasImpostoProdutosServicosNotas($dbNotas);
+        prepararColunaPermiteNotasFiscais($db);
+        marcarSchemaPreparada('notas_fiscais');
+    }
     semearEmpresasEmissorasNotas($dbNotas);
-    prepararTabelaNotasProdutosServicosNotas($dbNotas);
-    prepararTabelaNotasClientes($dbNotas);
-    prepararTabelaNotasFiscais($dbNotas);
-    prepararTabelaNotasFiscaisItens($dbNotas);
-    prepararTabelaNotasFiscaisNfse($dbNotas);
-    prepararColunasFase3bNotasFiscaisNfse($dbNotas);
-    prepararColunaInscricaoMunicipalClientes($dbNotas);
-    prepararTabelaNotasFiscaisLog($dbNotas);
-    prepararColunasFase2Notas($dbNotas);
-    prepararColunasCertificadoEmpresa($dbNotas);
-    prepararColunaSerieNfeEmpresaEmissora($dbNotas);
-    prepararColunaSerieNotaFiscal($dbNotas);
-    prepararTabelaNotasFiscaisNfe($dbNotas);
-    prepararColunasImpostoItensNotas($dbNotas);
-    prepararColunasImpostoProdutosServicosNotas($dbNotas);
-
-    prepararColunaPermiteNotasFiscais($db);
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

@@ -137,8 +137,11 @@ function semearEmpresasEmissoras(PDO $db): void
 
 try {
     $db = obterConexaoNotas();
-    prepararTabelaEmpresasEmissoras($db);
-    prepararColunasCertificadoEmpresaEmissoras($db);
+    if (!schemaJaPreparada('notas_empresas_emissoras')) {
+        prepararTabelaEmpresasEmissoras($db);
+        prepararColunasCertificadoEmpresaEmissoras($db);
+        marcarSchemaPreparada('notas_empresas_emissoras');
+    }
     semearEmpresasEmissoras($db);
 
     if (empty($_SESSION['csrf_notas_empresas_emissoras'])) {

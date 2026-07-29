@@ -175,9 +175,12 @@ $tiposDocumento = [];
 
 try {
     $db = obterConexao();
-    prepararCamposFuncionarios($db);
-    prepararTabelaAfastamentos($db);
-    prepararTabelasTiposAfastamento($db);
+    if (!schemaJaPreparada('afastamentos')) {
+        prepararCamposFuncionarios($db);
+        prepararTabelaAfastamentos($db);
+        prepararTabelasTiposAfastamento($db);
+        marcarSchemaPreparada('afastamentos');
+    }
 
     $stmt = $db->prepare('SELECT nivel_acesso FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);

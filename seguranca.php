@@ -1,4 +1,20 @@
 <?php
+// Evita repetir os CREATE TABLE IF NOT EXISTS / ALTER TABLE de verificação de schema
+// a cada requisição: essas checagens só precisam rodar uma vez por deploy.
+function schemaJaPreparada(string $chave): bool
+{
+    return is_file(__DIR__ . '/.security/schema_' . $chave . '.flag');
+}
+
+function marcarSchemaPreparada(string $chave): void
+{
+    $diretorio = __DIR__ . '/.security';
+    if (!is_dir($diretorio)) {
+        @mkdir($diretorio, 0755, true);
+    }
+    @file_put_contents($diretorio . '/schema_' . $chave . '.flag', (string) time());
+}
+
 function requisicaoHttps(): bool
 {
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
