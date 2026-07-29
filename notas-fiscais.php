@@ -336,6 +336,9 @@ function prepararColunaSerieNfeEmpresaEmissora(PDO $db): void
     if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfe_serie')) {
         $db->exec("ALTER TABLE empresas_emissoras ADD COLUMN nfe_serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER crt");
     }
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfe_numero_base')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfe_numero_base INT UNSIGNED NOT NULL DEFAULT 0 AFTER nfe_serie');
+    }
 }
 
 function prepararColunaSerieNotaFiscal(PDO $db): void

@@ -105,6 +105,7 @@ function prepararColunasCertificadoEmpresaEmissoras(PDO $db): void
         'certificado_atualizado_por' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_atualizado_por INT UNSIGNED NULL AFTER certificado_atualizado_em",
         'certificado_validade' => "ALTER TABLE empresas_emissoras ADD COLUMN certificado_validade DATE NULL AFTER certificado_atualizado_por",
         'nfe_serie' => "ALTER TABLE empresas_emissoras ADD COLUMN nfe_serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER crt",
+        'nfe_numero_base' => "ALTER TABLE empresas_emissoras ADD COLUMN nfe_numero_base INT UNSIGNED NOT NULL DEFAULT 0 AFTER nfe_serie",
     ];
 
     foreach ($campos as $coluna => $sql) {
@@ -165,6 +166,7 @@ try {
             $uf = strtoupper(trim($_POST['uf'] ?? ''));
             $crt = $_POST['crt'] !== '' ? (int) $_POST['crt'] : null;
             $nfeSerie = trim((string) ($_POST['nfe_serie'] ?? '')) !== '' ? trim((string) $_POST['nfe_serie']) : '1';
+            $nfeNumeroBase = (int) ($_POST['nfe_numero_base'] ?? 0);
             $ambiente = ($_POST['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'producao' : 'homologacao';
             $opcaoSimplesNacional = (int) ($_POST['nfse_opcao_simples_nacional'] ?? 0);
             $regimeApuracaoSn = trim((string) ($_POST['nfse_regime_apuracao_sn'] ?? '')) !== '' ? (int) $_POST['nfse_regime_apuracao_sn'] : null;
@@ -187,6 +189,8 @@ try {
                 $erro = 'Selecione o CRT da empresa.';
             } elseif (!preg_match('/^[0-9]{1,3}$/D', $nfeSerie)) {
                 $erro = 'A série da NF-e deve conter de 1 a 3 dígitos.';
+            } elseif ($nfeNumeroBase < 0) {
+                $erro = 'O número da última NF-e emitida não pode ser negativo.';
             } elseif (!in_array($opcaoSimplesNacional, [1, 2, 3], true)) {
                 $erro = 'Informe a opção da empresa pelo Simples Nacional para a NFS-e.';
             } elseif ($opcaoSimplesNacional === 3 && !in_array($regimeApuracaoSn, [1, 2, 3], true)) {
@@ -217,6 +221,7 @@ try {
                         uf = :uf,
                         crt = :crt,
                         nfe_serie = :nfe_serie,
+                        nfe_numero_base = :nfe_numero_base,
                         ambiente_emissao = :ambiente_emissao,
                         nfse_opcao_simples_nacional = :nfse_opcao_simples_nacional,
                         nfse_regime_apuracao_sn = :nfse_regime_apuracao_sn,
@@ -241,6 +246,7 @@ try {
                         'uf' => $uf !== '' ? $uf : null,
                         'crt' => $crt,
                         'nfe_serie' => $nfeSerie,
+                        'nfe_numero_base' => $nfeNumeroBase,
                         'ambiente_emissao' => $ambiente,
                         'nfse_opcao_simples_nacional' => $opcaoSimplesNacional,
                         'nfse_regime_apuracao_sn' => $regimeApuracaoSn,
@@ -259,11 +265,11 @@ try {
                     'INSERT INTO empresas_emissoras (
                         razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
                         logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
-                        crt, nfe_serie, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
+                        crt, nfe_serie, nfe_numero_base, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
                      ) VALUES (
                         :razao_social, :nome_fantasia, :cnpj, :inscricao_estadual, :inscricao_municipal,
                         :logradouro, :numero, :complemento, :bairro, :cep, :municipio, :codigo_ibge_municipio, :uf,
-                        :crt, :nfe_serie, :ambiente_emissao, :nfse_opcao_simples_nacional, :nfse_regime_apuracao_sn, :nfse_tributacao_issqn, :nfse_regime_especial_tributacao, 1
+                        :crt, :nfe_serie, :nfe_numero_base, :ambiente_emissao, :nfse_opcao_simples_nacional, :nfse_regime_apuracao_sn, :nfse_tributacao_issqn, :nfse_regime_especial_tributacao, 1
                      )
                      ON DUPLICATE KEY UPDATE
                         nome_fantasia = VALUES(nome_fantasia),
@@ -280,6 +286,7 @@ try {
                         uf = VALUES(uf),
                         crt = VALUES(crt),
                         nfe_serie = VALUES(nfe_serie),
+                        nfe_numero_base = VALUES(nfe_numero_base),
                         ambiente_emissao = VALUES(ambiente_emissao),
                         nfse_opcao_simples_nacional = VALUES(nfse_opcao_simples_nacional),
                         nfse_regime_apuracao_sn = VALUES(nfse_regime_apuracao_sn),
@@ -303,6 +310,7 @@ try {
                     'uf' => $uf !== '' ? $uf : null,
                     'crt' => $crt,
                     'nfe_serie' => $nfeSerie,
+                    'nfe_numero_base' => $nfeNumeroBase,
                     'ambiente_emissao' => $ambiente,
                     'nfse_opcao_simples_nacional' => $opcaoSimplesNacional,
                     'nfse_regime_apuracao_sn' => $regimeApuracaoSn,
@@ -369,15 +377,17 @@ try {
     $stmt = $db->query(
         'SELECT id, razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal,
                 logradouro, numero, complemento, bairro, cep, municipio, codigo_ibge_municipio, uf,
-                crt, nfe_serie, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
+                crt, nfe_serie, nfe_numero_base, ambiente_emissao, nfse_opcao_simples_nacional, nfse_regime_apuracao_sn, nfse_tributacao_issqn, nfse_regime_especial_tributacao, ativo
          FROM empresas_emissoras
          ORDER BY ativo DESC, razao_social ASC'
     );
     $empresas = $stmt->fetchAll();
 
-    // Ultima NF-e lancada por empresa (na serie atual dela), para exibir e conferir
-    // a numeracao sem depender de contador separado: sempre reflete o que ja foi gravado
-    // em notas_fiscais, entao acompanha automaticamente cada nova emissao.
+    // Ultima NF-e lancada por empresa (na serie atual dela). "ultima_nfe_sistema" e o que
+    // ja foi emitido por aqui; "ultima_nfe_efetiva" tambem considera o ajuste manual
+    // (nfe_numero_base), que serve de piso quando ha numeracao emitida fora do sistema.
+    // A proxima nota usa sempre o maior dos dois + 1, entao ela acompanha automaticamente
+    // tanto as emissoes pelo sistema quanto um novo ajuste manual.
     try {
         $stmtUltimaNfe = $db->prepare(
             "SELECT MAX(numero_interno) FROM notas_fiscais WHERE empresa_emissora_id = :empresa_id AND tipo_nota = 'nfe' AND serie = :serie"
@@ -387,12 +397,18 @@ try {
                 'empresa_id' => $empresaUltimaNfe['id'],
                 'serie' => (string) ($empresaUltimaNfe['nfe_serie'] ?? '1'),
             ]);
-            $empresaUltimaNfe['ultima_nfe_numero'] = $stmtUltimaNfe->fetchColumn();
+            $ultimaSistema = $stmtUltimaNfe->fetchColumn();
+            $empresaUltimaNfe['ultima_nfe_sistema'] = $ultimaSistema !== false && $ultimaSistema !== null ? (int) $ultimaSistema : null;
+            $empresaUltimaNfe['ultima_nfe_efetiva'] = max((int) ($empresaUltimaNfe['ultima_nfe_sistema'] ?? 0), (int) $empresaUltimaNfe['nfe_numero_base']);
+            if ($empresaUltimaNfe['ultima_nfe_efetiva'] === 0) {
+                $empresaUltimaNfe['ultima_nfe_efetiva'] = null;
+            }
         }
         unset($empresaUltimaNfe);
     } catch (PDOException $e) {
         foreach ($empresas as &$empresaUltimaNfe) {
-            $empresaUltimaNfe['ultima_nfe_numero'] = null;
+            $empresaUltimaNfe['ultima_nfe_sistema'] = null;
+            $empresaUltimaNfe['ultima_nfe_efetiva'] = (int) $empresaUltimaNfe['nfe_numero_base'] > 0 ? (int) $empresaUltimaNfe['nfe_numero_base'] : null;
         }
         unset($empresaUltimaNfe);
     }
@@ -507,13 +523,17 @@ function rotuloCrt(?int $crt): string
                     <div class="field">
                         <label for="nfe_serie">Série da NF-e</label>
                         <input id="nfe_serie" name="nfe_serie" type="text" maxlength="3" value="<?php echo h((string) ($empresaEmEdicao['nfe_serie'] ?? '1')); ?>">
-                        <?php if ($empresaEmEdicao !== null): ?>
-                            <span class="muted">
-                                Última NF-e lançada nesta série:
-                                <?php echo $empresaEmEdicao['ultima_nfe_numero'] !== null ? 'Nº ' . h((string) $empresaEmEdicao['ultima_nfe_numero']) : 'nenhuma ainda'; ?>
-                                (atualiza automaticamente a cada nova emissão)
-                            </span>
-                        <?php endif; ?>
+                    </div>
+                    <div class="field">
+                        <label for="nfe_numero_base">Última NF-e emitida (ajuste manual)</label>
+                        <input id="nfe_numero_base" name="nfe_numero_base" type="number" min="0" step="1" value="<?php echo h((string) ($empresaEmEdicao['nfe_numero_base'] ?? 0)); ?>">
+                        <span class="muted">
+                            Preencha aqui se já existir numeração emitida fora do sistema (ou para corrigir a sequência). A próxima NF-e emitida por aqui sempre usa o maior valor entre este ajuste e o que já foi lançado pelo sistema, mais 1 — depois disso a numeração segue sozinha.
+                            <?php if ($empresaEmEdicao !== null): ?>
+                                <br>Já lançado pelo sistema nesta série: <?php echo $empresaEmEdicao['ultima_nfe_sistema'] !== null ? 'Nº ' . h((string) $empresaEmEdicao['ultima_nfe_sistema']) : 'nenhuma ainda'; ?>.
+                                Próxima NF-e será a Nº <?php echo h((string) ((int) ($empresaEmEdicao['ultima_nfe_efetiva'] ?? 0) + 1)); ?>.
+                            <?php endif; ?>
+                        </span>
                     </div>
                     <div class="field">
                         <label for="nfse_opcao_simples_nacional">Opção pelo Simples na NFS-e</label>
@@ -644,7 +664,7 @@ function rotuloCrt(?int $crt): string
                                 <td><?php echo h(($empresa['inscricao_estadual'] ?? '—') . ' / ' . ($empresa['inscricao_municipal'] ?? '—')); ?></td>
                                 <td><?php echo h(($empresa['municipio'] ?? '—') . '/' . ($empresa['uf'] ?? '')); ?></td>
                                 <td><?php echo h(rotuloCrt($empresa['crt'] !== null ? (int) $empresa['crt'] : null)); ?></td>
-                                <td><?php echo h((string) ($empresa['nfe_serie'] ?? '1')); ?> / <?php echo $empresa['ultima_nfe_numero'] !== null ? 'Nº ' . h((string) $empresa['ultima_nfe_numero']) : '—'; ?></td>
+                                <td><?php echo h((string) ($empresa['nfe_serie'] ?? '1')); ?> / <?php echo $empresa['ultima_nfe_efetiva'] !== null ? 'Nº ' . h((string) $empresa['ultima_nfe_efetiva']) : '—'; ?></td>
                                 <td><?php echo h($empresa['ambiente_emissao'] === 'producao' ? 'Produção' : 'Homologação'); ?></td>
                                 <td>
                                     <?php if ((int) $empresa['ativo'] === 1): ?>

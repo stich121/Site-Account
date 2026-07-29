@@ -410,6 +410,9 @@ function prepararColunaSerieNfeEmpresaEmissora(PDO $db): void
     if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfe_serie')) {
         $db->exec("ALTER TABLE empresas_emissoras ADD COLUMN nfe_serie VARCHAR(3) NOT NULL DEFAULT '1' AFTER crt");
     }
+    if (!colunaExisteNotas($db, 'empresas_emissoras', 'nfe_numero_base')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfe_numero_base INT UNSIGNED NOT NULL DEFAULT 0 AFTER nfe_serie');
+    }
 }
 
 function prepararColunaSerieNotaFiscal(PDO $db): void
@@ -1200,11 +1203,15 @@ try {
                     } else {
                     $serieNota = $tipoNota === 'nfe' ? (string) ($empresaSelecionada['nfe_serie'] ?? '1') : '1';
                     $stmt = $dbNotas->prepare(
-                        'SELECT COALESCE(MAX(numero_interno), 0) + 1 FROM notas_fiscais
+                        'SELECT COALESCE(MAX(numero_interno), 0) FROM notas_fiscais
                          WHERE empresa_emissora_id = :empresa_id AND tipo_nota = :tipo_nota AND serie = :serie FOR UPDATE'
                     );
                     $stmt->execute(['empresa_id' => $empresaId, 'tipo_nota' => $tipoNota, 'serie' => $serieNota]);
-                    $numeroInterno = (int) $stmt->fetchColumn();
+                    $maxNumeroInternoAtual = (int) $stmt->fetchColumn();
+                    // nfe_numero_base permite ao admin "avancar" a numeracao manualmente (ex.: notas ja
+                    // emitidas fora do sistema); nunca reduz o proximo numero, so serve de piso.
+                    $numeroBaseManual = $tipoNota === 'nfe' ? (int) ($empresaSelecionada['nfe_numero_base'] ?? 0) : 0;
+                    $numeroInterno = max($maxNumeroInternoAtual, $numeroBaseManual) + 1;
 
                     $stmt = $dbNotas->prepare(
                         'INSERT INTO notas_fiscais (
