@@ -539,6 +539,7 @@ function rotuloCrt(?int $crt): string
                     <div class="field">
                         <label for="inscricao_municipal">Inscrição Municipal</label>
                         <input id="inscricao_municipal" name="inscricao_municipal" type="text" maxlength="30" required value="<?php echo h($empresaEmEdicao['inscricao_municipal'] ?? ''); ?>">
+                        <span class="muted" id="statusImEmpresa" style="font-size: 0.75rem;"></span>
                     </div>
                 </div>
 
@@ -905,6 +906,8 @@ function rotuloCrt(?int $crt): string
 
                         statusEl.style.color = 'var(--primary)';
                         statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de salvar.';
+
+                        buscarImEmpresaCnc(digitos, dados.codigo_ibge_municipio || '');
                     })
                     .catch(function () {
                         statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
@@ -914,6 +917,44 @@ function rotuloCrt(?int $crt): string
                         btnBuscarCnpj.disabled = false;
                     });
             });
+        }
+
+        // Busca automática da Inscrição Municipal da própria empresa emissora no CNC (Cadastro
+        // Nacional de Contribuintes) do Portal Nacional, logo após a busca do CNPJ preencher o
+        // município - a mesma checagem que o Sefin Nacional faz ao validar a DPS (erro E0116).
+        function buscarImEmpresaCnc(cnpjDigitos, codigoIbge) {
+            const campoIM = document.getElementById('inscricao_municipal');
+            const statusIM = document.getElementById('statusImEmpresa');
+            if (!campoIM || !statusIM || cnpjDigitos.length !== 14 || !codigoIbge) {
+                return;
+            }
+
+            statusIM.style.color = 'var(--text-muted)';
+            statusIM.textContent = 'Consultando IM no cadastro nacional (CNC)...';
+
+            fetch('buscar-im-cnc-empresa?cnpj=' + encodeURIComponent(cnpjDigitos) + '&codigo_ibge_municipio=' + encodeURIComponent(codigoIbge))
+                .then(function (resposta) {
+                    return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; });
+                })
+                .then(function (resultado) {
+                    if (!resultado.ok) {
+                        statusIM.style.color = '#FFD1CE';
+                        statusIM.textContent = resultado.dados.erro || 'Não foi possível consultar a IM automaticamente.';
+                        return;
+                    }
+                    if (resultado.dados.im) {
+                        campoIM.value = resultado.dados.im;
+                        statusIM.style.color = 'var(--primary)';
+                        statusIM.textContent = 'IM preenchida automaticamente pelo cadastro nacional.';
+                    } else {
+                        statusIM.style.color = 'var(--text-muted)';
+                        statusIM.textContent = resultado.dados.mensagem || 'Nenhuma IM encontrada nesse município para esse CNPJ - confira e preencha na mão.';
+                    }
+                })
+                .catch(function () {
+                    statusIM.style.color = '#FFD1CE';
+                    statusIM.textContent = 'Falha ao consultar a IM automaticamente; preencha na mão.';
+                });
         }
 
         const opcaoSimplesNfse = document.getElementById('nfse_opcao_simples_nacional');

@@ -1,7 +1,13 @@
 <?php
-// Consulta a Inscrição Municipal de um CPF/CNPJ no CNC (Cadastro Nacional de Contribuintes) do
-// Portal Nacional da NFS-e, no município da empresa emissora - usado pra autopreencher a IM do
-// tomador na tela de emissão (ver notas-emitir-servico.php).
+// Consulta a Inscrição Municipal de um CNPJ no CNC (Cadastro Nacional de Contribuintes) do Portal
+// Nacional da NFS-e - usado pra autopreencher a IM no cadastro de EMPRESA EMISSORA (ver
+// notas-empresas-emissoras.php), logo após a busca de dados do CNPJ.
+//
+// Diferente de buscar-im-cnc.php (que consulta a IM do tomador usando o certificado da própria
+// empresa emissora ativa), aqui a empresa sendo cadastrada pode ainda não ter certificado A1
+// próprio - então a consulta usa emprestado o certificado de qualquer outra empresa já
+// configurada no sistema, só para autenticar no gateway do ADN (ver
+// empresaComCertificadoParaConsultaCnc() em nfse-nacional-integracao.php).
 require_once __DIR__ . '/seguranca.php';
 iniciarSessaoSegura(true);
 require_once __DIR__ . '/config_db.php';
@@ -31,40 +37,31 @@ try {
     exit;
 }
 
-$empresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
-$documento = preg_replace('/\D+/', '', (string) ($_GET['documento'] ?? ''));
+$cnpj = preg_replace('/\D+/', '', (string) ($_GET['cnpj'] ?? ''));
+$codMunicipio = preg_replace('/\D+/', '', (string) ($_GET['codigo_ibge_municipio'] ?? ''));
 
-if ($empresaId <= 0) {
+if (strlen($cnpj) !== 14) {
     http_response_code(400);
-    echo json_encode(['erro' => 'Empresa emissora inválida.']);
+    echo json_encode(['erro' => 'Informe um CNPJ com 14 dígitos.']);
     exit;
 }
-if (!in_array(strlen($documento), [11, 14], true)) {
+if ($codMunicipio === '') {
     http_response_code(400);
-    echo json_encode(['erro' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.']);
+    echo json_encode(['erro' => 'Código IBGE do município não informado (busque o CNPJ primeiro).']);
     exit;
 }
 
 try {
     $dbNotas = obterConexaoNotas();
-    $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
-    $stmtEmpresa->execute(['id' => $empresaId]);
-    $empresa = $stmtEmpresa->fetch();
+    $empresaCertificado = empresaComCertificadoParaConsultaCnc($dbNotas);
 
-    if (!$empresa) {
-        http_response_code(404);
-        echo json_encode(['erro' => 'Empresa emissora não encontrada.']);
-        exit;
-    }
-
-    $codMunicipio = (string) ($empresa['codigo_ibge_municipio'] ?? '');
-    if ($codMunicipio === '') {
+    if (!$empresaCertificado) {
         http_response_code(422);
-        echo json_encode(['erro' => 'Empresa emissora sem código IBGE do município cadastrado.']);
+        echo json_encode(['erro' => 'Nenhuma empresa do sistema tem certificado A1 válido cadastrado ainda para emprestar a consulta ao CNC.']);
         exit;
     }
 
-    $resultado = consultarContribuinteCnc($empresa, $documento, $codMunicipio);
+    $resultado = consultarContribuinteCnc($empresaCertificado, $cnpj, $codMunicipio);
 
     if (!$resultado['sucesso']) {
         http_response_code(502);

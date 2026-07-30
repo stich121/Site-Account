@@ -67,22 +67,28 @@ function certificadoEmpresaDisponivel(array $empresa): array
     return [true, ''];
 }
 // Consulta o CNC (Cadastro Nacional de Contribuintes) do Portal Nacional pra descobrir se um
-// CPF/CNPJ tem Inscrição Municipal registrada no mesmo município da empresa emissora - é essa
-// mesma checagem que o Sefin Nacional faz ao validar a IM do tomador/prestador na DPS (erro
-// E0116/E0228 quando deveria ter IM e não tem). Usado pra autopreencher a IM do tomador na tela
-// de emissão, sem depender do usuário digitar/saber esse dado.
+// CPF/CNPJ tem Inscrição Municipal registrada num município - é essa mesma checagem que o Sefin
+// Nacional faz ao validar a IM do prestador/tomador na DPS (erro E0116/E0228 quando deveria ter
+// IM e não tem). Usado pra autopreencher a IM tanto do tomador (na emissão) quanto da própria
+// empresa emissora (no cadastro dela).
+//
+// $empresaCertificado só empresta o certificado A1 pra autenticar no gateway do ADN - não precisa
+// ser a mesma empresa/CNPJ que está sendo consultada (por isso $documento e $codMunicipio são
+// parâmetros à parte): uma empresa emissora recém-cadastrada ainda não tem certificado próprio,
+// então usa o de qualquer outra empresa já configurada só pra abrir a conexão (ver
+// empresaComCertificadoParaConsultaCnc()).
 //
 // A biblioteca nfse-nacional/nfse-php tem um método pronto (Nfse::municipio()->consultarContribuinte),
 // mas ele monta a URL como path (/cnc/consulta/cad/{documento}) - diferente do endpoint oficial
 // documentado (GET /cnc/consulta/cad?inscricaoFederal=...&codMunicipio=...), então a chamada
 // direta aqui segue a especificação oficial (references/api-specs/*/API-NFS-e-CNC-Consulta-*.json).
-function consultarContribuinteCnc(array $empresa, string $documento): array
+function consultarContribuinteCnc(array $empresaCertificado, string $documento, string $codMunicipio): array
 {
     [$disponivel, $motivo] = integracaoNfseDisponivel();
     if (!$disponivel) {
         return ['sucesso' => false, 'mensagem' => $motivo, 'im' => null];
     }
-    [$certificadoOk, $motivoCertificado] = certificadoEmpresaDisponivel($empresa);
+    [$certificadoOk, $motivoCertificado] = certificadoEmpresaDisponivel($empresaCertificado);
     if (!$certificadoOk) {
         return ['sucesso' => false, 'mensagem' => $motivoCertificado, 'im' => null];
     }
@@ -92,18 +98,18 @@ function consultarContribuinteCnc(array $empresa, string $documento): array
         return ['sucesso' => false, 'mensagem' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.', 'im' => null];
     }
 
-    $codMunicipio = preg_replace('/\D+/', '', (string) ($empresa['codigo_ibge_municipio'] ?? ''));
+    $codMunicipio = preg_replace('/\D+/', '', $codMunicipio);
     if ($codMunicipio === '') {
-        return ['sucesso' => false, 'mensagem' => 'Empresa emissora sem código IBGE do município cadastrado.', 'im' => null];
+        return ['sucesso' => false, 'mensagem' => 'Município (código IBGE) não informado para a consulta.', 'im' => null];
     }
 
     try {
-        $baseUrl = ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao'
+        $baseUrl = ($empresaCertificado['ambiente_emissao'] ?? 'homologacao') === 'producao'
             ? 'https://adn.nfse.gov.br'
             : 'https://adn.producaorestrita.nfse.gov.br';
 
-        $caminhoCert = __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']);
-        $senha = descriptografarSegredo((string) $empresa['certificado_senha_cifrada']);
+        $caminhoCert = __DIR__ . '/certificados-nfse/' . basename((string) $empresaCertificado['certificado_arquivo']);
+        $senha = descriptografarSegredo((string) $empresaCertificado['certificado_senha_cifrada']);
 
         $client = new \GuzzleHttp\Client([
             'base_uri' => $baseUrl,
@@ -163,6 +169,26 @@ function consultarContribuinteCnc(array $empresa, string $documento): array
     } catch (Throwable $e) {
         return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o CNC: ' . trim(strip_tags($e->getMessage())), 'im' => null];
     }
+}
+
+// Acha qualquer empresa emissora ativa com certificado A1 válido, pra emprestar a autenticação
+// numa consulta ao CNC sobre uma empresa DIFERENTE (ex.: uma que está sendo cadastrada agora e
+// ainda não tem certificado próprio). Preferência pelo ambiente de produção, que é onde o CNC
+// tem os dados reais - em homologação o cadastro é só de teste.
+function empresaComCertificadoParaConsultaCnc(PDO $dbNotas): ?array
+{
+    $empresas = $dbNotas->query(
+        "SELECT * FROM empresas_emissoras WHERE ativo = 1 ORDER BY (ambiente_emissao = 'producao') DESC, razao_social ASC"
+    )->fetchAll();
+
+    foreach ($empresas as $empresa) {
+        [$certificadoOk] = certificadoEmpresaDisponivel($empresa);
+        if ($certificadoOk) {
+            return $empresa;
+        }
+    }
+
+    return null;
 }
 
 function normalizarChaveAcessoNfse(?string $valor): ?string
