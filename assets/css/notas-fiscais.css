@@ -21,6 +21,12 @@
     --text-muted: #A1A1A6;
     --border: rgba(255, 255, 255, 0.1);
     --border-soft: rgba(255, 255, 255, 0.06);
+    --notice-error-text: #FFD1CE;
+    --notice-error-bg: rgba(255, 69, 58, 0.08);
+    --notice-error-border: rgba(255, 69, 58, 0.35);
+    --notice-warning-text: #FFE8A3;
+    --notice-warning-bg: rgba(255, 191, 0, 0.08);
+    --notice-warning-border: rgba(255, 191, 0, 0.35);
     --radius: 10px;
     --radius-sm: 6px;
     --shadow-card: 0 12px 30px rgba(0, 0, 0, 0.28);
@@ -45,6 +51,12 @@
     --text-muted: #666D74;
     --border: rgba(10, 10, 10, 0.12);
     --border-soft: rgba(10, 10, 10, 0.06);
+    --notice-error-text: #8A241C;
+    --notice-error-bg: rgba(214, 57, 47, 0.1);
+    --notice-error-border: rgba(214, 57, 47, 0.35);
+    --notice-warning-text: #7A5600;
+    --notice-warning-bg: rgba(181, 129, 10, 0.12);
+    --notice-warning-border: rgba(181, 129, 10, 0.4);
     --shadow-card: 0 12px 30px rgba(20, 24, 26, 0.08);
     --shadow-pop: 0 24px 60px rgba(20, 24, 26, 0.16);
     color-scheme: light;
@@ -396,8 +408,8 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
 
 .btn-danger {
     background: transparent;
-    color: #FFD1CE;
-    border: 1px solid rgba(255, 69, 58, 0.35);
+    color: var(--notice-error-text);
+    border: 1px solid var(--notice-error-border);
 }
 
 .btn-danger:hover { background: rgba(255, 69, 58, 0.1); box-shadow: none; }
@@ -421,15 +433,15 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
 .notice i { margin-top: 0.2rem; font-size: 0.95rem; }
 
 .notice.error {
-    border-color: rgba(255, 69, 58, 0.35);
-    background: rgba(255, 69, 58, 0.08);
-    color: #FFD1CE;
+    border-color: var(--notice-error-border);
+    background: var(--notice-error-bg);
+    color: var(--notice-error-text);
 }
 
 .notice.warning {
-    border-color: rgba(255, 191, 0, 0.35);
-    background: rgba(255, 191, 0, 0.08);
-    color: #FFE8A3;
+    border-color: var(--notice-warning-border);
+    background: var(--notice-warning-bg);
+    color: var(--notice-warning-text);
 }
 
 /* ---------- Formulários ---------- */
@@ -787,10 +799,10 @@ table.lista tbody tr:hover,
 }
 .status-pill::before { content: ''; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: currentColor; flex: none; }
 .status-rascunho { background: rgba(161, 161, 166, 0.18); color: var(--text-muted); }
-.status-pendente_envio { background: rgba(255, 191, 0, 0.15); color: #FFE8A3; }
+.status-pendente_envio { background: var(--notice-warning-bg); color: var(--notice-warning-text); }
 .status-autorizada { background: rgba(116, 201, 44, 0.15); color: var(--primary); }
 .status-rejeitada,
-.status-cancelada { background: rgba(255, 69, 58, 0.15); color: #FFD1CE; }
+.status-cancelada { background: var(--notice-error-bg); color: var(--notice-error-text); }
 
 .status-active { color: var(--primary); font-weight: 700; }
 .status-inactive { color: var(--danger); font-weight: 700; }
