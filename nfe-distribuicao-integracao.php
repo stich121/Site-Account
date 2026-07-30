@@ -1,0 +1,293 @@
+<?php
+require_once __DIR__ . '/nfe-sefaz-integracao.php';
+// Buscador de NF-e: usa a Distribuição de DFe da SEFAZ (NfeDistribuicaoDFe/sefazDistDFe) para
+// baixar, por NSU sequencial, os documentos ligados ao CNPJ da empresa - tanto as NF-e que ela
+// emitiu (emit = empresa) quanto as que ela recebeu como destinatária. Mesmo padrão da NFS-e
+// (nfse-nacional-integracao.php), só que aqui é por UF (a lib resolve isso sozinha) e o
+// documento pode vir de duas formas diferentes:
+//
+// - resNFe: resumo (chave, emitente, valor, data, situação) - é o que normalmente chega para
+//   quem NÃO emitiu a nota (destinatário). Não tem destinatário nem itens, então não dá pra
+//   gerar DANFE a partir dele (falta o XML completo assinado).
+// - procNFe: NF-e completa (protocolo + XML autorizado) - normalmente para as notas que a
+//   própria empresa emitiu. A partir dela dá pra gerar o DANFE localmente (mesma função já usada
+//   em notas-fiscais.php).
+//
+// Eventos (cancelamento etc.) chegam como resEvento, referenciando a chave de uma nota já
+// sincronizada - mesmo tratamento dado aos eventos da NFS-e (não sobrescreve os dados da nota,
+// só marca cancelada).
+
+// Extrai série e número da própria chave de acesso (44 dígitos), já que o resumo (resNFe) não
+// traz esses campos separados - só a chave. Posições conforme o layout oficial da chave de NF-e.
+function extrairSerieNumeroDaChaveNfe(string $chave44): array
+{
+    $chave44 = preg_replace('/\D+/', '', $chave44);
+    if (strlen($chave44) !== 44) {
+        return ['serie' => null, 'numero' => null];
+    }
+
+    return [
+        'serie' => (int) substr($chave44, 22, 3),
+        'numero' => (int) substr($chave44, 25, 9),
+    ];
+}
+
+// Extrai os campos gravados em notas_fiscais_nfe_dfe a partir do conteúdo (já descompactado) de
+// um docZip cujo schema é resNFe_* ou procNFe_* (chamador decide isso olhando o atributo schema
+// antes de chamar). Retorna null se o XML não puder ser interpretado como NF-e/resumo de NF-e.
+function extrairCamposNfeDfe(string $xmlConteudo, bool $documentoCompleto, string $cnpjEmpresa): ?array
+{
+    try {
+        $xml = new SimpleXMLElement($xmlConteudo);
+    } catch (Throwable $e) {
+        return null;
+    }
+
+    if ($documentoCompleto) {
+        $infNfe = $xml->NFe->infNFe ?? null;
+        if ($infNfe === null) {
+            return null;
+        }
+        $chave = str_replace('NFe', '', (string) $infNfe->attributes()->Id);
+        $cnpjEmitente = preg_replace('/\D+/', '', (string) ($infNfe->emit->CNPJ ?? ''));
+        $cnpjDestinatario = preg_replace('/\D+/', '', (string) ($infNfe->dest->CNPJ ?? $infNfe->dest->CPF ?? ''));
+        $qtdItens = count($infNfe->det ?? []);
+        $primeiroProduto = (string) ($infNfe->det[0]->prod->xProd ?? '');
+        $descricao = $qtdItens > 1 ? "{$primeiroProduto} e mais " . ($qtdItens - 1) . ' item(ns)' : $primeiroProduto;
+        $cStat = (string) ($xml->protNFe->infProt->cStat ?? '');
+
+        return [
+            'chave_acesso' => $chave,
+            'tipo_documento' => $cnpjEmitente === $cnpjEmpresa ? 'emitida' : 'recebida',
+            'numero_nfe' => (int) ($infNfe->ide->nNF ?? 0) ?: null,
+            'serie' => (int) ($infNfe->ide->serie ?? 0) ?: null,
+            'situacao' => $cStat === '101' ? 'cancelada' : ($cStat === '110' || $cStat === '301' || $cStat === '302' ? 'denegada' : 'autorizada'),
+            'cnpj_emitente' => $cnpjEmitente !== '' ? $cnpjEmitente : null,
+            'nome_emitente' => (string) ($infNfe->emit->xNome ?? '') ?: null,
+            'cnpj_destinatario' => $cnpjDestinatario !== '' ? $cnpjDestinatario : null,
+            'nome_destinatario' => (string) ($infNfe->dest->xNome ?? '') ?: null,
+            'natureza_operacao' => (string) ($infNfe->ide->natOp ?? '') ?: null,
+            'descricao_resumida' => $descricao !== '' ? $descricao : null,
+            'data_emissao' => !empty($infNfe->ide->dhEmi) ? date('Y-m-d H:i:s', strtotime((string) $infNfe->ide->dhEmi)) : null,
+            'valor_nfe' => (float) ($infNfe->total->ICMSTot->vNF ?? 0),
+            'protocolo_autorizacao' => (string) ($xml->protNFe->infProt->nProt ?? '') ?: null,
+            'tem_documento_completo' => 1,
+        ];
+    }
+
+    // resNFe: resumo, sem destinatário nem itens - número/série vêm da própria chave.
+    $chave = (string) ($xml->chNFe ?? '');
+    if ($chave === '') {
+        return null;
+    }
+    $cnpjEmitente = preg_replace('/\D+/', '', (string) ($xml->CNPJ ?? ''));
+    $serieNumero = extrairSerieNumeroDaChaveNfe($chave);
+    $cSitNFe = (string) ($xml->cSitNFe ?? '');
+
+    return [
+        'chave_acesso' => $chave,
+        'tipo_documento' => $cnpjEmitente === $cnpjEmpresa ? 'emitida' : 'recebida',
+        'numero_nfe' => $serieNumero['numero'],
+        'serie' => $serieNumero['serie'],
+        'situacao' => $cSitNFe === '2' ? 'denegada' : 'autorizada',
+        'cnpj_emitente' => $cnpjEmitente !== '' ? $cnpjEmitente : null,
+        'nome_emitente' => (string) ($xml->xNome ?? '') ?: null,
+        'cnpj_destinatario' => null,
+        'nome_destinatario' => null,
+        'natureza_operacao' => null,
+        'descricao_resumida' => null,
+        'data_emissao' => !empty($xml->dhEmi) ? date('Y-m-d H:i:s', strtotime((string) $xml->dhEmi)) : null,
+        'valor_nfe' => (float) ($xml->vNF ?? 0),
+        'protocolo_autorizacao' => (string) ($xml->nProt ?? '') ?: null,
+        'tem_documento_completo' => 0,
+    ];
+}
+
+// Códigos de evento (tabela oficial da NF-e) que significam "esta NF-e foi cancelada".
+const NFE_DFE_CODIGOS_EVENTO_CANCELAMENTO = ['110111'];
+
+// Aplica um evento (resEvento) recebido da SEFAZ: só nos interessa marcar cancelamento na nota já
+// sincronizada, identificada pela chave que o próprio evento referencia.
+function aplicarEventoNfeDfe(PDO $dbNotas, string $xmlConteudo): bool
+{
+    try {
+        $xml = new SimpleXMLElement($xmlConteudo);
+    } catch (Throwable $e) {
+        return false;
+    }
+    if ((string) ($xml->getName()) !== 'resEvento' || empty($xml->chNFe)) {
+        return false;
+    }
+
+    $chave = preg_replace('/\D+/', '', (string) $xml->chNFe);
+    $tipoEvento = (string) ($xml->tpEvento ?? '');
+    if ($chave !== '' && in_array($tipoEvento, NFE_DFE_CODIGOS_EVENTO_CANCELAMENTO, true)) {
+        $stmt = $dbNotas->prepare(
+            'UPDATE notas_fiscais_nfe_dfe
+             SET cancelada = 1, data_cancelamento = COALESCE(data_cancelamento, :data_evento), atualizado_em = NOW()
+             WHERE chave_acesso = :chave_acesso'
+        );
+        $stmt->execute([
+            'data_evento' => !empty($xml->dhEvento) ? date('Y-m-d H:i:s', strtotime((string) $xml->dhEvento)) : date('Y-m-d H:i:s'),
+            'chave_acesso' => $chave,
+        ]);
+    }
+
+    return true;
+}
+
+function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
+{
+    [$ok, $erro, $tools] = montarToolsNfe($empresa);
+    if (!$ok) {
+        return ['sucesso' => false, 'mensagem' => $erro, 'total' => 0];
+    }
+
+    $cnpjEmpresa = preg_replace('/\D+/', '', (string) ($empresa['cnpj'] ?? ''));
+    if ($cnpjEmpresa === '') {
+        return ['sucesso' => false, 'mensagem' => 'Empresa sem CNPJ cadastrado; cadastre o CNPJ em Empresas emissoras.', 'total' => 0];
+    }
+
+    $totalProcessado = 0;
+
+    try {
+        $stmtUpsert = $dbNotas->prepare(
+            'INSERT INTO notas_fiscais_nfe_dfe
+                (empresa_emissora_id, chave_acesso, nsu, tipo_documento, numero_nfe, serie, situacao,
+                 cnpj_emitente, nome_emitente, cnpj_destinatario, nome_destinatario, natureza_operacao,
+                 descricao_resumida, data_emissao, valor_nfe, protocolo_autorizacao, tem_documento_completo,
+                 xml_completo, atualizado_em)
+             VALUES
+                (:empresa_emissora_id, :chave_acesso, :nsu, :tipo_documento, :numero_nfe, :serie, :situacao,
+                 :cnpj_emitente, :nome_emitente, :cnpj_destinatario, :nome_destinatario, :natureza_operacao,
+                 :descricao_resumida, :data_emissao, :valor_nfe, :protocolo_autorizacao, :tem_documento_completo,
+                 :xml_completo, NOW())
+             ON DUPLICATE KEY UPDATE
+                nsu = VALUES(nsu), tipo_documento = VALUES(tipo_documento), numero_nfe = VALUES(numero_nfe),
+                serie = VALUES(serie), situacao = VALUES(situacao), cnpj_emitente = VALUES(cnpj_emitente),
+                nome_emitente = VALUES(nome_emitente),
+                cnpj_destinatario = COALESCE(VALUES(cnpj_destinatario), cnpj_destinatario),
+                nome_destinatario = COALESCE(VALUES(nome_destinatario), nome_destinatario),
+                natureza_operacao = COALESCE(VALUES(natureza_operacao), natureza_operacao),
+                descricao_resumida = COALESCE(VALUES(descricao_resumida), descricao_resumida),
+                data_emissao = VALUES(data_emissao), valor_nfe = VALUES(valor_nfe),
+                protocolo_autorizacao = VALUES(protocolo_autorizacao),
+                tem_documento_completo = GREATEST(tem_documento_completo, VALUES(tem_documento_completo)),
+                xml_completo = IF(VALUES(tem_documento_completo) = 1, VALUES(xml_completo), xml_completo),
+                atualizado_em = NOW()'
+        );
+
+        $ultimoNsu = (int) ($empresa['nfe_dfe_ultimo_nsu'] ?? 0);
+        // A SEFAZ também aplica rate limit por CNPJ nesse serviço; mesma cautela usada na NFS-e.
+        $maximoLotes = 5;
+
+        $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_ultimo_nsu = :nsu, nfe_dfe_sincronizado_em = NOW() WHERE id = :id');
+
+        for ($lote = 0; $lote < $maximoLotes; $lote++) {
+            $respostaXml = $tools->sefazDistDFe($ultimoNsu);
+            $resposta = new SimpleXMLElement($respostaXml);
+            $cStat = (string) ($resposta->cStat ?? '');
+
+            if ($cStat !== '137' && $cStat !== '138' && empty($resposta->loteDistDFeInt)) {
+                // Código diferente de "documentos localizados"/"nenhum documento localizado" e sem
+                // lote: trata como aviso, não erro - encerra o laço sem mais tentativas.
+                $mensagemAviso = (string) ($resposta->xMotivo ?? 'Resposta inesperada da SEFAZ.');
+                if ($totalProcessado === 0) {
+                    return ['sucesso' => true, 'mensagem' => "Portal da SEFAZ: [{$cStat}] {$mensagemAviso}", 'total' => 0];
+                }
+                break;
+            }
+
+            if (!empty($resposta->loteDistDFeInt)) {
+                foreach ($resposta->loteDistDFeInt->docZip as $docZip) {
+                    $schema = (string) $docZip->attributes()->schema;
+                    $nsuDoc = (string) $docZip->attributes()->NSU;
+                    $xmlDoc = @gzdecode(base64_decode((string) $docZip));
+                    if ($xmlDoc === false || $xmlDoc === '') {
+                        continue;
+                    }
+
+                    if (str_starts_with($schema, 'resEvento') || str_starts_with($schema, 'procEventoNFe')) {
+                        aplicarEventoNfeDfe($dbNotas, $xmlDoc);
+                        continue;
+                    }
+
+                    $documentoCompleto = str_starts_with($schema, 'procNFe');
+                    if (!$documentoCompleto && !str_starts_with($schema, 'resNFe')) {
+                        continue;
+                    }
+
+                    $campos = extrairCamposNfeDfe($xmlDoc, $documentoCompleto, $cnpjEmpresa);
+                    if ($campos === null) {
+                        continue;
+                    }
+
+                    $campos['empresa_emissora_id'] = (int) $empresa['id'];
+                    $campos['nsu'] = $nsuDoc !== '' ? (int) $nsuDoc : null;
+                    $campos['xml_completo'] = $documentoCompleto ? $xmlDoc : null;
+                    $stmtUpsert->execute($campos);
+                    $totalProcessado++;
+                }
+            }
+
+            $novoUltimoNsu = (int) ($resposta->ultNSU ?? $ultimoNsu);
+            if ($novoUltimoNsu <= $ultimoNsu) {
+                $ultimoNsu = $novoUltimoNsu;
+                $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
+                break;
+            }
+            $ultimoNsu = $novoUltimoNsu;
+            $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
+            if (empty($resposta->loteDistDFeInt)) {
+                break;
+            }
+        }
+
+        $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
+        if ($totalProcessado > 0) {
+            $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
+        }
+
+        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado];
+    } catch (Throwable $e) {
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar a SEFAZ: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
+    }
+}
+
+// Coloca em dia TODAS as empresas com certificado válido para NF-e (mesma checagem de
+// certificado usada na NFS-e - certificadoEmpresaDisponivel() não é específica de nenhuma delas).
+function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpresa = 5): array
+{
+    $resultados = [];
+
+    foreach (empresasComCertificadoValidoAdn($dbNotas) as $empresa) {
+        $totalEmpresa = 0;
+        $ultimaMensagem = '';
+        $ultimoSucesso = true;
+
+        for ($tentativa = 0; $tentativa < $maxTentativasPorEmpresa; $tentativa++) {
+            $resultado = sincronizarNfeDfe($dbNotas, $empresa);
+            $ultimaMensagem = $resultado['mensagem'];
+            $ultimoSucesso = $resultado['sucesso'];
+            $totalEmpresa += $resultado['total'];
+
+            if (!$resultado['sucesso'] || $resultado['total'] === 0) {
+                break;
+            }
+
+            $stmtRecarregar = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+            $stmtRecarregar->execute(['id' => (int) $empresa['id']]);
+            $empresa = $stmtRecarregar->fetch();
+        }
+
+        $resultados[] = [
+            'empresa' => $empresa['razao_social'],
+            'sucesso' => $ultimoSucesso,
+            'total' => $totalEmpresa,
+            'mensagem' => $ultimaMensagem,
+        ];
+    }
+
+    return $resultados;
+}
+?>

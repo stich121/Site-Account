@@ -10,7 +10,8 @@ if (!isset($_SESSION['funcionario_id'])) {
 
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
-require_once __DIR__ . '/nfse-nacional-integracao.php';
+require_once __DIR__ . '/nfe-distribuicao-integracao.php';
+require_once __DIR__ . '/nfe-operacoes.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -30,7 +31,7 @@ function nomeExibicao(?string $usuario): string
     return trim(str_replace('.', ' ', $usuario ?? ''));
 }
 
-function paginasParaExibirAdn(int $paginaAtual, int $totalPaginas): array
+function paginasParaExibirNfeDfe(int $paginaAtual, int $totalPaginas): array
 {
     $paginas = array_unique(array_filter(array_merge(
         [1, 2],
@@ -42,7 +43,7 @@ function paginasParaExibirAdn(int $paginaAtual, int $totalPaginas): array
     return $paginas;
 }
 
-function colunaExisteNotasAdn(PDO $db, string $tabela, string $coluna): bool
+function colunaExisteNfeDfe(PDO $db, string $tabela, string $coluna): bool
 {
     $stmt = $db->prepare(
         'SELECT COUNT(*)
@@ -56,56 +57,50 @@ function colunaExisteNotasAdn(PDO $db, string $tabela, string $coluna): bool
     return (int) $stmt->fetchColumn() > 0;
 }
 
-function prepararTabelaNfseAdn(PDO $db): void
+function prepararTabelaNfeDfe(PDO $db): void
 {
     $db->exec(
-        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfse_adn (
+        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfe_dfe (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             empresa_emissora_id INT UNSIGNED NOT NULL,
             chave_acesso VARCHAR(60) NOT NULL,
             nsu BIGINT UNSIGNED NULL,
             tipo_documento ENUM('emitida','recebida') NOT NULL,
-            numero_nfse VARCHAR(30) NULL,
-            codigo_status INT UNSIGNED NULL,
-            cnpj_prestador VARCHAR(20) NULL,
-            nome_prestador VARCHAR(180) NULL,
-            cnpj_tomador VARCHAR(20) NULL,
-            nome_tomador VARCHAR(180) NULL,
-            descricao_servico VARCHAR(255) NULL,
+            numero_nfe INT UNSIGNED NULL,
+            serie SMALLINT UNSIGNED NULL,
+            situacao ENUM('autorizada','cancelada','denegada') NOT NULL DEFAULT 'autorizada',
+            cancelada TINYINT(1) NOT NULL DEFAULT 0,
+            data_cancelamento DATETIME NULL,
+            cnpj_emitente VARCHAR(20) NULL,
+            nome_emitente VARCHAR(180) NULL,
+            cnpj_destinatario VARCHAR(20) NULL,
+            nome_destinatario VARCHAR(180) NULL,
+            natureza_operacao VARCHAR(120) NULL,
+            descricao_resumida VARCHAR(255) NULL,
             data_emissao DATETIME NULL,
-            competencia DATE NULL,
-            valor_servico DECIMAL(14,2) NULL,
-            valor_liquido DECIMAL(14,2) NULL,
+            valor_nfe DECIMAL(14,2) NULL,
+            protocolo_autorizacao VARCHAR(30) NULL,
+            tem_documento_completo TINYINT(1) NOT NULL DEFAULT 0,
             xml_completo MEDIUMTEXT NULL,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uq_nfse_adn_chave (chave_acesso),
-            KEY idx_nfse_adn_empresa (empresa_emissora_id, tipo_documento, data_emissao),
-            CONSTRAINT fk_nfse_adn_empresa
+            UNIQUE KEY uq_nfe_dfe_chave (chave_acesso),
+            KEY idx_nfe_dfe_empresa (empresa_emissora_id, tipo_documento, data_emissao),
+            CONSTRAINT fk_nfe_dfe_empresa
                 FOREIGN KEY (empresa_emissora_id) REFERENCES empresas_emissoras(id)
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 }
 
-function prepararColunasNsuEmpresasEmissoras(PDO $db): void
+function prepararColunasNsuNfeEmpresasEmissoras(PDO $db): void
 {
-    if (!colunaExisteNotasAdn($db, 'empresas_emissoras', 'nfse_adn_ultimo_nsu')) {
-        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfse_adn_ultimo_nsu BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER certificado_validade');
+    if (!colunaExisteNfeDfe($db, 'empresas_emissoras', 'nfe_dfe_ultimo_nsu')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfe_dfe_ultimo_nsu BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER certificado_validade');
     }
-    if (!colunaExisteNotasAdn($db, 'empresas_emissoras', 'nfse_adn_sincronizado_em')) {
-        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfse_adn_sincronizado_em TIMESTAMP NULL AFTER nfse_adn_ultimo_nsu');
-    }
-}
-
-function prepararColunasCancelamentoNfseAdn(PDO $db): void
-{
-    if (!colunaExisteNotasAdn($db, 'notas_fiscais_nfse_adn', 'cancelada')) {
-        $db->exec('ALTER TABLE notas_fiscais_nfse_adn ADD COLUMN cancelada TINYINT(1) NOT NULL DEFAULT 0 AFTER codigo_status');
-    }
-    if (!colunaExisteNotasAdn($db, 'notas_fiscais_nfse_adn', 'data_cancelamento')) {
-        $db->exec('ALTER TABLE notas_fiscais_nfse_adn ADD COLUMN data_cancelamento DATETIME NULL AFTER cancelada');
+    if (!colunaExisteNfeDfe($db, 'empresas_emissoras', 'nfe_dfe_sincronizado_em')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfe_dfe_sincronizado_em TIMESTAMP NULL AFTER nfe_dfe_ultimo_nsu');
     }
 }
 
@@ -113,17 +108,10 @@ try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
 
-    if (!schemaJaPreparada('notas_fiscais_nfse_adn')) {
-        prepararTabelaNfseAdn($dbNotas);
-        prepararColunasNsuEmpresasEmissoras($dbNotas);
-        marcarSchemaPreparada('notas_fiscais_nfse_adn');
-    }
-    // Flag própria: a tabela notas_fiscais_nfse_adn já podia estar marcada como "preparada" em
-    // servidores onde o buscador rodou antes dessas colunas existirem, então essa migração
-    // precisa de um gate independente do de cima para não ficar pra sempre sem rodar.
-    if (!schemaJaPreparada('notas_fiscais_nfse_adn_cancelamento')) {
-        prepararColunasCancelamentoNfseAdn($dbNotas);
-        marcarSchemaPreparada('notas_fiscais_nfse_adn_cancelamento');
+    if (!schemaJaPreparada('notas_fiscais_nfe_dfe')) {
+        prepararTabelaNfeDfe($dbNotas);
+        prepararColunasNsuNfeEmpresasEmissoras($dbNotas);
+        marcarSchemaPreparada('notas_fiscais_nfe_dfe');
     }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
@@ -136,29 +124,26 @@ try {
         exit;
     }
 
-    if (empty($_SESSION['csrf_notas_nfse_adn'])) {
-        $_SESSION['csrf_notas_nfse_adn'] = bin2hex(random_bytes(32));
+    if (empty($_SESSION['csrf_notas_nfe_dfe'])) {
+        $_SESSION['csrf_notas_nfe_dfe'] = bin2hex(random_bytes(32));
     }
 
     $empresasEmissorasFiltro = $dbNotas->query(
-        'SELECT id, razao_social, cnpj, ambiente_emissao, nfse_adn_sincronizado_em FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
+        'SELECT id, razao_social, cnpj, uf, ambiente_emissao, nfe_dfe_sincronizado_em FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
     )->fetchAll();
 
-    // Sincronização automática: em toda visita normal à página (não em download nem em POST de uma
-    // ação manual), tenta colocar em dia UMA empresa com certificado digital válido - a que está há
-    // mais tempo sem sincronizar - sem precisar clicar em nada. Só uma por vez (e com intervalo
-    // mínimo) pra não deixar a página lenta nem estourar o rate limit do ADN; ao longo de algumas
-    // visitas (ou via cron, ver processar-nfse-adn-automatico.php) todas ficam em dia sozinhas.
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export'])) {
-        [$integracaoAutoOk] = integracaoNfseDisponivel();
+    // Sincronização automática: mesma lógica da NFS-e - uma empresa por visita normal à página,
+    // a que estiver há mais tempo sem sincronizar, respeitando um intervalo mínimo.
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_nfe_dfe']) && !isset($_GET['pdf_nfe_dfe']) && !isset($_GET['zip_export'])) {
+        [$integracaoAutoOk] = integracaoNfeDisponivel();
         if ($integracaoAutoOk) {
             $candidatasAuto = empresasComCertificadoValidoAdn($dbNotas);
-            usort($candidatasAuto, static fn (array $a, array $b): int => strtotime($a['nfse_adn_sincronizado_em'] ?? '1970-01-01') <=> strtotime($b['nfse_adn_sincronizado_em'] ?? '1970-01-01'));
+            usort($candidatasAuto, static fn (array $a, array $b): int => strtotime($a['nfe_dfe_sincronizado_em'] ?? '1970-01-01') <=> strtotime($b['nfe_dfe_sincronizado_em'] ?? '1970-01-01'));
 
             $empresaAuto = $candidatasAuto[0] ?? null;
             $cooldownAutoSegundos = 300;
-            if ($empresaAuto !== null && (empty($empresaAuto['nfse_adn_sincronizado_em']) || (time() - strtotime($empresaAuto['nfse_adn_sincronizado_em'])) > $cooldownAutoSegundos)) {
-                $resultadoAuto = sincronizarNfseAdn($dbNotas, $empresaAuto);
+            if ($empresaAuto !== null && (empty($empresaAuto['nfe_dfe_sincronizado_em']) || (time() - strtotime($empresaAuto['nfe_dfe_sincronizado_em'])) > $cooldownAutoSegundos)) {
+                $resultadoAuto = sincronizarNfeDfe($dbNotas, $empresaAuto);
                 if ($resultadoAuto['sucesso'] && $resultadoAuto['total'] > 0) {
                     $sucesso = "Sincronização automática de {$empresaAuto['razao_social']}: {$resultadoAuto['total']} documento(s) novo(s).";
                 }
@@ -166,67 +151,60 @@ try {
         }
     }
 
-    // Download do XML já baixado e guardado localmente (não faz nova chamada ao Portal Nacional).
-    if (isset($_GET['xml_adn'])) {
-        $documentoId = (int) $_GET['xml_adn'];
-        $stmtXml = $dbNotas->prepare('SELECT chave_acesso, xml_completo FROM notas_fiscais_nfse_adn WHERE id = :id LIMIT 1');
+    // Download do XML já baixado e guardado localmente. Só existe quando o documento veio
+    // completo (procNFe) - resumo (resNFe) não traz o XML autorizado, só os campos principais.
+    if (isset($_GET['xml_nfe_dfe'])) {
+        $documentoId = (int) $_GET['xml_nfe_dfe'];
+        $stmtXml = $dbNotas->prepare('SELECT chave_acesso, xml_completo FROM notas_fiscais_nfe_dfe WHERE id = :id LIMIT 1');
         $stmtXml->execute(['id' => $documentoId]);
         $documentoXml = $stmtXml->fetch();
         if (!$documentoXml || empty($documentoXml['xml_completo'])) {
             http_response_code(404);
-            echo 'Documento não encontrado.';
+            echo 'XML completo não disponível para este documento (só temos o resumo enviado pela SEFAZ).';
             exit;
         }
         header('Content-Type: application/xml; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="NFSe' . preg_replace('/[^0-9A-Za-z]/', '', (string) $documentoXml['chave_acesso']) . '.xml"');
+        header('Content-Disposition: attachment; filename="NFe' . preg_replace('/[^0-9A-Za-z]/', '', (string) $documentoXml['chave_acesso']) . '.xml"');
         echo $documentoXml['xml_completo'];
         exit;
     }
 
-    // DANFSe: renderizado localmente no leiaute oficial NT 008/2026 (mesmo gerador já usado
-    // em notas-fiscais.php para as notas emitidas pelo sistema), a partir do XML já salvo aqui
-    // — sem chamar o Portal Nacional de novo (o endpoint de PDF do ADN foi descontinuado).
-    if (isset($_GET['pdf_adn'])) {
-        $documentoId = (int) $_GET['pdf_adn'];
-        $stmtPdf = $dbNotas->prepare('SELECT chave_acesso, xml_completo FROM notas_fiscais_nfse_adn WHERE id = :id LIMIT 1');
+    // DANFE: gerado localmente (nfephp-org/sped-da) a partir do XML completo já salvo aqui,
+    // sem chamar a SEFAZ de novo. Só disponível quando temos o documento completo (procNFe).
+    if (isset($_GET['pdf_nfe_dfe'])) {
+        $documentoId = (int) $_GET['pdf_nfe_dfe'];
+        $stmtPdf = $dbNotas->prepare('SELECT chave_acesso, xml_completo FROM notas_fiscais_nfe_dfe WHERE id = :id LIMIT 1');
         $stmtPdf->execute(['id' => $documentoId]);
         $documentoPdf = $stmtPdf->fetch();
         if (!$documentoPdf || empty($documentoPdf['xml_completo'])) {
             http_response_code(404);
-            echo 'Documento não encontrado.';
+            echo 'DANFE não disponível para este documento (só temos o resumo enviado pela SEFAZ).';
             exit;
         }
 
         try {
-            if (!class_exists(\PhpNfseNacional\Services\DanfseService::class)) {
-                throw new RuntimeException('Gerador local de DANFSe não instalado no vendor/.');
-            }
-            $pdf = (new \PhpNfseNacional\Services\DanfseService())->gerarDoXml((string) $documentoPdf['xml_completo']);
-            if (!str_starts_with($pdf, '%PDF-')) {
-                throw new RuntimeException('Não foi possível gerar o DANFSe a partir do XML salvo.');
-            }
+            $pdf = gerarDanfePdf((string) $documentoPdf['xml_completo']);
         } catch (Throwable $e) {
             http_response_code(502);
             header('Content-Type: text/plain; charset=UTF-8');
-            echo 'DANFSe indisponível para este documento: ' . $e->getMessage() . ' Baixe o XML fiscal como alternativa.';
+            echo 'DANFE indisponível para este documento: ' . $e->getMessage() . ' Baixe o XML fiscal como alternativa.';
             exit;
         }
 
         header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="DANFSe' . preg_replace('/[^0-9A-Za-z]/', '', (string) $documentoPdf['chave_acesso']) . '.pdf"');
+        header('Content-Disposition: inline; filename="DANFE' . preg_replace('/[^0-9A-Za-z]/', '', (string) $documentoPdf['chave_acesso']) . '.pdf"');
         echo $pdf;
         exit;
     }
 
-    // Exportação em lote: ZIP com XML e/ou PDF de todo um período (data exata a data exata),
-    // sobre a cópia local já sincronizada. O usuário escolhe o formato pelo botão clicado:
-    // "ambos" (XML e PDF juntos no mesmo ZIP), "xml" ou "pdf" (cada um em ZIP separado).
+    // Exportação em lote: ZIP com XML e/ou DANFE de um período (data exata a data exata). Só
+    // entram documentos com XML completo salvo (resumo não gera nem XML fiscal nem DANFE).
     if (isset($_GET['zip_export'])) {
         $zipDataInicio = trim((string) ($_GET['zip_data_inicio'] ?? ''));
         $zipDataFim = trim((string) ($_GET['zip_data_fim'] ?? ''));
-        $dataValidaAdn = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1
+        $dataValidaNfe = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1
             && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
-        if (!$dataValidaAdn($zipDataInicio) || !$dataValidaAdn($zipDataFim)) {
+        if (!$dataValidaNfe($zipDataInicio) || !$dataValidaNfe($zipDataFim)) {
             http_response_code(400);
             echo 'Informe uma data inicial e final válidas para o ZIP.';
             exit;
@@ -244,7 +222,7 @@ try {
         $zipEmpresaId = (int) ($_GET['zip_empresa_emissora_id'] ?? 0);
         $zipTipo = in_array($_GET['zip_tipo'] ?? '', ['emitida', 'recebida'], true) ? $_GET['zip_tipo'] : '';
 
-        $condicoesZip = ['e.ativo = 1', 'a.data_emissao BETWEEN :data_inicio AND :data_fim'];
+        $condicoesZip = ['e.ativo = 1', 'a.data_emissao BETWEEN :data_inicio AND :data_fim', 'a.xml_completo IS NOT NULL'];
         $bindZip = ['data_inicio' => $zipDataInicio . ' 00:00:00', 'data_fim' => $zipDataFim . ' 23:59:59'];
         if ($zipEmpresaId > 0) {
             $condicoesZip[] = 'a.empresa_emissora_id = :empresa_emissora_id';
@@ -257,7 +235,7 @@ try {
 
         $stmtZip = $dbNotas->prepare(
             'SELECT a.chave_acesso, a.tipo_documento, a.xml_completo
-             FROM notas_fiscais_nfse_adn a
+             FROM notas_fiscais_nfe_dfe a
              INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id
              WHERE ' . implode(' AND ', $condicoesZip) . '
              ORDER BY a.data_emissao ASC'
@@ -270,65 +248,59 @@ try {
 
         if (empty($documentosZip)) {
             http_response_code(404);
-            echo 'Nenhum documento sincronizado encontrado para esse período. Sincronize a empresa antes de exportar.';
+            echo 'Nenhum documento com XML completo encontrado para esse período. Sincronize a empresa antes de exportar.';
             exit;
         }
 
-        $danfseDisponivelZip = class_exists(\PhpNfseNacional\Services\DanfseService::class);
-        $arquivoZipTempAdn = tempnam(sys_get_temp_dir(), 'nfse_adn_zip_');
-        $zipAdn = new ZipArchive();
-        if ($zipAdn->open($arquivoZipTempAdn, ZipArchive::OVERWRITE) !== true) {
+        $arquivoZipTempNfe = tempnam(sys_get_temp_dir(), 'nfe_dfe_zip_');
+        $zipNfe = new ZipArchive();
+        if ($zipNfe->open($arquivoZipTempNfe, ZipArchive::OVERWRITE) !== true) {
             http_response_code(500);
             echo 'Não foi possível gerar o arquivo ZIP.';
             exit;
         }
 
-        $totalArquivosZipAdn = 0;
+        $totalArquivosZipNfe = 0;
         foreach ($documentosZip as $documentoZip) {
-            if (empty($documentoZip['xml_completo']) || empty($documentoZip['chave_acesso'])) {
-                continue;
-            }
             $prefixoZip = ($documentoZip['tipo_documento'] === 'emitida' ? 'EMITIDA' : 'RECEBIDA') . '-' . preg_replace('/\D/', '', (string) $documentoZip['chave_acesso']);
 
             if ($zipFormato === 'ambos' || $zipFormato === 'xml') {
-                $zipAdn->addFromString($prefixoZip . '.xml', (string) $documentoZip['xml_completo']);
-                $totalArquivosZipAdn++;
+                $zipNfe->addFromString($prefixoZip . '.xml', (string) $documentoZip['xml_completo']);
+                $totalArquivosZipNfe++;
             }
 
-            if (($zipFormato === 'ambos' || $zipFormato === 'pdf') && $danfseDisponivelZip) {
+            if ($zipFormato === 'ambos' || $zipFormato === 'pdf') {
                 try {
-                    $pdfZip = (new \PhpNfseNacional\Services\DanfseService())->gerarDoXml((string) $documentoZip['xml_completo']);
-                    if (str_starts_with($pdfZip, '%PDF-')) {
-                        $zipAdn->addFromString($prefixoZip . '.pdf', $pdfZip);
-                        $totalArquivosZipAdn++;
-                    }
+                    $pdfZip = gerarDanfePdf((string) $documentoZip['xml_completo']);
+                    $zipNfe->addFromString($prefixoZip . '.pdf', $pdfZip);
+                    $totalArquivosZipNfe++;
                 } catch (Throwable $e) {
-                    // DANFSe pode falhar num documento pontual (XML incompleto); mantem so o XML dessa nota.
+                    // DANFE pode falhar num documento pontual; mantem so o XML dessa nota no ZIP.
                 }
             }
         }
 
-        $zipAdn->close();
+        $zipNfe->close();
 
-        if ($totalArquivosZipAdn === 0) {
-            unlink($arquivoZipTempAdn);
+        if ($totalArquivosZipNfe === 0) {
+            unlink($arquivoZipTempNfe);
             http_response_code(409);
-            echo 'Nenhum XML ou PDF pôde ser gerado para esse período.';
+            echo 'Nenhum XML ou DANFE pôde ser gerado para esse período.';
             exit;
         }
 
         header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="nfse-portal-nacional-' . $zipDataInicio . '_a_' . $zipDataFim . '.zip"');
-        header('Content-Length: ' . filesize($arquivoZipTempAdn));
-        readfile($arquivoZipTempAdn);
-        unlink($arquivoZipTempAdn);
+        header('Content-Disposition: attachment; filename="nfe-sefaz-' . $zipDataInicio . '_a_' . $zipDataFim . '.zip"');
+        header('Content-Length: ' . filesize($arquivoZipTempNfe));
+        readfile($arquivoZipTempNfe);
+        unlink($arquivoZipTempNfe);
         exit;
     }
 
     $empresaSincronizarId = 0;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
-        if (!hash_equals($_SESSION['csrf_notas_nfse_adn'], $csrf)) {
+        if (!hash_equals($_SESSION['csrf_notas_nfe_dfe'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
         } elseif (($_POST['acao'] ?? '') === 'sincronizar') {
             $empresaSincronizarId = (int) ($_POST['empresa_emissora_id'] ?? 0);
@@ -338,35 +310,17 @@ try {
             if (!$empresaSincronizar) {
                 $erro = 'Selecione uma empresa emissora válida para sincronizar.';
             } else {
-                $resultadoSync = sincronizarNfseAdn($dbNotas, $empresaSincronizar);
+                $resultadoSync = sincronizarNfeDfe($dbNotas, $empresaSincronizar);
                 if ($resultadoSync['sucesso']) {
                     $sucesso = $resultadoSync['mensagem'];
                 } else {
                     $erro = $resultadoSync['mensagem'];
                 }
             }
-        } elseif (($_POST['acao'] ?? '') === 'reprocessar_local') {
-            $totalReprocessado = reprocessarNfseAdnLocal($dbNotas);
-            $sucesso = "{$totalReprocessado} documento(s) reprocessado(s) a partir do XML já salvo (sem consultar o Portal Nacional de novo).";
-        } elseif (($_POST['acao'] ?? '') === 'reparar_eventos') {
-            $empresaSincronizarId = (int) ($_POST['empresa_emissora_id'] ?? 0);
-            $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
-            $stmtEmpresa->execute(['id' => $empresaSincronizarId]);
-            $empresaReparar = $stmtEmpresa->fetch();
-            if (!$empresaReparar) {
-                $erro = 'Selecione uma empresa emissora válida para reparar.';
-            } else {
-                $resultadoReparo = repararNotasCorrompidasPorEventoAdn($dbNotas, $empresaReparar);
-                if ($resultadoReparo['sucesso']) {
-                    $sucesso = $resultadoReparo['mensagem'];
-                } else {
-                    $erro = $resultadoReparo['mensagem'];
-                }
-            }
         }
     }
 
-    // Filtros de busca (aplicados sobre a cópia local sincronizada do Portal Nacional).
+    // Filtros de busca (aplicados sobre a cópia local sincronizada da SEFAZ).
     $filtroEmpresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
     $filtroTipo = in_array($_GET['tipo'] ?? '', ['emitida', 'recebida'], true) ? $_GET['tipo'] : '';
     $filtroDataInicio = trim($_GET['data_inicio'] ?? '');
@@ -394,14 +348,14 @@ try {
         $bind['data_fim'] = $filtroDataFim . ' 23:59:59';
     }
     if ($filtroBusca !== '') {
-        $condicoes[] = '(a.nome_prestador LIKE :busca OR a.nome_tomador LIKE :busca OR a.cnpj_prestador LIKE :busca_doc OR a.cnpj_tomador LIKE :busca_doc OR a.numero_nfse LIKE :busca_doc OR a.chave_acesso LIKE :busca_doc)';
+        $condicoes[] = '(a.nome_emitente LIKE :busca OR a.nome_destinatario LIKE :busca OR a.cnpj_emitente LIKE :busca_doc OR a.cnpj_destinatario LIKE :busca_doc OR a.numero_nfe LIKE :busca_doc OR a.chave_acesso LIKE :busca_doc)';
         $bind['busca'] = '%' . $filtroBusca . '%';
         $bind['busca_doc'] = '%' . preg_replace('/\D+/', '', $filtroBusca) . '%';
     }
     $sqlWhere = 'WHERE ' . implode(' AND ', $condicoes);
 
     $stmtTotal = $dbNotas->prepare(
-        "SELECT COUNT(*) FROM notas_fiscais_nfse_adn a INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id {$sqlWhere}"
+        "SELECT COUNT(*) FROM notas_fiscais_nfe_dfe a INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id {$sqlWhere}"
     );
     foreach ($bind as $chaveBind => $valorBind) {
         $stmtTotal->bindValue($chaveBind, $valorBind);
@@ -414,7 +368,7 @@ try {
 
     $stmt = $dbNotas->prepare(
         "SELECT a.*, e.razao_social AS empresa_razao_social
-         FROM notas_fiscais_nfse_adn a
+         FROM notas_fiscais_nfe_dfe a
          INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id
          {$sqlWhere}
          ORDER BY a.data_emissao DESC
@@ -428,14 +382,14 @@ try {
     $stmt->execute();
     $documentos = $stmt->fetchAll();
 } catch (PDOException $e) {
-    $erro = 'Erro ao carregar o buscador de NFS-e: ' . $e->getMessage();
+    $erro = 'Erro ao carregar o buscador de NF-e: ' . $e->getMessage();
     $documentos = [];
     $totalDocumentos = 0;
     $totalPaginas = 1;
     $paginaAtual = 1;
 }
 
-$csrf = h($_SESSION['csrf_notas_nfse_adn'] ?? '');
+$csrf = h($_SESSION['csrf_notas_nfe_dfe'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
 ?>
 <!DOCTYPE html>
@@ -443,7 +397,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buscador de NFS-e (Portal Nacional) | ACCOUNT Contabilidade</title>
+    <title>Buscador de NF-e (SEFAZ) | ACCOUNT Contabilidade</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
@@ -461,10 +415,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <i class="fa-solid fa-bars"></i> Menu
                 </button>
                 <div class="menu-dropdown" id="menuDropdown">
-                    <a class="btn btn-outline" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
+                    <a class="btn btn-outline" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
                     <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas fiscais</a>
                     <?php if ($podeAdministrar): ?>
-                        <a class="btn btn-outline" href="processar-nfse-adn-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (ADN)</a>
+                        <a class="btn btn-outline" href="processar-nfe-dfe-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (SEFAZ)</a>
                     <?php endif; ?>
                     <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                     <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
@@ -474,8 +428,8 @@ $usuario = h(nomeExibicao($usuarioRaw));
         </header>
 
         <section class="panel">
-            <h1>Buscador de NFS-e (Portal Nacional)</h1>
-            <p class="muted">Olá, <?php echo $usuario; ?>. Ferramenta independente do emissor de notas: consulta direto o Ambiente de Dados Nacional (ADN) e mostra todas as NFS-e ligadas ao CNPJ de cada empresa — as que ela emitiu e as que ela recebeu como tomadora.</p>
+            <h1>Buscador de NF-e (SEFAZ)</h1>
+            <p class="muted">Olá, <?php echo $usuario; ?>. Ferramenta independente do emissor de notas: consulta direto a Distribuição de DFe da SEFAZ e mostra as NF-e ligadas ao CNPJ de cada empresa — as que ela emitiu e as que ela recebeu como destinatária.</p>
         </section>
 
         <?php if ($erro !== ''): ?>
@@ -487,11 +441,11 @@ $usuario = h(nomeExibicao($usuarioRaw));
         <?php endif; ?>
 
         <div class="notice warning">
-            <strong>Como funciona:</strong> o Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfse-adn-automatico">sincronização automática</a> configurado) — não é preciso clicar em nada. Use o botão "Sincronizar agora" abaixo só se quiser forçar uma empresa específica na hora. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é o DANFSe gerado localmente no leiaute oficial (NT 008/2026), a partir do XML já sincronizado — sem depender do endpoint do ADN, que o governo descontinuou em 01/07/2026.
+            <strong>Como funciona:</strong> a SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis); para NF-e recebidas de terceiros, às vezes só chega um <strong>resumo</strong> (chave, emitente, valor, data) sem XML completo — nesse caso XML e DANFE não ficam disponíveis, só os dados na tabela.
         </div>
 
         <section class="panel">
-            <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente com o Portal Nacional</h2>
+            <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente com a SEFAZ</h2>
             <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                 <input type="hidden" name="acao" value="sincronizar">
@@ -503,36 +457,13 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 </select>
                 <button class="btn" type="submit"><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar agora</button>
             </form>
-
-            <details style="margin-top:1rem;">
-                <summary class="muted" style="cursor:pointer;">Ferramentas de manutenção (uso ocasional)</summary>
-                <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap;">
-                    <form method="post" onsubmit="return confirm('Reprocessar todos os documentos já baixados a partir do XML salvo? Não consulta o Portal Nacional, só recalcula os dados exibidos.');">
-                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                        <input type="hidden" name="acao" value="reprocessar_local">
-                        <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reprocessar documentos já baixados</button>
-                    </form>
-                    <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
-                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                        <input type="hidden" name="acao" value="reparar_eventos">
-                        <select class="select-filtro" name="empresa_emissora_id" required>
-                            <option value="">Selecione a empresa para reparar</option>
-                            <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                                <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-wrench"></i> Corrigir documentos sem dados (afetados por eventos)</button>
-                    </form>
-                </div>
-                <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Versões antigas dessa tela podiam gravar o evento de cancelamento por cima dos dados da nota original, deixando a linha sem prestador/tomador/valor. O botão "Corrigir" acima refaz a consulta por chave e restaura os dados certos, marcando também a nota como cancelada.</p>
-            </details>
         </section>
 
         <section class="panel">
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                 <h2 style="margin-bottom:0;"><i class="fa-solid fa-magnifying-glass"></i> Buscar documentos</h2>
                 <form method="get" class="row-actions" style="flex-wrap:wrap;">
-                    <input class="select-filtro" type="text" name="busca" value="<?php echo h($filtroBusca); ?>" placeholder="Nome, CNPJ, nº NFS-e ou chave" style="min-width:220px;">
+                    <input class="select-filtro" type="text" name="busca" value="<?php echo h($filtroBusca); ?>" placeholder="Nome, CNPJ, nº NF-e ou chave" style="min-width:220px;">
                     <input class="select-filtro" type="date" name="data_inicio" value="<?php echo h($filtroDataInicio); ?>" aria-label="Data inicial">
                     <span class="muted">até</span>
                     <input class="select-filtro" type="date" name="data_fim" value="<?php echo h($filtroDataFim); ?>" aria-label="Data final">
@@ -554,8 +485,8 @@ $usuario = h(nomeExibicao($usuarioRaw));
 
         <section class="panel">
             <h2><i class="fa-solid fa-file-zipper"></i> Exportar em lote</h2>
-            <p class="muted" style="margin-top:0;">Baixe em ZIP todos os documentos sincronizados de uma data exata até outra. Escolha se quer o XML e o PDF juntos no mesmo ZIP, ou cada formato em um ZIP separado.</p>
-            <form method="get" action="notas-fiscais-nfse-adn" class="row-actions" style="flex-wrap:wrap; align-items:center;">
+            <p class="muted" style="margin-top:0;">Baixe em ZIP os documentos com XML completo sincronizados de uma data exata até outra (resumos sem XML completo não entram). Escolha se quer o XML e o DANFE juntos no mesmo ZIP, ou cada formato em um ZIP separado.</p>
+            <form method="get" action="notas-fiscais-nfe-dfe" class="row-actions" style="flex-wrap:wrap; align-items:center;">
                 <input type="hidden" name="zip_export" value="1">
                 <input class="select-filtro" type="date" name="zip_data_inicio" required aria-label="Data inicial da exportação">
                 <span class="muted">até</span>
@@ -571,9 +502,9 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <option value="emitida">Somente emitidas</option>
                     <option value="recebida">Somente recebidas</option>
                 </select>
-                <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> ZIP: XML + PDF juntos</button>
+                <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> ZIP: XML + DANFE juntos</button>
                 <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="xml"><i class="fa-solid fa-file-zipper"></i> ZIP: só XML</button>
-                <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> ZIP: só PDF</button>
+                <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> ZIP: só DANFE</button>
             </form>
         </section>
 
@@ -584,10 +515,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         <tr>
                             <th>Data emissão</th>
                             <th>Tipo</th>
-                            <th>Prestador</th>
-                            <th>Tomador</th>
-                            <th>Nº NFS-e</th>
-                            <th>Valor líquido</th>
+                            <th>Emitente</th>
+                            <th>Destinatário</th>
+                            <th>Nº / Série</th>
+                            <th>Valor</th>
                             <th>Ação</th>
                         </tr>
                     </thead>
@@ -602,33 +533,40 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                     <span class="status-pill <?php echo $documento['tipo_documento'] === 'emitida' ? 'status-autorizada' : 'status-pendente_envio'; ?>">
                                         <?php echo $documento['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida'; ?>
                                     </span>
-                                    <?php if (!empty($documento['cancelada'])): ?>
+                                    <?php if (!empty($documento['cancelada']) || $documento['situacao'] !== 'autorizada'): ?>
                                         <div class="muted" style="font-size:0.7rem; margin-top:0.25rem;">
-                                            <span class="status-pill status-rejeitada">Cancelada</span>
+                                            <span class="status-pill status-rejeitada"><?php echo !empty($documento['cancelada']) ? 'Cancelada' : ucfirst((string) $documento['situacao']); ?></span>
                                             <?php if (!empty($documento['data_cancelamento'])): ?>
                                                 <div><?php echo h(date('d/m/Y H:i', strtotime($documento['data_cancelamento']))); ?></div>
                                             <?php endif; ?>
                                         </div>
                                     <?php endif; ?>
+                                    <?php if (empty($documento['tem_documento_completo'])): ?>
+                                        <div class="muted" style="font-size:0.65rem; margin-top:0.25rem;">Só resumo</div>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php echo h($documento['nome_prestador'] ?? '—'); ?>
-                                    <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_prestador'] ?? ''); ?></div>
+                                    <?php echo h($documento['nome_emitente'] ?? '—'); ?>
+                                    <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_emitente'] ?? ''); ?></div>
                                 </td>
                                 <td>
-                                    <?php echo h($documento['nome_tomador'] ?? '—'); ?>
-                                    <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_tomador'] ?? ''); ?></div>
+                                    <?php echo h($documento['nome_destinatario'] ?? '—'); ?>
+                                    <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_destinatario'] ?? ''); ?></div>
                                 </td>
                                 <td>
-                                    <?php echo h($documento['numero_nfse'] ?? '—'); ?>
+                                    <?php echo h((string) ($documento['numero_nfe'] ?? '—')); ?><?php echo !empty($documento['serie']) ? ' / ' . h((string) $documento['serie']) : ''; ?>
                                     <div class="muted" style="font-size:0.65rem;">Chave: <?php echo h($documento['chave_acesso']); ?></div>
                                 </td>
-                                <td>R$ <?php echo number_format((float) ($documento['valor_liquido'] ?? 0), 2, ',', '.'); ?></td>
+                                <td>R$ <?php echo number_format((float) ($documento['valor_nfe'] ?? 0), 2, ',', '.'); ?></td>
                                 <td>
-                                    <div class="row-actions" style="flex-wrap:nowrap;">
-                                        <a class="btn btn-outline btn-small" href="notas-fiscais-nfse-adn?xml_adn=<?php echo (int) $documento['id']; ?>"><i class="fa-solid fa-code"></i> XML</a>
-                                        <a class="btn btn-outline btn-small" href="notas-fiscais-nfse-adn?pdf_adn=<?php echo (int) $documento['id']; ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> PDF</a>
-                                    </div>
+                                    <?php if (!empty($documento['tem_documento_completo'])): ?>
+                                        <div class="row-actions" style="flex-wrap:nowrap;">
+                                            <a class="btn btn-outline btn-small" href="notas-fiscais-nfe-dfe?xml_nfe_dfe=<?php echo (int) $documento['id']; ?>"><i class="fa-solid fa-code"></i> XML</a>
+                                            <a class="btn btn-outline btn-small" href="notas-fiscais-nfe-dfe?pdf_nfe_dfe=<?php echo (int) $documento['id']; ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFE</a>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="muted" style="font-size:0.75rem;">Sem XML completo</span>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -637,7 +575,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
             </div>
 
             <?php if ($totalPaginas > 1): ?>
-                <?php $paginasExibir = paginasParaExibirAdn($paginaAtual, $totalPaginas); ?>
+                <?php $paginasExibir = paginasParaExibirNfeDfe($paginaAtual, $totalPaginas); ?>
                 <div class="row-actions" style="justify-content:center; margin-top:1rem;">
                     <?php $paginaAnterior = 0; ?>
                     <?php foreach ($paginasExibir as $p): ?>
@@ -645,7 +583,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                             <span class="muted" style="padding:0 0.25rem;">…</span>
                         <?php endif; ?>
                         <a class="btn <?php echo $p === $paginaAtual ? '' : 'btn-outline'; ?> btn-small"
-                           href="notas-fiscais-nfse-adn?<?php echo h(http_build_query(array_filter([
+                           href="notas-fiscais-nfe-dfe?<?php echo h(http_build_query(array_filter([
                                'busca' => $filtroBusca,
                                'data_inicio' => $filtroDataInicio,
                                'data_fim' => $filtroDataFim,
