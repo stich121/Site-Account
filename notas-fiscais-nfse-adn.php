@@ -179,6 +179,113 @@ try {
         exit;
     }
 
+    // Exportação em lote: ZIP com XML e/ou PDF de todo um período (data exata a data exata),
+    // sobre a cópia local já sincronizada. O usuário escolhe o formato pelo botão clicado:
+    // "ambos" (XML e PDF juntos no mesmo ZIP), "xml" ou "pdf" (cada um em ZIP separado).
+    if (isset($_GET['zip_export'])) {
+        $zipDataInicio = trim((string) ($_GET['zip_data_inicio'] ?? ''));
+        $zipDataFim = trim((string) ($_GET['zip_data_fim'] ?? ''));
+        $dataValidaAdn = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1
+            && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+        if (!$dataValidaAdn($zipDataInicio) || !$dataValidaAdn($zipDataFim)) {
+            http_response_code(400);
+            echo 'Informe uma data inicial e final válidas para o ZIP.';
+            exit;
+        }
+        if ($zipDataFim < $zipDataInicio) {
+            [$zipDataInicio, $zipDataFim] = [$zipDataFim, $zipDataInicio];
+        }
+        if (!class_exists('ZipArchive')) {
+            http_response_code(500);
+            echo 'Geração de ZIP indisponível: a extensão PHP "zip" não está habilitada neste servidor.';
+            exit;
+        }
+
+        $zipFormato = in_array($_GET['zip_formato'] ?? '', ['ambos', 'xml', 'pdf'], true) ? $_GET['zip_formato'] : 'ambos';
+        $zipEmpresaId = (int) ($_GET['zip_empresa_emissora_id'] ?? 0);
+        $zipTipo = in_array($_GET['zip_tipo'] ?? '', ['emitida', 'recebida'], true) ? $_GET['zip_tipo'] : '';
+
+        $condicoesZip = ['e.ativo = 1', 'a.data_emissao BETWEEN :data_inicio AND :data_fim'];
+        $bindZip = ['data_inicio' => $zipDataInicio . ' 00:00:00', 'data_fim' => $zipDataFim . ' 23:59:59'];
+        if ($zipEmpresaId > 0) {
+            $condicoesZip[] = 'a.empresa_emissora_id = :empresa_emissora_id';
+            $bindZip['empresa_emissora_id'] = $zipEmpresaId;
+        }
+        if ($zipTipo !== '') {
+            $condicoesZip[] = 'a.tipo_documento = :tipo_documento';
+            $bindZip['tipo_documento'] = $zipTipo;
+        }
+
+        $stmtZip = $dbNotas->prepare(
+            'SELECT a.chave_acesso, a.tipo_documento, a.xml_completo
+             FROM notas_fiscais_nfse_adn a
+             INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id
+             WHERE ' . implode(' AND ', $condicoesZip) . '
+             ORDER BY a.data_emissao ASC'
+        );
+        foreach ($bindZip as $chaveBindZip => $valorBindZip) {
+            $stmtZip->bindValue($chaveBindZip, $valorBindZip);
+        }
+        $stmtZip->execute();
+        $documentosZip = $stmtZip->fetchAll();
+
+        if (empty($documentosZip)) {
+            http_response_code(404);
+            echo 'Nenhum documento sincronizado encontrado para esse período. Sincronize a empresa antes de exportar.';
+            exit;
+        }
+
+        $danfseDisponivelZip = class_exists(\PhpNfseNacional\Services\DanfseService::class);
+        $arquivoZipTempAdn = tempnam(sys_get_temp_dir(), 'nfse_adn_zip_');
+        $zipAdn = new ZipArchive();
+        if ($zipAdn->open($arquivoZipTempAdn, ZipArchive::OVERWRITE) !== true) {
+            http_response_code(500);
+            echo 'Não foi possível gerar o arquivo ZIP.';
+            exit;
+        }
+
+        $totalArquivosZipAdn = 0;
+        foreach ($documentosZip as $documentoZip) {
+            if (empty($documentoZip['xml_completo']) || empty($documentoZip['chave_acesso'])) {
+                continue;
+            }
+            $prefixoZip = ($documentoZip['tipo_documento'] === 'emitida' ? 'EMITIDA' : 'RECEBIDA') . '-' . preg_replace('/\D/', '', (string) $documentoZip['chave_acesso']);
+
+            if ($zipFormato === 'ambos' || $zipFormato === 'xml') {
+                $zipAdn->addFromString($prefixoZip . '.xml', (string) $documentoZip['xml_completo']);
+                $totalArquivosZipAdn++;
+            }
+
+            if (($zipFormato === 'ambos' || $zipFormato === 'pdf') && $danfseDisponivelZip) {
+                try {
+                    $pdfZip = (new \PhpNfseNacional\Services\DanfseService())->gerarDoXml((string) $documentoZip['xml_completo']);
+                    if (str_starts_with($pdfZip, '%PDF-')) {
+                        $zipAdn->addFromString($prefixoZip . '.pdf', $pdfZip);
+                        $totalArquivosZipAdn++;
+                    }
+                } catch (Throwable $e) {
+                    // DANFSe pode falhar num documento pontual (XML incompleto); mantem so o XML dessa nota.
+                }
+            }
+        }
+
+        $zipAdn->close();
+
+        if ($totalArquivosZipAdn === 0) {
+            unlink($arquivoZipTempAdn);
+            http_response_code(409);
+            echo 'Nenhum XML ou PDF pôde ser gerado para esse período.';
+            exit;
+        }
+
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="nfse-portal-nacional-' . $zipDataInicio . '_a_' . $zipDataFim . '.zip"');
+        header('Content-Length: ' . filesize($arquivoZipTempAdn));
+        readfile($arquivoZipTempAdn);
+        unlink($arquivoZipTempAdn);
+        exit;
+    }
+
     $empresaSincronizarId = 0;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
@@ -377,7 +484,34 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
                 </form>
             </div>
+        </section>
 
+        <section class="panel">
+            <h2><i class="fa-solid fa-file-zipper"></i> Exportar em lote</h2>
+            <p class="muted" style="margin-top:0;">Baixe em ZIP todos os documentos sincronizados de uma data exata até outra. Escolha se quer o XML e o PDF juntos no mesmo ZIP, ou cada formato em um ZIP separado.</p>
+            <form method="get" action="notas-fiscais-nfse-adn" class="row-actions" style="flex-wrap:wrap; align-items:center;">
+                <input type="hidden" name="zip_export" value="1">
+                <input class="select-filtro" type="date" name="zip_data_inicio" required aria-label="Data inicial da exportação">
+                <span class="muted">até</span>
+                <input class="select-filtro" type="date" name="zip_data_fim" required aria-label="Data final da exportação">
+                <select class="select-filtro" name="zip_empresa_emissora_id">
+                    <option value="">Todas as empresas</option>
+                    <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                        <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select class="select-filtro" name="zip_tipo">
+                    <option value="">Emitidas e recebidas</option>
+                    <option value="emitida">Somente emitidas</option>
+                    <option value="recebida">Somente recebidas</option>
+                </select>
+                <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> ZIP: XML + PDF juntos</button>
+                <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="xml"><i class="fa-solid fa-file-zipper"></i> ZIP: só XML</button>
+                <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> ZIP: só PDF</button>
+            </form>
+        </section>
+
+        <section class="panel">
             <div class="table-wrap">
                 <table class="lista">
                     <thead>
