@@ -351,6 +351,18 @@ try {
                     $erro = $resultadoSync['mensagem'];
                 }
             }
+        } elseif (($_POST['acao'] ?? '') === 'reiniciar_nsu') {
+            $empresaSincronizarId = (int) ($_POST['empresa_emissora_id'] ?? 0);
+            $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+            $stmtEmpresa->execute(['id' => $empresaSincronizarId]);
+            $empresaReiniciar = $stmtEmpresa->fetch();
+            if (!$empresaReiniciar) {
+                $erro = 'Selecione uma empresa emissora válida para reiniciar.';
+            } else {
+                $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_ultimo_nsu = 0, nfe_dfe_bloqueado_ate = NULL WHERE id = :id')
+                    ->execute(['id' => (int) $empresaReiniciar['id']]);
+                $sucesso = "Sincronização de {$empresaReiniciar['razao_social']} reiniciada do zero. Clique em \"Sincronizar agora\" (ou aguarde a automática/cron) para buscar todo o histórico de novo.";
+            }
         }
     }
 
@@ -491,6 +503,24 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 </select>
                 <button class="btn" type="submit"><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar agora</button>
             </form>
+
+            <details style="margin-top:1rem;">
+                <summary class="muted" style="cursor:pointer;">Ferramentas de manutenção (uso ocasional)</summary>
+                <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap; align-items:center;">
+                    <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;" onsubmit="return confirm('Reiniciar a sincronização dessa empresa do zero (NSU = 0)? Isso vai buscar todo o histórico de novo desde o início, aos poucos, respeitando o limite de requisições da SEFAZ.');">
+                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                        <input type="hidden" name="acao" value="reiniciar_nsu">
+                        <select class="select-filtro" name="empresa_emissora_id" required>
+                            <option value="">Selecione a empresa para reiniciar</option>
+                            <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                                <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reiniciar sincronização do zero</button>
+                    </form>
+                </div>
+                <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Um bug já corrigido fazia notas emitidas (que vêm como documento completo, não resumo) serem descartadas silenciosamente em algumas sincronizações antigas - e como o ponteiro de posição (NSU) já tinha avançado, elas ficaram pra trás e não vão aparecer sozinhas. Use "Reiniciar sincronização do zero" na empresa afetada para buscar tudo de novo desde o início.</p>
+            </details>
         </section>
 
         <section class="panel">

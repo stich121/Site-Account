@@ -44,17 +44,28 @@ function extrairCamposNfeDfe(string $xmlConteudo, bool $documentoCompleto, strin
     }
 
     if ($documentoCompleto) {
-        $infNfe = $xml->NFe->infNFe ?? null;
+        // Busca infNFe/infProt em qualquer profundidade via local-name(), em vez de assumir uma
+        // estrutura fixa tipo $xml->NFe->infNFe: o docZip retornado pela SEFAZ pra um documento
+        // completo pode vir como <nfeProc><NFe><infNFe>...</infNFe></NFe><protNFe>...</protNFe>
+        // </nfeProc>, mas também já apareceu como <NFe><infNFe>...</infNFe></NFe> "solto" (sem o
+        // wrapper nfeProc/protNFe) dependendo do caso - acesso direto por propriedade falha
+        // silenciosamente nesse segundo formato, fazendo a nota inteira ser descartada sem erro.
+        $infNfeNodes = $xml->xpath('//*[local-name()="infNFe"]') ?: [];
+        $infNfe = $infNfeNodes[0] ?? null;
         if ($infNfe === null) {
             return null;
         }
+        $protNodes = $xml->xpath('//*[local-name()="infProt"]') ?: [];
+        $infProt = $protNodes[0] ?? null;
+
         $chave = str_replace('NFe', '', (string) $infNfe->attributes()->Id);
         $cnpjEmitente = preg_replace('/\D+/', '', (string) ($infNfe->emit->CNPJ ?? ''));
-        $cnpjDestinatario = preg_replace('/\D+/', '', (string) ($infNfe->dest->CNPJ ?? $infNfe->dest->CPF ?? ''));
+        $cnpjDestCnpj = (string) ($infNfe->dest->CNPJ ?? '');
+        $cnpjDestinatario = preg_replace('/\D+/', '', $cnpjDestCnpj !== '' ? $cnpjDestCnpj : (string) ($infNfe->dest->CPF ?? ''));
         $qtdItens = count($infNfe->det ?? []);
         $primeiroProduto = (string) ($infNfe->det[0]->prod->xProd ?? '');
         $descricao = $qtdItens > 1 ? "{$primeiroProduto} e mais " . ($qtdItens - 1) . ' item(ns)' : $primeiroProduto;
-        $cStat = (string) ($xml->protNFe->infProt->cStat ?? '');
+        $cStat = $infProt !== null ? (string) ($infProt->cStat ?? '') : '';
 
         return [
             'chave_acesso' => $chave,
@@ -70,19 +81,27 @@ function extrairCamposNfeDfe(string $xmlConteudo, bool $documentoCompleto, strin
             'descricao_resumida' => $descricao !== '' ? $descricao : null,
             'data_emissao' => !empty($infNfe->ide->dhEmi) ? date('Y-m-d H:i:s', strtotime((string) $infNfe->ide->dhEmi)) : null,
             'valor_nfe' => (float) ($infNfe->total->ICMSTot->vNF ?? 0),
-            'protocolo_autorizacao' => (string) ($xml->protNFe->infProt->nProt ?? '') ?: null,
+            'protocolo_autorizacao' => $infProt !== null ? ((string) ($infProt->nProt ?? '') ?: null) : null,
             'tem_documento_completo' => 1,
         ];
     }
 
-    // resNFe: resumo, sem destinatário nem itens - número/série vêm da própria chave.
-    $chave = (string) ($xml->chNFe ?? '');
+    // resNFe: resumo, sem destinatário nem itens - número/série vêm da própria chave. Mesma
+    // cautela de buscar via xpath/local-name() em vez de propriedade direta na raiz.
+    $noChNFe = $xml->xpath('//*[local-name()="chNFe"]');
+    $chave = !empty($noChNFe) ? (string) $noChNFe[0] : '';
     if ($chave === '') {
         return null;
     }
-    $cnpjEmitente = preg_replace('/\D+/', '', (string) ($xml->CNPJ ?? ''));
+    $noCnpjEmit = $xml->xpath('//*[local-name()="CNPJ"]');
+    $cnpjEmitente = preg_replace('/\D+/', '', !empty($noCnpjEmit) ? (string) $noCnpjEmit[0] : '');
     $serieNumero = extrairSerieNumeroDaChaveNfe($chave);
-    $cSitNFe = (string) ($xml->cSitNFe ?? '');
+    $noCSitNFe = $xml->xpath('//*[local-name()="cSitNFe"]');
+    $cSitNFe = !empty($noCSitNFe) ? (string) $noCSitNFe[0] : '';
+    $noXNome = $xml->xpath('//*[local-name()="xNome"]');
+    $noDhEmi = $xml->xpath('//*[local-name()="dhEmi"]');
+    $noVNF = $xml->xpath('//*[local-name()="vNF"]');
+    $noNProt = $xml->xpath('//*[local-name()="nProt"]');
 
     return [
         'chave_acesso' => $chave,
@@ -91,14 +110,14 @@ function extrairCamposNfeDfe(string $xmlConteudo, bool $documentoCompleto, strin
         'serie' => $serieNumero['serie'],
         'situacao' => $cSitNFe === '2' ? 'denegada' : 'autorizada',
         'cnpj_emitente' => $cnpjEmitente !== '' ? $cnpjEmitente : null,
-        'nome_emitente' => (string) ($xml->xNome ?? '') ?: null,
+        'nome_emitente' => !empty($noXNome) ? ((string) $noXNome[0] ?: null) : null,
         'cnpj_destinatario' => null,
         'nome_destinatario' => null,
         'natureza_operacao' => null,
         'descricao_resumida' => null,
-        'data_emissao' => !empty($xml->dhEmi) ? date('Y-m-d H:i:s', strtotime((string) $xml->dhEmi)) : null,
-        'valor_nfe' => (float) ($xml->vNF ?? 0),
-        'protocolo_autorizacao' => (string) ($xml->nProt ?? '') ?: null,
+        'data_emissao' => !empty($noDhEmi) ? date('Y-m-d H:i:s', strtotime((string) $noDhEmi[0])) : null,
+        'valor_nfe' => !empty($noVNF) ? (float) $noVNF[0] : 0.0,
+        'protocolo_autorizacao' => !empty($noNProt) ? ((string) $noNProt[0] ?: null) : null,
         'tem_documento_completo' => 0,
     ];
 }
@@ -115,20 +134,24 @@ function aplicarEventoNfeDfe(PDO $dbNotas, string $xmlConteudo): bool
     } catch (Throwable $e) {
         return false;
     }
-    if ((string) ($xml->getName()) !== 'resEvento' || empty($xml->chNFe)) {
+
+    $noChNFe = $xml->xpath('//*[local-name()="chNFe"]');
+    if (empty($noChNFe)) {
         return false;
     }
 
-    $chave = preg_replace('/\D+/', '', (string) $xml->chNFe);
-    $tipoEvento = (string) ($xml->tpEvento ?? '');
+    $chave = preg_replace('/\D+/', '', (string) $noChNFe[0]);
+    $noTpEvento = $xml->xpath('//*[local-name()="tpEvento"]');
+    $tipoEvento = !empty($noTpEvento) ? (string) $noTpEvento[0] : '';
     if ($chave !== '' && in_array($tipoEvento, NFE_DFE_CODIGOS_EVENTO_CANCELAMENTO, true)) {
+        $noDhEvento = $xml->xpath('//*[local-name()="dhEvento"]');
         $stmt = $dbNotas->prepare(
             'UPDATE notas_fiscais_nfe_dfe
              SET cancelada = 1, data_cancelamento = COALESCE(data_cancelamento, :data_evento), atualizado_em = NOW()
              WHERE chave_acesso = :chave_acesso'
         );
         $stmt->execute([
-            'data_evento' => !empty($xml->dhEvento) ? date('Y-m-d H:i:s', strtotime((string) $xml->dhEvento)) : date('Y-m-d H:i:s'),
+            'data_evento' => !empty($noDhEvento) ? date('Y-m-d H:i:s', strtotime((string) $noDhEvento[0])) : date('Y-m-d H:i:s'),
             'chave_acesso' => $chave,
         ]);
     }
@@ -247,20 +270,30 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             }
 
             foreach ($docZips as $docZip) {
-                $schema = (string) $docZip->attributes()->schema;
                 $nsuDoc = (string) $docZip->attributes()->NSU;
                 $xmlDoc = @gzdecode(base64_decode((string) $docZip));
                 if ($xmlDoc === false || $xmlDoc === '') {
                     continue;
                 }
 
-                if (str_starts_with($schema, 'resEvento') || str_starts_with($schema, 'procEventoNFe')) {
+                // Classifica pelo conteúdo real do documento, não pelo atributo "schema" do docZip:
+                // o formato exato desse atributo variou entre UFs/versões (foi a causa de notas
+                // emitidas sumindo, quando o código confiava só nesse texto). infEvento identifica
+                // um evento; infNFe identifica documento completo; chNFe sozinho (sem infNFe) é o
+                // resumo (resNFe).
+                try {
+                    $docParcial = new SimpleXMLElement($xmlDoc);
+                } catch (Throwable $e) {
+                    continue;
+                }
+
+                if (!empty($docParcial->xpath('//*[local-name()="infEvento"]'))) {
                     aplicarEventoNfeDfe($dbNotas, $xmlDoc);
                     continue;
                 }
 
-                $documentoCompleto = str_starts_with($schema, 'procNFe');
-                if (!$documentoCompleto && !str_starts_with($schema, 'resNFe')) {
+                $documentoCompleto = !empty($docParcial->xpath('//*[local-name()="infNFe"]'));
+                if (!$documentoCompleto && empty($docParcial->xpath('//*[local-name()="chNFe"]'))) {
                     continue;
                 }
 
