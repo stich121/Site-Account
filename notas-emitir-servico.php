@@ -833,19 +833,6 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             secoesFormJump.forEach(function (secao) { observadorSecoes.observe(secao); });
         }
 
-        const selectTomadorLocal = document.getElementById('nfse_tomador_local');
-        const campoTomadorInscricaoMunicipal = document.getElementById('nfse_tomador_inscricao_municipal');
-
-        function atualizarObrigatoriedadeTomador() {
-            if (!campoTomadorInscricaoMunicipal || !selectTomadorLocal) return;
-            campoTomadorInscricaoMunicipal.required = selectTomadorLocal.value === 'brasil';
-        }
-
-        if (selectTomadorLocal) {
-            selectTomadorLocal.addEventListener('change', atualizarObrigatoriedadeTomador);
-            atualizarObrigatoriedadeTomador();
-        }
-
         const municipioCodigo = document.getElementById('nfse_municipio_prestacao');
         const municipioBusca = document.getElementById('nfse_municipio_prestacao_busca');
         const municipioOpcoes = document.getElementById('nfse_municipio_prestacao_opcoes');
