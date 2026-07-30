@@ -99,6 +99,13 @@ function prepararColunasNsuEmpresasEmissoras(PDO $db): void
     }
 }
 
+function prepararColunaBloqueioEmpresasEmissoras(PDO $db): void
+{
+    if (!colunaExisteNotasAdn($db, 'empresas_emissoras', 'nfse_adn_bloqueado_ate')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfse_adn_bloqueado_ate DATETIME NULL AFTER nfse_adn_sincronizado_em');
+    }
+}
+
 function prepararColunasCancelamentoNfseAdn(PDO $db): void
 {
     if (!colunaExisteNotasAdn($db, 'notas_fiscais_nfse_adn', 'cancelada')) {
@@ -125,6 +132,10 @@ try {
         prepararColunasCancelamentoNfseAdn($dbNotas);
         marcarSchemaPreparada('notas_fiscais_nfse_adn_cancelamento');
     }
+    if (!schemaJaPreparada('notas_fiscais_nfse_adn_bloqueio')) {
+        prepararColunaBloqueioEmpresasEmissoras($dbNotas);
+        marcarSchemaPreparada('notas_fiscais_nfse_adn_bloqueio');
+    }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);
@@ -141,7 +152,7 @@ try {
     }
 
     $empresasEmissorasFiltro = $dbNotas->query(
-        'SELECT id, razao_social, cnpj, ambiente_emissao, nfse_adn_sincronizado_em FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
+        'SELECT id, razao_social, cnpj, ambiente_emissao, nfse_adn_sincronizado_em, nfse_adn_bloqueado_ate FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
     )->fetchAll();
 
     // Sincronização automática: em toda visita normal à página (não em download nem em POST de uma
@@ -149,10 +160,14 @@ try {
     // mais tempo sem sincronizar - sem precisar clicar em nada. Só uma por vez (e com intervalo
     // mínimo) pra não deixar a página lenta nem estourar o rate limit do ADN; ao longo de algumas
     // visitas (ou via cron, ver processar-nfse-adn-automatico.php) todas ficam em dia sozinhas.
+    // Empresas com bloqueio de rate-limit em vigor ficam de fora até o prazo passar.
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export'])) {
         [$integracaoAutoOk] = integracaoNfseDisponivel();
         if ($integracaoAutoOk) {
-            $candidatasAuto = empresasComCertificadoValidoAdn($dbNotas);
+            $candidatasAuto = array_values(array_filter(
+                empresasComCertificadoValidoAdn($dbNotas),
+                static fn (array $e): bool => empty($e['nfse_adn_bloqueado_ate']) || strtotime($e['nfse_adn_bloqueado_ate']) <= time()
+            ));
             usort($candidatasAuto, static fn (array $a, array $b): int => strtotime($a['nfse_adn_sincronizado_em'] ?? '1970-01-01') <=> strtotime($b['nfse_adn_sincronizado_em'] ?? '1970-01-01'));
 
             $empresaAuto = $candidatasAuto[0] ?? null;

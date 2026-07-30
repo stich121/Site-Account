@@ -470,6 +470,11 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         }
 
         if ($e->getCode() === 429) {
+            // Grava um prazo de bloqueio pra sincronização automática não insistir na mesma trava
+            // a cada poucos minutos - mesmo problema encontrado e corrigido no lado da NF-e.
+            $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_bloqueado_ate = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = :id')
+                ->execute(['id' => (int) $empresa['id']]);
+
             $mensagem = $totalProcessado > 0
                 ? "Portal Nacional limitou as requisições (erro 429) depois de {$totalProcessado} documento(s). O progresso já foi salvo; aguarde alguns minutos antes de sincronizar de novo."
                 : 'O Portal Nacional limitou as requisições neste CNPJ (erro 429 - excesso de chamadas em pouco tempo). Aguarde alguns minutos e clique em "Sincronizar agora" novamente.';
@@ -527,6 +532,11 @@ function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpr
     foreach (empresasComCertificadoValidoAdn($dbNotas) as $empresa) {
         if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
             break; // orçamento de tempo estourado - as empresas restantes ficam pra próxima execução
+        }
+
+        if (!empty($empresa['nfse_adn_bloqueado_ate']) && strtotime($empresa['nfse_adn_bloqueado_ate']) > time()) {
+            $resultados[] = ['empresa' => $empresa['razao_social'], 'sucesso' => true, 'total' => 0, 'mensagem' => 'Bloqueada pelo Portal Nacional até ' . date('d/m/Y H:i', strtotime($empresa['nfse_adn_bloqueado_ate'])) . '.'];
+            continue;
         }
 
         $totalEmpresa = 0;

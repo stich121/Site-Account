@@ -233,7 +233,13 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 
             if ($cStat !== '137' && $cStat !== '138' && empty($docZips)) {
                 // Código diferente de "documentos localizados"/"nenhum documento localizado" e sem
-                // lote: trata como aviso, não erro - encerra o laço sem mais tentativas.
+                // lote: trata como aviso, não erro - encerra o laço sem mais tentativas. cStat 656
+                // (Consumo Indevido) é a SEFAZ pedindo pra esperar - normalmente "tente após 1 hora".
+                // Grava esse prazo pra sincronização automática não insistir na mesma trava a cada
+                // poucos minutos.
+                $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_bloqueado_ate = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = :id')
+                    ->execute(['id' => (int) $empresa['id']]);
+
                 if ($totalProcessado === 0) {
                     return ['sucesso' => true, 'mensagem' => "Portal da SEFAZ: [{$cStat}] {$xMotivo}", 'total' => 0];
                 }
@@ -334,6 +340,11 @@ function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpre
     foreach (empresasComCertificadoValidoAdn($dbNotas) as $empresa) {
         if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
             break; // orçamento de tempo estourado - as empresas restantes ficam pra próxima execução
+        }
+
+        if (!empty($empresa['nfe_dfe_bloqueado_ate']) && strtotime($empresa['nfe_dfe_bloqueado_ate']) > time()) {
+            $resultados[] = ['empresa' => $empresa['razao_social'], 'sucesso' => true, 'total' => 0, 'mensagem' => 'Bloqueada pela SEFAZ até ' . date('d/m/Y H:i', strtotime($empresa['nfe_dfe_bloqueado_ate'])) . '.'];
+            continue;
         }
 
         $totalEmpresa = 0;

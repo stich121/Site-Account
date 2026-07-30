@@ -106,6 +106,13 @@ function prepararColunasNsuNfeEmpresasEmissoras(PDO $db): void
     }
 }
 
+function prepararColunaBloqueioNfeEmpresasEmissoras(PDO $db): void
+{
+    if (!colunaExisteNfeDfe($db, 'empresas_emissoras', 'nfe_dfe_bloqueado_ate')) {
+        $db->exec('ALTER TABLE empresas_emissoras ADD COLUMN nfe_dfe_bloqueado_ate DATETIME NULL AFTER nfe_dfe_sincronizado_em');
+    }
+}
+
 function prepararColunasManifestacaoNfeDfe(PDO $db): void
 {
     if (!colunaExisteNfeDfe($db, 'notas_fiscais_nfe_dfe', 'manifestada')) {
@@ -131,6 +138,10 @@ try {
         prepararColunasManifestacaoNfeDfe($dbNotas);
         marcarSchemaPreparada('notas_fiscais_nfe_dfe_manifestacao');
     }
+    if (!schemaJaPreparada('notas_fiscais_nfe_dfe_bloqueio')) {
+        prepararColunaBloqueioNfeEmpresasEmissoras($dbNotas);
+        marcarSchemaPreparada('notas_fiscais_nfe_dfe_bloqueio');
+    }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $funcionarioId]);
@@ -147,15 +158,20 @@ try {
     }
 
     $empresasEmissorasFiltro = $dbNotas->query(
-        'SELECT id, razao_social, cnpj, uf, ambiente_emissao, nfe_dfe_sincronizado_em FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
+        'SELECT id, razao_social, cnpj, uf, ambiente_emissao, nfe_dfe_sincronizado_em, nfe_dfe_bloqueado_ate FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
     )->fetchAll();
 
     // Sincronização automática: mesma lógica da NFS-e - uma empresa por visita normal à página,
-    // a que estiver há mais tempo sem sincronizar, respeitando um intervalo mínimo.
+    // a que estiver há mais tempo sem sincronizar, respeitando um intervalo mínimo. Empresas que
+    // levaram um bloqueio de rate-limit da SEFAZ (ex.: "tente após 1 hora") ficam de fora até o
+    // prazo do bloqueio passar - nada de insistir na mesma trava a cada poucos minutos.
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_nfe_dfe']) && !isset($_GET['pdf_nfe_dfe']) && !isset($_GET['zip_export'])) {
         [$integracaoAutoOk] = integracaoNfeDisponivel();
         if ($integracaoAutoOk) {
-            $candidatasAuto = empresasComCertificadoValidoAdn($dbNotas);
+            $candidatasAuto = array_values(array_filter(
+                empresasComCertificadoValidoAdn($dbNotas),
+                static fn (array $e): bool => empty($e['nfe_dfe_bloqueado_ate']) || strtotime($e['nfe_dfe_bloqueado_ate']) <= time()
+            ));
             usort($candidatasAuto, static fn (array $a, array $b): int => strtotime($a['nfe_dfe_sincronizado_em'] ?? '1970-01-01') <=> strtotime($b['nfe_dfe_sincronizado_em'] ?? '1970-01-01'));
 
             $empresaAuto = $candidatasAuto[0] ?? null;
