@@ -29,10 +29,12 @@ if ($viaCli) {
         exit(0);
     }
 
-    // CLI não tem o limite de ~30s de uma requisição via navegador; orçamento maior aqui ajuda a
-    // dar conta de um catch-up retroativo grande (ex.: 3 meses de histórico) em poucas execuções.
+    // CLI não tem o limite de ~30s de uma requisição via navegador. O orçamento de tempo aqui é
+    // maior, mas sincronizarNfeDfe() já espaça as chamadas internamente (sleep) pra não levar um
+    // bloqueio de "Consumo Indevido" da SEFAZ - o catch-up de um histórico grande é feito aos
+    // poucos, ao longo de várias execuções do cron, não tudo de uma vez.
     set_time_limit(180);
-    $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas, 40, 150);
+    $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas, 10, 150);
     if (empty($resultados)) {
         echo "Nenhuma empresa com certificado A1 válido para sincronizar.\n";
         exit(0);
@@ -85,7 +87,7 @@ try {
             // Orçamento de tempo curto aqui: requisição via navegador costuma ter limite de
             // execução de ~30s. Pra um catch-up retroativo grande, use o cron via CLI (mais acima
             // nesta página) ou clique em "Sincronizar todas agora" várias vezes.
-            $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas, 15, 20);
+            $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas, 3, 20);
             $sucesso = !empty($resultados)
                 ? ('Sincronização concluída: ' . count($resultados) . ' empresa(s) verificada(s).')
                 : 'Nenhuma empresa com certificado A1 válido para sincronizar.';
@@ -157,7 +159,7 @@ $csrf = h($_SESSION['csrf_processar_nfe_dfe'] ?? '');
         <div class="notice warning">
             <strong>Para rodar sozinho, sem depender de ninguém abrir esta página:</strong> configure no hPanel da Hostinger (Avançado &gt; Cron Jobs) uma tarefa a cada 10-15 minutos executando:
             <code>php <?php echo h(__DIR__); ?>/processar-nfe-dfe-automatico.php --cli</code>
-            Cada execução do cron busca bem mais fundo que uma sincronização manual (até 150 segundos de tentativas por empresa), então um histórico retroativo grande (ex.: 3 meses numa empresa que nunca sincronizou) tende a ficar em dia em poucas execuções, sem precisar de nada manual.
+Cada execução do cron avança um pouco mais que uma sincronização manual, mas de forma espaçada (com pausas reais entre as chamadas) pra não levar um bloqueio de rate limit da SEFAZ. Um histórico retroativo grande (ex.: 3 meses numa empresa que nunca sincronizou) fica em dia ao longo de várias execuções do cron, sem precisar de nada manual.
         </div>
 
         <?php if (!empty($resultados)): ?>

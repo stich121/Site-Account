@@ -405,6 +405,9 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = :nsu, nfse_adn_sincronizado_em = NOW() WHERE id = :id');
 
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
+            if ($lote > 0) {
+                sleep(3);
+            }
             $resposta = $nfse->contribuinte()->baixarDfe($ultimoNsu, $cnpjEmpresa, true);
 
             foreach ($resposta->listaNsu as $documento) {
@@ -518,13 +521,14 @@ function empresasComCertificadoValidoAdn(PDO $dbNotas): array
 // o buscador (uma empresa por vez) quanto pelo script de cron processar-nfse-adn-automatico.php
 // (todas de uma vez, pra funcionar sem ninguém precisar abrir a página).
 //
-// $maxTentativasPorEmpresa alto e $tempoLimiteSegundos existem pra dar conta de um catch-up
+// $maxTentativasPorEmpresa e $tempoLimiteSegundos existem pra dar conta de um catch-up
 // retroativo grande (ex.: 3 meses de histórico numa empresa que nunca sincronizou) num único
 // cron, sem precisar de dezenas de execuções - mas sem risco de estourar o tempo de execução do
 // PHP. Não aumenta o número de chamadas ao Portal Nacional além do necessário: cada empresa já
-// para sozinha assim que não há mais documento novo ou dá erro (ex.: rate limit) - o limite alto
-// só permite ir mais fundo quando o backlog é grande de verdade.
-function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpresa = 40, int $tempoLimiteSegundos = 90): array
+// para sozinha assim que não há mais documento novo ou dá erro (ex.: rate limit). Cada tentativa
+// é espaçada por uma pausa real - o objetivo é avançar de forma sustentável, não processar o
+// máximo possível num único cron (foi rajada demais que causou bloqueio de rate limit na NF-e).
+function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpresa = 10, int $tempoLimiteSegundos = 90): array
 {
     $resultados = [];
     $inicio = microtime(true);
@@ -547,6 +551,10 @@ function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpr
             if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
                 $ultimaMensagem .= ' (parou por orçamento de tempo; continua na próxima execução)';
                 break;
+            }
+
+            if ($tentativa > 0) {
+                sleep(5);
             }
 
             $resultado = sincronizarNfseAdn($dbNotas, $empresa);

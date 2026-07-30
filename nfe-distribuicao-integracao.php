@@ -234,12 +234,18 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
         );
 
         $ultimoNsu = (int) ($empresa['nfe_dfe_ultimo_nsu'] ?? 0);
-        // A SEFAZ também aplica rate limit por CNPJ nesse serviço; mesma cautela usada na NFS-e.
+        // A SEFAZ aplica um controle de consumo bem mais rígido do que o ADN da NFS-e (o "[656]
+        // Consumo Indevido" chega rápido se as chamadas vierem em rajada). O SIEG e sistemas
+        // parecidos não "driblam" esse limite - eles só respeitam um intervalo real entre
+        // chamadas, então o sleep() abaixo entre lotes é essencial, não opcional.
         $maximoLotes = 5;
 
         $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_ultimo_nsu = :nsu, nfe_dfe_sincronizado_em = NOW() WHERE id = :id');
 
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
+            if ($lote > 0) {
+                sleep(3);
+            }
             $respostaXml = $tools->sefazDistDFe($ultimoNsu);
             $resposta = new SimpleXMLElement($respostaXml);
             // A resposta pode vir com um wrapper da operação SOAP por cima de retDistDFeInt (varia
@@ -334,7 +340,12 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
         );
         $stmtPendentesManifestacao->execute(['empresa_emissora_id' => (int) $empresa['id']]);
         $stmtMarcarManifestada = $dbNotas->prepare('UPDATE notas_fiscais_nfe_dfe SET manifestada = 1, data_manifestacao = NOW() WHERE id = :id');
+        $primeiraManifestacao = true;
         foreach ($stmtPendentesManifestacao->fetchAll() as $pendente) {
+            if (!$primeiraManifestacao) {
+                sleep(2);
+            }
+            $primeiraManifestacao = false;
             $resultadoManifesto = manifestarCienciaNfe($empresa, (string) $pendente['chave_acesso']);
             if ($resultadoManifesto['sucesso']) {
                 $stmtMarcarManifestada->execute(['id' => (int) $pendente['id']]);
@@ -359,13 +370,12 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 // Coloca em dia TODAS as empresas com certificado válido para NF-e (mesma checagem de
 // certificado usada na NFS-e - certificadoEmpresaDisponivel() não é específica de nenhuma delas).
 //
-// $maxTentativasPorEmpresa alto (cada tentativa já busca até 5 lotes) e $tempoLimiteSegundos
-// existem pra dar conta de um catch-up retroativo grande (ex.: 3 meses de histórico numa empresa
-// que nunca sincronizou) num único cron, sem depender de dezenas de execuções - mas sem correr o
-// risco de estourar o tempo de execução do PHP. Não aumenta o número de chamadas feitas à SEFAZ
-// além do necessário: cada empresa já para sozinha assim que não há mais documento novo ou dá erro
-// (ex.: rate limit) - o limite alto só permite ir mais fundo quando o backlog é grande de verdade.
-function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpresa = 40, int $tempoLimiteSegundos = 90): array
+// A SEFAZ bloqueia rápido quando as chamadas vêm em rajada (ver comentário em sincronizarNfeDfe()
+// sobre o "[656] Consumo Indevido"). Por isso, apesar de $maxTentativasPorEmpresa permitir ir
+// fundo num catch-up retroativo grande, cada tentativa aqui é espaçada por uma pausa real - o
+// objetivo não é processar o máximo possível num único cron, e sim avançar de forma sustentável,
+// confiando que o cron vai rodar de novo em 10-15 minutos pra continuar de onde parou.
+function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpresa = 10, int $tempoLimiteSegundos = 90): array
 {
     $resultados = [];
     $inicio = microtime(true);
@@ -388,6 +398,10 @@ function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpre
             if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
                 $ultimaMensagem .= ' (parou por orçamento de tempo; continua na próxima execução)';
                 break;
+            }
+
+            if ($tentativa > 0) {
+                sleep(5);
             }
 
             $resultado = sincronizarNfeDfe($dbNotas, $empresa);
