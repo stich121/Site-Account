@@ -336,6 +336,15 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
 
         return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado];
     } catch (\Nfse\Http\Exceptions\NfseApiException $e) {
+        // E2220/"NENHUM_DOCUMENTO_LOCALIZADO" não é uma falha: é o próprio ADN avisando que não
+        // há documento novo a partir do NSU informado (fim da fila). Trata como sincronização
+        // tranquila, sem novidades, em vez de mostrar o JSON de erro cru pro usuário.
+        $semDocumentoNovo = str_contains((string) $e->getRawResponse(), 'NENHUM_DOCUMENTO_LOCALIZADO')
+            || (bool) array_filter($e->getErrors(), static fn ($erro): bool => ($erro->codigo ?? '') === 'E2220');
+        if ($semDocumentoNovo) {
+            return ['sucesso' => true, 'mensagem' => 'Nenhum documento novo encontrado no Portal Nacional. A empresa já está em dia.', 'total' => $totalProcessado];
+        }
+
         if ($e->getCode() === 429) {
             $mensagem = $totalProcessado > 0
                 ? "Portal Nacional limitou as requisições (erro 429) depois de {$totalProcessado} documento(s). O progresso já foi salvo; aguarde alguns minutos antes de sincronizar de novo."
