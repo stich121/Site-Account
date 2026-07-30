@@ -327,7 +327,6 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         <tr>
                             <th>Data emissão</th>
                             <th>Tipo</th>
-                            <th>Empresa</th>
                             <th>Prestador</th>
                             <th>Tomador</th>
                             <th>Nº NFS-e</th>
@@ -337,7 +336,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     </thead>
                     <tbody>
                         <?php if (empty($documentos)): ?>
-                            <tr><td colspan="8" class="muted">Nenhum documento encontrado. Sincronize a empresa acima ou ajuste os filtros.</td></tr>
+                            <tr><td colspan="7" class="muted">Nenhum documento encontrado. Sincronize a empresa acima ou ajuste os filtros.</td></tr>
                         <?php endif; ?>
                         <?php foreach ($documentos as $documento): ?>
                             <tr>
@@ -347,7 +346,6 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                         <?php echo $documento['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida'; ?>
                                     </span>
                                 </td>
-                                <td><?php echo h($documento['empresa_razao_social']); ?></td>
                                 <td>
                                     <?php echo h($documento['nome_prestador'] ?? '—'); ?>
                                     <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_prestador'] ?? ''); ?></div>
