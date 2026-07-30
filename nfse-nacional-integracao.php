@@ -206,9 +206,11 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
 
         $ultimoNsu = (int) ($empresa['nfse_adn_ultimo_nsu'] ?? 0);
         // O ADN aplica rate limit por CNPJ nesse endpoint (HTTP 429 se chamado rápido demais).
-        // Por isso um clique em "Sincronizar agora" baixa só 1 lote; para pegar um backlog grande
-        // o usuário clica de novo (o NSU já avançado fica salvo, então continua de onde parou).
-        $maximoLotes = 1;
+        // Por isso um clique em "Sincronizar agora" baixa no máximo 5 lotes; para pegar um backlog
+        // maior o usuário clica de novo (o NSU já avançado fica salvo, então continua de onde parou).
+        $maximoLotes = 5;
+
+        $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = :nsu, nfse_adn_sincronizado_em = NOW() WHERE id = :id');
 
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
             $resposta = $nfse->contribuinte()->baixarDfe($ultimoNsu, $cnpjEmpresa, true);
@@ -263,16 +265,15 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
             $novoUltimoNsu = (int) ($resposta->ultimoNsu ?? $ultimoNsu);
             if ($novoUltimoNsu <= $ultimoNsu) {
                 $ultimoNsu = $novoUltimoNsu;
+                $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
                 break;
             }
             $ultimoNsu = $novoUltimoNsu;
+            $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
             if (empty($resposta->listaNsu)) {
                 break;
             }
         }
-
-        $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = :nsu, nfse_adn_sincronizado_em = NOW() WHERE id = :id');
-        $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
 
         $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
         if ($totalProcessado > 0) {
