@@ -152,6 +152,83 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa)
     }
 }
 
+// Extrai os campos gravados em notas_fiscais_nfse_adn a partir do XML já parseado.
+// Isolado para poder ser reaproveitado tanto na sincronização (dados novos vindos do ADN)
+// quanto num reprocessamento local (recalcular a partir do xml_completo já salvo, sem
+// chamar o Portal Nacional de novo) sempre que essa extração for corrigida/melhorada.
+function extrairCamposNfseAdn(\Nfse\Dto\Nfse\NfseData $nfseData, string $cnpjEmpresa): array
+{
+    $infNfse = $nfseData->infNfse ?? null;
+    $infDps = $infNfse?->dps?->infDps;
+    $prestador = $infDps?->prestador;
+    $tomador = $infDps?->tomador;
+    $servico = $infDps?->servico;
+
+    $cnpjPrestador = preg_replace('/\D+/', '', (string) ($prestador?->cnpj ?? ''));
+    $cnpjTomador = preg_replace('/\D+/', '', (string) ($tomador?->cnpj ?? ''));
+    $dataEmissao = $infDps?->dataEmissao;
+    $dataCompetencia = $infDps?->dataCompetencia;
+
+    return [
+        'tipo_documento' => $cnpjPrestador === $cnpjEmpresa ? 'emitida' : 'recebida',
+        'numero_nfse' => $infNfse?->numeroNfse,
+        'codigo_status' => $infNfse?->codigoStatus?->value,
+        'cnpj_prestador' => $cnpjPrestador !== '' ? $cnpjPrestador : null,
+        // xNome no bloco "prestador" da DPS é opcional (nem todo emissor de terceiros preenche);
+        // o nome oficial e sempre garantido é o do bloco "emitente" da NFS-e, preenchido pelo
+        // ADN a partir do cadastro nacional do CNPJ emissor.
+        'nome_prestador' => $prestador?->nome ?? $infNfse?->emitente?->nome,
+        'cnpj_tomador' => $cnpjTomador !== '' ? $cnpjTomador : null,
+        'nome_tomador' => $tomador?->nome,
+        'descricao_servico' => $servico?->codigoServico?->descricaoServico ?? $servico?->informacaoComplemento?->informacoesComplementares,
+        'data_emissao' => !empty($dataEmissao) ? date('Y-m-d H:i:s', strtotime($dataEmissao)) : null,
+        'competencia' => !empty($dataCompetencia) ? date('Y-m-d', strtotime($dataCompetencia)) : null,
+        'valor_servico' => $infDps?->valores?->valorServicoPrestado?->valorServico,
+        'valor_liquido' => $infNfse?->valores?->valorLiquido,
+    ];
+}
+
+// Reprocessa os documentos já baixados (xml_completo salvo) sem chamar o Portal Nacional de
+// novo. Usado depois de corrigir/melhorar extrairCamposNfseAdn(), para os documentos antigos
+// ganharem os campos novos/corrigidos sem precisar re-sincronizar (e sem esbarrar no rate limit).
+function reprocessarNfseAdnLocal(PDO $dbNotas): int
+{
+    $parser = new \Nfse\Xml\NfseXmlParser();
+    $total = 0;
+
+    $stmtSelecionar = $dbNotas->query(
+        "SELECT a.id, a.xml_completo, e.cnpj AS empresa_cnpj
+         FROM notas_fiscais_nfse_adn a
+         INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id
+         WHERE a.xml_completo IS NOT NULL"
+    );
+    $stmtAtualizar = $dbNotas->prepare(
+        'UPDATE notas_fiscais_nfse_adn SET
+            tipo_documento = :tipo_documento, numero_nfse = :numero_nfse, codigo_status = :codigo_status,
+            cnpj_prestador = :cnpj_prestador, nome_prestador = :nome_prestador,
+            cnpj_tomador = :cnpj_tomador, nome_tomador = :nome_tomador,
+            descricao_servico = :descricao_servico, data_emissao = :data_emissao, competencia = :competencia,
+            valor_servico = :valor_servico, valor_liquido = :valor_liquido, atualizado_em = NOW()
+         WHERE id = :id'
+    );
+
+    while ($linha = $stmtSelecionar->fetch()) {
+        $cnpjEmpresa = preg_replace('/\D+/', '', (string) ($linha['empresa_cnpj'] ?? ''));
+        try {
+            $nfseData = $parser->parse((string) $linha['xml_completo']);
+        } catch (Throwable $e) {
+            continue;
+        }
+
+        $campos = extrairCamposNfseAdn($nfseData, $cnpjEmpresa);
+        $campos['id'] = (int) $linha['id'];
+        $stmtAtualizar->execute($campos);
+        $total++;
+    }
+
+    return $total;
+}
+
 // Buscador de NFS-e: usa a Distribuição de DFe do ADN (/contribuintes/DFe/{nsu}) para baixar,
 // por NSU sequencial, TODOS os documentos ligados ao CNPJ da empresa — tanto as notas que ela
 // emitiu (prestador = empresa) quanto as que ela recebeu (tomador = empresa). Não existe filtro
@@ -229,36 +306,13 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
                     continue;
                 }
 
-                $infNfse = $nfseData->infNfse ?? null;
-                $infDps = $infNfse?->dps?->infDps;
-                $prestador = $infDps?->prestador;
-                $tomador = $infDps?->tomador;
-                $servico = $infDps?->servico;
+                $campos = extrairCamposNfseAdn($nfseData, $cnpjEmpresa);
+                $campos['empresa_emissora_id'] = (int) $empresa['id'];
+                $campos['chave_acesso'] = normalizarChaveAcessoNfse($documento->chaveAcesso) ?? $documento->chaveAcesso;
+                $campos['nsu'] = $documento->nsu;
+                $campos['xml_completo'] = $xml;
 
-                $cnpjPrestador = preg_replace('/\D+/', '', (string) ($prestador?->cnpj ?? ''));
-                $cnpjTomador = preg_replace('/\D+/', '', (string) ($tomador?->cnpj ?? ''));
-                $tipoDocumento = $cnpjPrestador === $cnpjEmpresa ? 'emitida' : 'recebida';
-                $dataEmissao = $infDps?->dataEmissao;
-                $dataCompetencia = $infDps?->dataCompetencia;
-
-                $stmtUpsert->execute([
-                    'empresa_emissora_id' => (int) $empresa['id'],
-                    'chave_acesso' => normalizarChaveAcessoNfse($documento->chaveAcesso) ?? $documento->chaveAcesso,
-                    'nsu' => $documento->nsu,
-                    'tipo_documento' => $tipoDocumento,
-                    'numero_nfse' => $infNfse?->numeroNfse,
-                    'codigo_status' => $infNfse?->codigoStatus?->value,
-                    'cnpj_prestador' => $cnpjPrestador !== '' ? $cnpjPrestador : null,
-                    'nome_prestador' => $prestador?->nome,
-                    'cnpj_tomador' => $cnpjTomador !== '' ? $cnpjTomador : null,
-                    'nome_tomador' => $tomador?->nome,
-                    'descricao_servico' => $servico?->codigoServico?->descricaoServico ?? $servico?->informacaoComplemento?->informacoesComplementares,
-                    'data_emissao' => !empty($dataEmissao) ? date('Y-m-d H:i:s', strtotime($dataEmissao)) : null,
-                    'competencia' => !empty($dataCompetencia) ? date('Y-m-d', strtotime($dataCompetencia)) : null,
-                    'valor_servico' => $infDps?->valores?->valorServicoPrestado?->valorServico,
-                    'valor_liquido' => $infNfse?->valores?->valorLiquido,
-                    'xml_completo' => $xml,
-                ]);
+                $stmtUpsert->execute($campos);
                 $totalProcessado++;
             }
 

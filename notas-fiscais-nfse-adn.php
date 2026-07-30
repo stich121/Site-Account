@@ -152,6 +152,9 @@ try {
                     $erro = $resultadoSync['mensagem'];
                 }
             }
+        } elseif (($_POST['acao'] ?? '') === 'reprocessar_local') {
+            $totalReprocessado = reprocessarNfseAdnLocal($dbNotas);
+            $sucesso = "{$totalReprocessado} documento(s) reprocessado(s) a partir do XML já salvo (sem consultar o Portal Nacional de novo).";
         }
     }
 
@@ -295,6 +298,13 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         <?php echo !empty($empresaOpcao['nfse_adn_sincronizado_em']) ? 'última sincronização em ' . h(date('d/m/Y H:i', strtotime($empresaOpcao['nfse_adn_sincronizado_em']))) : 'ainda não sincronizada'; ?>
                     </span>
                 <?php endforeach; ?>
+            </div>
+            <div class="row-actions" style="margin-top:0.75rem;">
+                <form method="post" onsubmit="return confirm('Reprocessar todos os documentos já baixados a partir do XML salvo? Não consulta o Portal Nacional, só recalcula os dados exibidos.');">
+                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                    <input type="hidden" name="acao" value="reprocessar_local">
+                    <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reprocessar documentos já baixados</button>
+                </form>
             </div>
         </section>
 
