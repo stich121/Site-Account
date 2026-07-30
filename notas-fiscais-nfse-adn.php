@@ -501,9 +501,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
             <div class="notice"><?php echo h($sucesso); ?></div>
         <?php endif; ?>
 
-        <div class="notice warning">
-            <strong>Como funciona:</strong> o Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfse-adn-automatico">sincronização automática</a> configurado) — não é preciso clicar em nada. Use o botão "Sincronizar agora" abaixo só se quiser forçar uma empresa específica na hora. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é o DANFSe gerado localmente no leiaute oficial (NT 008/2026), a partir do XML já sincronizado — sem depender do endpoint do ADN, que o governo descontinuou em 01/07/2026.
-        </div>
+        <details class="notice warning">
+            <summary style="cursor:pointer;"><strong>Como funciona</strong> (clique para ver)</summary>
+            <p style="margin-top:0.75rem;">O Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfse-adn-automatico">sincronização automática</a> configurado) — não é preciso clicar em nada. Use o botão "Sincronizar agora" abaixo só se quiser forçar uma empresa específica na hora. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é o DANFSe gerado localmente no leiaute oficial (NT 008/2026), a partir do XML já sincronizado — sem depender do endpoint do ADN, que o governo descontinuou em 01/07/2026.</p>
+        </details>
 
         <section class="panel">
             <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente com o Portal Nacional</h2>

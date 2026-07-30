@@ -486,9 +486,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
             <div class="notice"><?php echo h($sucesso); ?></div>
         <?php endif; ?>
 
-        <div class="notice warning">
-            <strong>Como funciona:</strong> a SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis) direto. Para NF-e recebidas de terceiros, a SEFAZ manda primeiro só um <strong>resumo</strong> (chave, emitente, valor, data) — a sincronização já envia sozinha a <strong>Ciência da Operação</strong> (evento oficial que declara que a empresa está ciente da nota) pra cada resumo pendente, e a partir daí o XML completo passa a vir numa sincronização seguinte, liberando XML e DANFE. Até isso acontecer, a nota aparece com "Só resumo" na tabela.
-        </div>
+        <details class="notice warning">
+            <summary style="cursor:pointer;"><strong>Como funciona</strong> (clique para ver)</summary>
+            <p style="margin-top:0.75rem;">A SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis) direto. Para NF-e recebidas de terceiros, a SEFAZ manda primeiro só um <strong>resumo</strong> (chave, emitente, valor, data) — a sincronização já envia sozinha a <strong>Ciência da Operação</strong> (evento oficial que declara que a empresa está ciente da nota) pra cada resumo pendente, e a partir daí o XML completo passa a vir numa sincronização seguinte, liberando XML e DANFE. Até isso acontecer, a nota aparece com "Só resumo" na tabela.</p>
+        </details>
 
         <section class="panel">
             <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente com a SEFAZ</h2>
