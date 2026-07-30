@@ -151,4 +151,128 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa)
         ];
     }
 }
+
+// Buscador de NFS-e: usa a Distribuição de DFe do ADN (/contribuintes/DFe/{nsu}) para baixar,
+// por NSU sequencial, TODOS os documentos ligados ao CNPJ da empresa — tanto as notas que ela
+// emitiu (prestador = empresa) quanto as que ela recebeu (tomador = empresa). Não existe filtro
+// de data nesse endpoint: por isso os documentos baixados são gravados em
+// notas_fiscais_nfse_adn e a busca/filtro por período acontece sobre essa cópia local.
+function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
+{
+    [$disponivel, $motivo] = integracaoNfseDisponivel();
+    if (!$disponivel) {
+        return ['sucesso' => false, 'mensagem' => $motivo, 'total' => 0];
+    }
+
+    [$certificadoOk, $motivoCertificado] = certificadoEmpresaDisponivel($empresa);
+    if (!$certificadoOk) {
+        return ['sucesso' => false, 'mensagem' => $motivoCertificado, 'total' => 0];
+    }
+
+    $cnpjEmpresa = preg_replace('/\D+/', '', (string) ($empresa['cnpj'] ?? ''));
+    if ($cnpjEmpresa === '') {
+        return ['sucesso' => false, 'mensagem' => 'Empresa sem CNPJ cadastrado; cadastre o CNPJ em Empresas emissoras.', 'total' => 0];
+    }
+
+    try {
+        $context = new \Nfse\Http\NfseContext(
+            ambiente: ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? \Nfse\Enums\TipoAmbiente::Producao : \Nfse\Enums\TipoAmbiente::Homologacao,
+            certificatePath: __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']),
+            certificatePassword: descriptografarSegredo((string) $empresa['certificado_senha_cifrada'])
+        );
+        $nfse = new \Nfse\Nfse($context);
+        $parser = new \Nfse\Xml\NfseXmlParser();
+
+        $stmtUpsert = $dbNotas->prepare(
+            'INSERT INTO notas_fiscais_nfse_adn
+                (empresa_emissora_id, chave_acesso, nsu, tipo_documento, numero_nfse, codigo_status,
+                 cnpj_prestador, nome_prestador, cnpj_tomador, nome_tomador, descricao_servico,
+                 data_emissao, competencia, valor_servico, valor_liquido, xml_completo, atualizado_em)
+             VALUES
+                (:empresa_emissora_id, :chave_acesso, :nsu, :tipo_documento, :numero_nfse, :codigo_status,
+                 :cnpj_prestador, :nome_prestador, :cnpj_tomador, :nome_tomador, :descricao_servico,
+                 :data_emissao, :competencia, :valor_servico, :valor_liquido, :xml_completo, NOW())
+             ON DUPLICATE KEY UPDATE
+                nsu = VALUES(nsu), tipo_documento = VALUES(tipo_documento), numero_nfse = VALUES(numero_nfse),
+                codigo_status = VALUES(codigo_status), cnpj_prestador = VALUES(cnpj_prestador),
+                nome_prestador = VALUES(nome_prestador), cnpj_tomador = VALUES(cnpj_tomador),
+                nome_tomador = VALUES(nome_tomador), descricao_servico = VALUES(descricao_servico),
+                data_emissao = VALUES(data_emissao), competencia = VALUES(competencia),
+                valor_servico = VALUES(valor_servico), valor_liquido = VALUES(valor_liquido),
+                xml_completo = VALUES(xml_completo), atualizado_em = NOW()'
+        );
+
+        $ultimoNsu = (int) ($empresa['nfse_adn_ultimo_nsu'] ?? 0);
+        $totalProcessado = 0;
+        $maximoLotes = 40; // limite de segurança para não estourar o tempo de uma requisição HTTP só
+
+        for ($lote = 0; $lote < $maximoLotes; $lote++) {
+            $resposta = $nfse->contribuinte()->baixarDfe($ultimoNsu, $cnpjEmpresa, true);
+
+            foreach ($resposta->listaNsu as $documento) {
+                if (empty($documento->dfeXmlGZipB64) || empty($documento->chaveAcesso)) {
+                    continue;
+                }
+                $xml = @gzdecode(base64_decode($documento->dfeXmlGZipB64));
+                if ($xml === false || $xml === '') {
+                    continue;
+                }
+                try {
+                    $nfseData = $parser->parse($xml);
+                } catch (Throwable $e) {
+                    continue;
+                }
+
+                $infNfse = $nfseData->infNfse ?? null;
+                $infDps = $infNfse?->dps?->infDps;
+                $prestador = $infDps?->prestador;
+                $tomador = $infDps?->tomador;
+                $servico = $infDps?->servico;
+
+                $cnpjPrestador = preg_replace('/\D+/', '', (string) ($prestador?->cnpj ?? ''));
+                $cnpjTomador = preg_replace('/\D+/', '', (string) ($tomador?->cnpj ?? ''));
+                $tipoDocumento = $cnpjPrestador === $cnpjEmpresa ? 'emitida' : 'recebida';
+                $dataEmissao = $infDps?->dataEmissao;
+                $dataCompetencia = $infDps?->dataCompetencia;
+
+                $stmtUpsert->execute([
+                    'empresa_emissora_id' => (int) $empresa['id'],
+                    'chave_acesso' => normalizarChaveAcessoNfse($documento->chaveAcesso) ?? $documento->chaveAcesso,
+                    'nsu' => $documento->nsu,
+                    'tipo_documento' => $tipoDocumento,
+                    'numero_nfse' => $infNfse?->numeroNfse,
+                    'codigo_status' => $infNfse?->codigoStatus?->value,
+                    'cnpj_prestador' => $cnpjPrestador !== '' ? $cnpjPrestador : null,
+                    'nome_prestador' => $prestador?->nome,
+                    'cnpj_tomador' => $cnpjTomador !== '' ? $cnpjTomador : null,
+                    'nome_tomador' => $tomador?->nome,
+                    'descricao_servico' => $servico?->codigoServico?->descricaoServico ?? $servico?->informacaoComplemento?->informacoesComplementares,
+                    'data_emissao' => !empty($dataEmissao) ? date('Y-m-d H:i:s', strtotime($dataEmissao)) : null,
+                    'competencia' => !empty($dataCompetencia) ? date('Y-m-d', strtotime($dataCompetencia)) : null,
+                    'valor_servico' => $infDps?->valores?->valorServicoPrestado?->valorServico,
+                    'valor_liquido' => $infNfse?->valores?->valorLiquido,
+                    'xml_completo' => $xml,
+                ]);
+                $totalProcessado++;
+            }
+
+            $novoUltimoNsu = (int) ($resposta->ultimoNsu ?? $ultimoNsu);
+            if ($novoUltimoNsu <= $ultimoNsu) {
+                $ultimoNsu = $novoUltimoNsu;
+                break;
+            }
+            $ultimoNsu = $novoUltimoNsu;
+            if (empty($resposta->listaNsu)) {
+                break;
+            }
+        }
+
+        $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = :nsu, nfse_adn_sincronizado_em = NOW() WHERE id = :id');
+        $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
+
+        return ['sucesso' => true, 'mensagem' => "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).", 'total' => $totalProcessado];
+    } catch (Throwable $e) {
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o Portal Nacional: ' . $e->getMessage(), 'total' => 0];
+    }
+}
 ?>

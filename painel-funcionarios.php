@@ -3659,6 +3659,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                 </button>
                 <div class="admin-menu-group-links" id="grpFuncNotasLinks">
                     <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
+                    <a class="admin-menu-link" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
                 </div>
             </div>
             <div class="admin-menu-group" id="grpFuncProgramas">
@@ -3714,6 +3715,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                 </button>
                 <div class="admin-menu-group-links" id="grpAdminNotasLinks">
                     <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
+                    <a class="admin-menu-link" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
                 </div>
             </div>
             <div class="admin-menu-group" id="grpAdminProgramas">
