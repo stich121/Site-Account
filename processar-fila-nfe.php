@@ -378,7 +378,7 @@ $csrf = h($_SESSION['csrf_processar_fila_nfe'] ?? '');
             <a class="brand" href="painel" aria-label="Voltar para o painel">
                 <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
-            <?php $podeAdministrar = true; include __DIR__ . '/includes/menu-completo.php'; ?>
+            <?php include __DIR__ . '/includes/menu-completo.php'; ?>
         </header>
 
         <section class="panel">

@@ -465,7 +465,7 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
             </a>
             <div class="actions">
                 <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
-                <?php $podeAdministrar = true; include __DIR__ . '/includes/menu-completo.php'; ?>
+                <?php include __DIR__ . '/includes/menu-completo.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                 <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
