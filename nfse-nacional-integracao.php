@@ -174,6 +174,8 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         return ['sucesso' => false, 'mensagem' => 'Empresa sem CNPJ cadastrado; cadastre o CNPJ em Empresas emissoras.', 'total' => 0];
     }
 
+    $totalProcessado = 0;
+
     try {
         $context = new \Nfse\Http\NfseContext(
             ambiente: ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? \Nfse\Enums\TipoAmbiente::Producao : \Nfse\Enums\TipoAmbiente::Homologacao,
@@ -203,8 +205,10 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         );
 
         $ultimoNsu = (int) ($empresa['nfse_adn_ultimo_nsu'] ?? 0);
-        $totalProcessado = 0;
-        $maximoLotes = 40; // limite de segurança para não estourar o tempo de uma requisição HTTP só
+        // O ADN aplica rate limit por CNPJ nesse endpoint (HTTP 429 se chamado rápido demais).
+        // Por isso um clique em "Sincronizar agora" baixa só 1 lote; para pegar um backlog grande
+        // o usuário clica de novo (o NSU já avançado fica salvo, então continua de onde parou).
+        $maximoLotes = 1;
 
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
             $resposta = $nfse->contribuinte()->baixarDfe($ultimoNsu, $cnpjEmpresa, true);
@@ -270,9 +274,24 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = :nsu, nfse_adn_sincronizado_em = NOW() WHERE id = :id');
         $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
 
-        return ['sucesso' => true, 'mensagem' => "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).", 'total' => $totalProcessado];
+        $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
+        if ($totalProcessado > 0) {
+            $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
+        }
+
+        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado];
+    } catch (\Nfse\Http\Exceptions\NfseApiException $e) {
+        if ($e->getCode() === 429) {
+            $mensagem = $totalProcessado > 0
+                ? "Portal Nacional limitou as requisições (erro 429) depois de {$totalProcessado} documento(s). O progresso já foi salvo; aguarde alguns minutos antes de sincronizar de novo."
+                : 'O Portal Nacional limitou as requisições neste CNPJ (erro 429 - excesso de chamadas em pouco tempo). Aguarde alguns minutos e clique em "Sincronizar agora" novamente.';
+
+            return ['sucesso' => false, 'mensagem' => $mensagem, 'total' => $totalProcessado];
+        }
+
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o Portal Nacional: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
     } catch (Throwable $e) {
-        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o Portal Nacional: ' . $e->getMessage(), 'total' => 0];
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o Portal Nacional: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
     }
 }
 ?>
