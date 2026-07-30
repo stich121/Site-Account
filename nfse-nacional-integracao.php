@@ -537,6 +537,13 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
 
         $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = :nsu, nfse_adn_sincronizado_em = NOW() WHERE id = :id');
 
+        // Indica se ainda pode haver documento pendente além do que essa chamada buscou - mesmo
+        // quando $totalProcessado fica em 0 (ex.: os lotes buscados só tinham eventos, sem
+        // nenhuma NFS-e nova). Sem isso, sincronizarTodasEmpresasNfseAdn() parava de tentar de
+        // novo assim que uma leva só trazia eventos, mesmo com NSU ainda avançando e notas mais
+        // recentes esperando logo depois - empresa ficava "presa" num ponto antigo do histórico.
+        $maisDocumentosPendentes = false;
+
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
             if ($lote > 0) {
                 sleep(3);
@@ -587,14 +594,20 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
             if (empty($resposta->listaNsu)) {
                 break;
             }
+            if ($lote === $maximoLotes - 1) {
+                // Só saiu do laço porque esgotou $maximoLotes desta chamada, não porque acabou a
+                // fila do ADN (NSU continuava avançando e trazendo lotes não-vazios) - há chance
+                // real de existir mais documento logo depois.
+                $maisDocumentosPendentes = true;
+            }
         }
 
         $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
-        if ($totalProcessado > 0) {
+        if ($totalProcessado > 0 || $maisDocumentosPendentes) {
             $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
         }
 
-        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado];
+        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado, 'mais_documentos_pendentes' => $maisDocumentosPendentes];
     } catch (\Nfse\Http\Exceptions\NfseApiException $e) {
         // E2220/"NENHUM_DOCUMENTO_LOCALIZADO" não é uma falha: é o próprio ADN avisando que não
         // há documento novo a partir do NSU informado (fim da fila). Trata como sincronização
@@ -695,7 +708,10 @@ function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpr
             $ultimoSucesso = $resultado['sucesso'];
             $totalEmpresa += $resultado['total'];
 
-            if (!$resultado['sucesso'] || $resultado['total'] === 0) {
+            // Continua tentando mesmo com total=0 na leva, desde que ainda haja sinal de mais
+            // documento pela frente (ex.: leva só com eventos, sem NFS-e nova) - ver comentário em
+            // sincronizarNfseAdn(). Só para de fato quando dá erro ou o ADN confirma fim da fila.
+            if (!$resultado['sucesso'] || ($resultado['total'] === 0 && empty($resultado['mais_documentos_pendentes']))) {
                 break;
             }
 

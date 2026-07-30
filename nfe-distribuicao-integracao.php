@@ -242,6 +242,12 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 
         $stmtEmpresa = $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_ultimo_nsu = :nsu, nfe_dfe_sincronizado_em = NOW() WHERE id = :id');
 
+        // Indica se ainda pode haver documento pendente além do que essa chamada buscou - mesmo
+        // quando $totalProcessado fica em 0 (ex.: os lotes buscados só tinham eventos/resumos sem
+        // documento completo). Ver mesmo comentário em sincronizarNfseAdn() - sem isso a empresa
+        // ficava "presa" num ponto antigo sempre que uma leva só trazia esse tipo de documento.
+        $maisDocumentosPendentes = false;
+
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
             if ($lote > 0) {
                 sleep(3);
@@ -326,6 +332,11 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             if (empty($docZips)) {
                 break;
             }
+            if ($lote === $maximoLotes - 1) {
+                // Só saiu do laço porque esgotou $maximoLotes desta chamada, não porque a SEFAZ
+                // confirmou fim da fila (NSU continuava avançando e trazendo lotes não-vazios).
+                $maisDocumentosPendentes = true;
+            }
         }
 
         // Manifesta Ciência da Operação nas notas recebidas que só têm resumo (sem XML completo)
@@ -357,11 +368,11 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
         if ($totalManifestado > 0) {
             $mensagem .= " Ciência da Operação enviada para {$totalManifestado} nota(s) recebida(s); o XML completo delas deve aparecer numa próxima sincronização.";
         }
-        if ($totalProcessado > 0) {
+        if ($totalProcessado > 0 || $maisDocumentosPendentes) {
             $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
         }
 
-        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado];
+        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado, 'mais_documentos_pendentes' => $maisDocumentosPendentes];
     } catch (Throwable $e) {
         return ['sucesso' => false, 'mensagem' => 'Falha ao consultar a SEFAZ: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
     }
@@ -409,7 +420,10 @@ function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpre
             $ultimoSucesso = $resultado['sucesso'];
             $totalEmpresa += $resultado['total'];
 
-            if (!$resultado['sucesso'] || $resultado['total'] === 0) {
+            // Continua tentando mesmo com total=0 na leva, desde que ainda haja sinal de mais
+            // documento pela frente - ver comentário em sincronizarNfeDfe(). Só para de fato
+            // quando dá erro ou a SEFAZ confirma fim da fila.
+            if (!$resultado['sucesso'] || ($resultado['total'] === 0 && empty($resultado['mais_documentos_pendentes']))) {
                 break;
             }
 
