@@ -177,6 +177,14 @@ function consultarContribuinteCnc(array $empresaCertificado, string $documento, 
 // tem os dados reais - em homologação o cadastro é só de teste.
 function empresaComCertificadoParaConsultaCnc(PDO $dbNotas): ?array
 {
+    // certificadoEmpresaDisponivel() usa descriptografarSegredo(), que só existe depois que
+    // config_app_key.php é carregado dentro de integracaoNfseDisponivel(). Mesmo esquecimento já
+    // corrigido antes em empresasComCertificadoValidoAdn() - faltou replicar aqui.
+    [$integracaoOk] = integracaoNfseDisponivel();
+    if (!$integracaoOk) {
+        return null;
+    }
+
     $empresas = $dbNotas->query(
         "SELECT * FROM empresas_emissoras WHERE ativo = 1 ORDER BY (ambiente_emissao = 'producao') DESC, razao_social ASC"
     )->fetchAll();
