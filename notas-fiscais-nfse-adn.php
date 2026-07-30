@@ -132,6 +132,7 @@ try {
         exit;
     }
 
+    $empresaSincronizarId = 0;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
         if (!hash_equals($_SESSION['csrf_notas_nfse_adn'], $csrf)) {
@@ -282,7 +283,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 <select class="select-filtro" name="empresa_emissora_id" required>
                     <option value="">Selecione a empresa para sincronizar</option>
                     <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                        <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $empresaSincronizarId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <button class="btn" type="submit"><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar agora</button>
