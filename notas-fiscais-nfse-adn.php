@@ -30,71 +30,6 @@ function nomeExibicao(?string $usuario): string
     return trim(str_replace('.', ' ', $usuario ?? ''));
 }
 
-function escaparPdfTextoAdn(string $texto): string
-{
-    $semAcento = function_exists('iconv') ? iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto) : $texto;
-    $semAcento = $semAcento !== false ? $semAcento : $texto;
-
-    return str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $semAcento);
-}
-
-function gerarPdfSimplesAdn(array $linhas): string
-{
-    $linhasPorPagina = 54;
-    $paginas = array_chunk($linhas, $linhasPorPagina);
-    if (empty($paginas)) {
-        $paginas = [[]];
-    }
-
-    $fontObjNum = 3;
-    $objetos = [];
-    $objetos[1] = '<< /Type /Catalog /Pages 2 0 R >>';
-    $objetos[$fontObjNum] = '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>';
-
-    $nextObj = 4;
-    $pageObjNums = [];
-    foreach ($paginas as $paginaLinhas) {
-        $contentObjNum = $nextObj++;
-        $pageObjNum = $nextObj++;
-        $comandos = ['BT', '/F1 10 Tf', '40 800 Td', '12 TL'];
-        foreach ($paginaLinhas as $linha) {
-            $comandos[] = '(' . escaparPdfTextoAdn((string) $linha) . ') Tj T*';
-        }
-        $comandos[] = 'ET';
-        $stream = implode("\n", $comandos);
-        $streamLen = strlen($stream);
-        $objetos[$contentObjNum] = "<< /Length {$streamLen} >>\nstream\n{$stream}\nendstream";
-        $objetos[$pageObjNum] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 {$fontObjNum} 0 R >> >> /Contents {$contentObjNum} 0 R >>";
-        $pageObjNums[] = $pageObjNum;
-    }
-
-    $kidsRefs = implode(' ', array_map(static fn (int $n): string => "{$n} 0 R", $pageObjNums));
-    $objetos[2] = '<< /Type /Pages /Kids [' . $kidsRefs . '] /Count ' . count($pageObjNums) . ' >>';
-
-    ksort($objetos);
-    $pdf = "%PDF-1.4\n";
-    $offsets = [];
-    foreach ($objetos as $num => $body) {
-        $offsets[$num] = strlen($pdf);
-        $pdf .= "{$num} 0 obj\n{$body}\nendobj\n";
-    }
-
-    $totalObjs = max(array_keys($objetos)) + 1;
-    $xrefStart = strlen($pdf);
-    $pdf .= "xref\n0 {$totalObjs}\n0000000000 65535 f \n";
-    for ($i = 1; $i < $totalObjs; $i++) {
-        $pdf .= sprintf("%010d 00000 n \n", $offsets[$i] ?? 0);
-    }
-    $pdf .= "trailer\n<< /Size {$totalObjs} /Root 1 0 R >>\nstartxref\n{$xrefStart}\n%%EOF";
-
-    return $pdf;
-}
-
-function linhasPdfComQuebraAdn(string $texto, int $largura = 92): array
-{
-    return explode("\n", wordwrap($texto, $largura, "\n", true));
-}
-
 function paginasParaExibirAdn(int $paginaAtual, int $totalPaginas): array
 {
     $paginas = array_unique(array_filter(array_merge(
@@ -209,45 +144,37 @@ try {
         exit;
     }
 
-    // PDF de conferência: resumo interno gerado a partir dos dados já sincronizados, sem
-    // valor fiscal (o DANFSe oficial exige o renderizador NT 008, que este projeto ainda não tem).
+    // DANFSe: renderizado localmente no leiaute oficial NT 008/2026 (mesmo gerador já usado
+    // em notas-fiscais.php para as notas emitidas pelo sistema), a partir do XML já salvo aqui
+    // — sem chamar o Portal Nacional de novo (o endpoint de PDF do ADN foi descontinuado).
     if (isset($_GET['pdf_adn'])) {
         $documentoId = (int) $_GET['pdf_adn'];
-        $stmtPdf = $dbNotas->prepare('SELECT * FROM notas_fiscais_nfse_adn WHERE id = :id LIMIT 1');
+        $stmtPdf = $dbNotas->prepare('SELECT chave_acesso, xml_completo FROM notas_fiscais_nfse_adn WHERE id = :id LIMIT 1');
         $stmtPdf->execute(['id' => $documentoId]);
         $documentoPdf = $stmtPdf->fetch();
-        if (!$documentoPdf) {
+        if (!$documentoPdf || empty($documentoPdf['xml_completo'])) {
             http_response_code(404);
             echo 'Documento não encontrado.';
             exit;
         }
 
-        $linhasPdf = array_merge(
-            ['RESUMO DE NFS-e (PORTAL NACIONAL) - SEM VALOR FISCAL', ''],
-            ['Tipo: ' . ($documentoPdf['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida')],
-            ['Numero NFS-e: ' . ($documentoPdf['numero_nfse'] ?? '-')],
-            ['Chave de acesso: ' . $documentoPdf['chave_acesso']],
-            [''],
-            linhasPdfComQuebraAdn('Prestador: ' . ($documentoPdf['nome_prestador'] ?? '-')),
-            ['CNPJ prestador: ' . ($documentoPdf['cnpj_prestador'] ?? '-')],
-            [''],
-            linhasPdfComQuebraAdn('Tomador: ' . ($documentoPdf['nome_tomador'] ?? '-')),
-            ['CNPJ tomador: ' . ($documentoPdf['cnpj_tomador'] ?? '-')],
-            [''],
-            ['Data de emissão: ' . (!empty($documentoPdf['data_emissao']) ? date('d/m/Y H:i', strtotime($documentoPdf['data_emissao'])) : '-')],
-            ['Competência: ' . (!empty($documentoPdf['competencia']) ? date('m/Y', strtotime($documentoPdf['competencia'])) : '-')],
-            [''],
-            linhasPdfComQuebraAdn('Descrição do serviço: ' . ($documentoPdf['descricao_servico'] ?? '-')),
-            [''],
-            ['Valor do serviço: R$ ' . number_format((float) ($documentoPdf['valor_servico'] ?? 0), 2, ',', '.')],
-            ['Valor líquido: R$ ' . number_format((float) ($documentoPdf['valor_liquido'] ?? 0), 2, ',', '.')],
-            ['', 'Documento gerado a partir da cópia local sincronizada do Portal Nacional (ADN).'],
-            ['Resumo interno sem valor fiscal - não substitui o DANFSe oficial. Para a nota', 'autenticada, baixe o XML fiscal.'],
-        );
+        try {
+            if (!class_exists(\PhpNfseNacional\Services\DanfseService::class)) {
+                throw new RuntimeException('Gerador local de DANFSe não instalado no vendor/.');
+            }
+            $pdf = (new \PhpNfseNacional\Services\DanfseService())->gerarDoXml((string) $documentoPdf['xml_completo']);
+            if (!str_starts_with($pdf, '%PDF-')) {
+                throw new RuntimeException('Não foi possível gerar o DANFSe a partir do XML salvo.');
+            }
+        } catch (Throwable $e) {
+            http_response_code(502);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'DANFSe indisponível para este documento: ' . $e->getMessage() . ' Baixe o XML fiscal como alternativa.';
+            exit;
+        }
 
-        $pdf = gerarPdfSimplesAdn($linhasPdf);
         header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="NFSe' . preg_replace('/[^0-9A-Za-z]/', '', (string) $documentoPdf['chave_acesso']) . '.pdf"');
+        header('Content-Disposition: inline; filename="DANFSe' . preg_replace('/[^0-9A-Za-z]/', '', (string) $documentoPdf['chave_acesso']) . '.pdf"');
         echo $pdf;
         exit;
     }
@@ -395,7 +322,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
         <?php endif; ?>
 
         <div class="notice warning">
-            <strong>Como funciona:</strong> o Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU). Por isso, clique em "Sincronizar agora" para baixar os documentos novos de uma empresa; eles ficam guardados aqui e os filtros abaixo pesquisam nessa cópia local. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é um resumo interno gerado a partir desses dados, sem valor fiscal (o gerador oficial de DANFSe foi descontinuado pelo governo em 01/07/2026).
+            <strong>Como funciona:</strong> o Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU). Por isso, clique em "Sincronizar agora" para baixar os documentos novos de uma empresa; eles ficam guardados aqui e os filtros abaixo pesquisam nessa cópia local. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é o DANFSe gerado localmente no leiaute oficial (NT 008/2026), a partir do XML já sincronizado — sem depender do endpoint do ADN, que o governo descontinuou em 01/07/2026.
         </div>
 
         <section class="panel">
