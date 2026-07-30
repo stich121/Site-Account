@@ -225,7 +225,6 @@ try {
 
 $csrf = h($_SESSION['csrf_notas_nfse_adn'] ?? '');
 $usuario = h(nomeExibicao($usuarioRaw));
-$paginaAtivaNotas = 'buscador_adn';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -241,11 +240,26 @@ $paginaAtivaNotas = 'buscador_adn';
 </head>
 <body>
     <div class="shell">
-        <?php include __DIR__ . '/includes/notas-nav.php'; ?>
+        <header class="topbar">
+            <a class="brand" href="painel" aria-label="Voltar para o painel">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+            </a>
+            <div class="menu-hamburguer">
+                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
+                    <i class="fa-solid fa-bars"></i> Menu
+                </button>
+                <div class="menu-dropdown" id="menuDropdown">
+                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas fiscais</a>
+                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
+                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
+                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
+                </div>
+            </div>
+        </header>
 
         <section class="panel">
             <h1>Buscador de NFS-e (Portal Nacional)</h1>
-            <p class="muted">Olá, <?php echo $usuario; ?>. Aqui aparecem todas as NFS-e ligadas ao CNPJ da empresa emissora no Ambiente de Dados Nacional (ADN) — as que ela emitiu e as que ela recebeu como tomadora.</p>
+            <p class="muted">Olá, <?php echo $usuario; ?>. Ferramenta independente do emissor de notas: consulta direto o Ambiente de Dados Nacional (ADN) e mostra todas as NFS-e ligadas ao CNPJ de cada empresa — as que ela emitiu e as que ela recebeu como tomadora.</p>
         </section>
 
         <?php if ($erro !== ''): ?>
