@@ -74,6 +74,7 @@ $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ??
         <div class="menu-dropdown" id="menuDropdown">
             <?php if ($podeAdministrar): ?>
                 <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
+                <a class="btn btn-outline" href="processar-nfse-adn-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (ADN)</a>
                 <a class="btn btn-outline" href="processar-fila-nfe"><i class="fa-solid fa-paper-plane"></i> Processar fila NF-e</a>
                 <a class="btn btn-outline" href="nfe-diagnostico"><i class="fa-solid fa-stethoscope"></i> Diagnóstico NF-e</a>
             <?php endif; ?>

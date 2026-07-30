@@ -482,4 +482,58 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o Portal Nacional: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
     }
 }
+
+// Empresas emissoras ativas que já têm CNPJ + certificado A1 válido cadastrado - ou seja, aptas a
+// sincronizar com o ADN sem precisar de nenhuma ação manual do usuário.
+function empresasComCertificadoValidoAdn(PDO $dbNotas): array
+{
+    $empresas = $dbNotas->query('SELECT * FROM empresas_emissoras WHERE ativo = 1')->fetchAll();
+
+    return array_values(array_filter($empresas, static function (array $empresa): bool {
+        [$certificadoOk] = certificadoEmpresaDisponivel($empresa);
+
+        return $certificadoOk;
+    }));
+}
+
+// Coloca em dia TODAS as empresas com certificado válido, chamando sincronizarNfseAdn() várias
+// vezes por empresa (cada chamada já busca até 5 lotes) até não haver mais documento novo, dar
+// erro, ou esgotar $maxTentativasPorEmpresa. Usado tanto pela sincronização automática ao abrir
+// o buscador (uma empresa por vez) quanto pelo script de cron processar-nfse-adn-automatico.php
+// (todas de uma vez, pra funcionar sem ninguém precisar abrir a página).
+function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpresa = 5): array
+{
+    $resultados = [];
+
+    foreach (empresasComCertificadoValidoAdn($dbNotas) as $empresa) {
+        $totalEmpresa = 0;
+        $ultimaMensagem = '';
+        $ultimoSucesso = true;
+
+        for ($tentativa = 0; $tentativa < $maxTentativasPorEmpresa; $tentativa++) {
+            $resultado = sincronizarNfseAdn($dbNotas, $empresa);
+            $ultimaMensagem = $resultado['mensagem'];
+            $ultimoSucesso = $resultado['sucesso'];
+            $totalEmpresa += $resultado['total'];
+
+            if (!$resultado['sucesso'] || $resultado['total'] === 0) {
+                break;
+            }
+
+            // Recarrega a empresa pra pegar o NSU já avançado antes da próxima tentativa.
+            $stmtRecarregar = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+            $stmtRecarregar->execute(['id' => (int) $empresa['id']]);
+            $empresa = $stmtRecarregar->fetch();
+        }
+
+        $resultados[] = [
+            'empresa' => $empresa['razao_social'],
+            'sucesso' => $ultimoSucesso,
+            'total' => $totalEmpresa,
+            'mensagem' => $ultimaMensagem,
+        ];
+    }
+
+    return $resultados;
+}
 ?>

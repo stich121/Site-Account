@@ -144,6 +144,28 @@ try {
         'SELECT id, razao_social, cnpj, ambiente_emissao, nfse_adn_sincronizado_em FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
     )->fetchAll();
 
+    // Sincronização automática: em toda visita normal à página (não em download nem em POST de uma
+    // ação manual), tenta colocar em dia UMA empresa com certificado digital válido - a que está há
+    // mais tempo sem sincronizar - sem precisar clicar em nada. Só uma por vez (e com intervalo
+    // mínimo) pra não deixar a página lenta nem estourar o rate limit do ADN; ao longo de algumas
+    // visitas (ou via cron, ver processar-nfse-adn-automatico.php) todas ficam em dia sozinhas.
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export'])) {
+        [$integracaoAutoOk] = integracaoNfseDisponivel();
+        if ($integracaoAutoOk) {
+            $candidatasAuto = empresasComCertificadoValidoAdn($dbNotas);
+            usort($candidatasAuto, static fn (array $a, array $b): int => strtotime($a['nfse_adn_sincronizado_em'] ?? '1970-01-01') <=> strtotime($b['nfse_adn_sincronizado_em'] ?? '1970-01-01'));
+
+            $empresaAuto = $candidatasAuto[0] ?? null;
+            $cooldownAutoSegundos = 300;
+            if ($empresaAuto !== null && (empty($empresaAuto['nfse_adn_sincronizado_em']) || (time() - strtotime($empresaAuto['nfse_adn_sincronizado_em'])) > $cooldownAutoSegundos)) {
+                $resultadoAuto = sincronizarNfseAdn($dbNotas, $empresaAuto);
+                if ($resultadoAuto['sucesso'] && $resultadoAuto['total'] > 0) {
+                    $sucesso = "Sincronização automática de {$empresaAuto['razao_social']}: {$resultadoAuto['total']} documento(s) novo(s).";
+                }
+            }
+        }
+    }
+
     // Download do XML já baixado e guardado localmente (não faz nova chamada ao Portal Nacional).
     if (isset($_GET['xml_adn'])) {
         $documentoId = (int) $_GET['xml_adn'];
@@ -440,6 +462,9 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 </button>
                 <div class="menu-dropdown" id="menuDropdown">
                     <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas fiscais</a>
+                    <?php if ($podeAdministrar): ?>
+                        <a class="btn btn-outline" href="processar-nfse-adn-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (ADN)</a>
+                    <?php endif; ?>
                     <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                     <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
                     <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
@@ -461,11 +486,11 @@ $usuario = h(nomeExibicao($usuarioRaw));
         <?php endif; ?>
 
         <div class="notice warning">
-            <strong>Como funciona:</strong> o Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU). Por isso, clique em "Sincronizar agora" para baixar os documentos novos de uma empresa; eles ficam guardados aqui e os filtros abaixo pesquisam nessa cópia local. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é o DANFSe gerado localmente no leiaute oficial (NT 008/2026), a partir do XML já sincronizado — sem depender do endpoint do ADN, que o governo descontinuou em 01/07/2026.
+            <strong>Como funciona:</strong> o Portal Nacional não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfse-adn-automatico">sincronização automática</a> configurado) — não é preciso clicar em nada. Use o botão "Sincronizar agora" abaixo só se quiser forçar uma empresa específica na hora. O botão <strong>XML</strong> baixa o arquivo fiscal original; o <strong>PDF</strong> é o DANFSe gerado localmente no leiaute oficial (NT 008/2026), a partir do XML já sincronizado — sem depender do endpoint do ADN, que o governo descontinuou em 01/07/2026.
         </div>
 
         <section class="panel">
-            <h2><i class="fa-solid fa-rotate"></i> Sincronizar com o Portal Nacional</h2>
+            <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente com o Portal Nacional</h2>
             <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                 <input type="hidden" name="acao" value="sincronizar">
