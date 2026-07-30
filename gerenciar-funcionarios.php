@@ -222,10 +222,12 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/theme-toggle.css">
     <style>
         :root {
             --bg-main: #0A0A0A;
             --bg-card: #161616;
+            --input-bg: #0A0A0A;
             --primary: #74C92C;
             --primary-hover: #5EA522;
             --danger: #FF453A;
@@ -233,8 +235,27 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
             --text-light: #F5F5F7;
             --text-muted: #A1A1A6;
             --border: rgba(255,255,255,0.1);
+            --notice-error-text: #FFD1CE;
+            --notice-error-bg: rgba(255, 69, 58, 0.08);
+            --notice-error-border: rgba(255, 69, 58, 0.35);
             --font-titles: 'Montserrat', sans-serif;
             --font-body: 'Inter', sans-serif;
+        }
+
+        :root[data-theme="light"] {
+            --bg-main: #F2F3F1;
+            --bg-card: #FFFFFF;
+            --input-bg: #FFFFFF;
+            --primary: #5EA522;
+            --primary-hover: #4C8A1B;
+            --danger: #D6392F;
+            --text-white: #14181A;
+            --text-light: #1F2428;
+            --text-muted: #666D74;
+            --border: rgba(10, 10, 10, 0.12);
+            --notice-error-text: #8A241C;
+            --notice-error-bg: rgba(214, 57, 47, 0.1);
+            --notice-error-border: rgba(214, 57, 47, 0.35);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -317,7 +338,7 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
             border: 0;
             border-radius: 4px;
             padding: 0.85rem 1rem;
-            color: var(--bg-main);
+            color: #0A0A0A;
             background: var(--primary);
             font-family: var(--font-titles);
             font-size: 0.82rem;
@@ -340,8 +361,8 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
 
         .btn-danger {
             background: transparent;
-            color: #FFD1CE;
-            border: 1px solid rgba(255, 69, 58, 0.35);
+            color: var(--notice-error-text);
+            border: 1px solid var(--notice-error-border);
         }
 
         .form-grid {
@@ -359,7 +380,7 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
             padding: 0.85rem;
             border-radius: 4px;
             border: 1px solid var(--border);
-            background: #0A0A0A;
+            background: var(--input-bg);
             color: var(--text-white);
             font-family: var(--font-body);
         }
@@ -382,9 +403,9 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
         }
 
         .notice.error {
-            border-color: rgba(255, 69, 58, 0.35);
-            background: rgba(255, 69, 58, 0.08);
-            color: #FFD1CE;
+            border-color: var(--notice-error-border);
+            background: var(--notice-error-bg);
+            color: var(--notice-error-text);
         }
 
         .table-wrap { overflow-x: auto; }
@@ -440,9 +461,10 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="painel" aria-label="Voltar para o painel">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
             <div class="actions">
+                <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
                 <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>

@@ -486,11 +486,13 @@ $pdfTodosUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQuery);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apuração de ponto</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/theme-toggle.css">
     <style>
         :root {
             --bg-main: #0A0A0A;
             --bg-card: #161616;
             --bg-soft: #202020;
+            --input-bg: #0A0A0A;
             --primary: #74C92C;
             --primary-hover: #5EA522;
             --danger: #FF453A;
@@ -499,6 +501,34 @@ $pdfTodosUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQuery);
             --text-muted: #A1A1A6;
             --border: rgba(255, 255, 255, 0.12);
             --shadow: rgba(0, 0, 0, 0.38);
+            --notice-error-text: #FFD1CE;
+            --notice-error-bg: rgba(255, 69, 58, 0.08);
+            --notice-error-border: rgba(255, 69, 58, 0.35);
+        }
+
+        :root[data-theme="light"] {
+            --bg-main: #F2F3F1;
+            --bg-card: #FFFFFF;
+            --bg-soft: #EDEEEC;
+            --input-bg: #FFFFFF;
+            --primary: #5EA522;
+            --primary-hover: #4C8A1B;
+            --danger: #D6392F;
+            --text-white: #14181A;
+            --text-light: #1F2428;
+            --text-muted: #666D74;
+            --border: rgba(10, 10, 10, 0.12);
+            --shadow: rgba(20, 24, 26, 0.14);
+            --notice-error-text: #8A241C;
+            --notice-error-bg: rgba(214, 57, 47, 0.1);
+            --notice-error-border: rgba(214, 57, 47, 0.35);
+        }
+
+        :root[data-theme="light"] body {
+            background:
+                radial-gradient(circle at 18% 6%, rgba(94, 165, 34, 0.10), transparent 26rem),
+                radial-gradient(circle at 82% 0%, rgba(10, 10, 10, 0.03), transparent 22rem),
+                linear-gradient(135deg, #F5F6F3 0%, #EFF1ED 48%, #F7F8F5 100%);
         }
 
         * { box-sizing: border-box; }
@@ -917,9 +947,10 @@ $pdfTodosUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQuery);
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="/" aria-label="Voltar para o site">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
             <div class="top-actions">
+                <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
             </div>
         </header>

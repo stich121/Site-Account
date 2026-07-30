@@ -38,6 +38,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/theme-toggle.css">
     <style>
         :root {
             --primary: #74C92C;
@@ -48,8 +49,27 @@ $usuario = h(nomeExibicao($usuarioRaw));
             --text-white: #FFFFFF;
             --text-light: #D7D7D7;
             --text-muted: #A7A7AC;
+            --panel-bg: linear-gradient(145deg, rgba(24, 24, 24, 0.98), rgba(16, 17, 16, 0.96));
             --font-body: 'Inter', sans-serif;
             --font-titles: 'Montserrat', sans-serif;
+        }
+
+        :root[data-theme="light"] {
+            --primary: #5EA522;
+            --primary-dark: #4C8A1B;
+            --bg-main: #F2F3F1;
+            --bg-card: #FFFFFF;
+            --border: rgba(10, 10, 10, 0.12);
+            --text-white: #14181A;
+            --text-light: #1F2428;
+            --text-muted: #5C6169;
+            --panel-bg: #FFFFFF;
+        }
+
+        :root[data-theme="light"] body {
+            background:
+                radial-gradient(circle at 8% 0%, rgba(94, 165, 34, 0.12), transparent 28rem),
+                linear-gradient(135deg, #F7F8F5 0%, var(--bg-main) 52%, #EFF1ED 100%);
         }
 
         * {
@@ -122,6 +142,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
             border-color: var(--border);
         }
 
+        :root[data-theme="light"] .btn-outline {
+            background: rgba(10, 10, 10, 0.03);
+        }
+
         .btn:hover,
         .btn:focus {
             background: var(--primary-dark);
@@ -139,7 +163,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
         .panel {
             border: 1px solid var(--border);
             border-radius: 8px;
-            background: linear-gradient(145deg, rgba(24, 24, 24, 0.98), rgba(16, 17, 16, 0.96));
+            background: var(--panel-bg);
             box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
             padding: clamp(1.25rem, 3vw, 2rem);
         }
@@ -264,9 +288,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="/" aria-label="Voltar para o site">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
             <div class="top-actions">
+                <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
             </div>

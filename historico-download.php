@@ -183,8 +183,11 @@ $usuario = h(nomeExibicao($usuarioRaw));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/theme-toggle.css">
     <style>
-        :root { --bg-main:#0A0A0A; --bg-card:#161616; --primary:#74C92C; --primary-hover:#5EA522; --danger:#FF453A; --text-white:#FFFFFF; --text-light:#F5F5F7; --text-muted:#A1A1A6; --border:rgba(255,255,255,0.09); --font-titles:'Montserrat',sans-serif; --font-body:'Inter',sans-serif; }
+        :root { --bg-main:#0A0A0A; --bg-card:#161616; --input-bg:#0A0A0A; --primary:#74C92C; --primary-hover:#5EA522; --danger:#FF453A; --text-white:#FFFFFF; --text-light:#F5F5F7; --text-muted:#A1A1A6; --border:rgba(255,255,255,0.09); --notice-error-text:#FFD1CE; --notice-error-bg:rgba(255,69,58,0.08); --notice-error-border:rgba(255,69,58,0.35); --panel-bg:linear-gradient(145deg,rgba(24,24,24,0.96),rgba(17,18,17,0.94)); --font-titles:'Montserrat',sans-serif; --font-body:'Inter',sans-serif; }
+        :root[data-theme="light"] { --bg-main:#F2F3F1; --bg-card:#FFFFFF; --input-bg:#FFFFFF; --primary:#5EA522; --primary-hover:#4C8A1B; --danger:#D6392F; --text-white:#14181A; --text-light:#1F2428; --text-muted:#666D74; --border:rgba(10,10,10,0.12); --notice-error-text:#8A241C; --notice-error-bg:rgba(214,57,47,0.1); --notice-error-border:rgba(214,57,47,0.35); --panel-bg:#FFFFFF; }
+        :root[data-theme="light"] body { background:linear-gradient(135deg,#F5F6F3 0%,#EFF1ED 48%,#F7F8F5 100%); }
         * { box-sizing:border-box; margin:0; padding:0; }
         body { min-height:100vh; font-family:var(--font-body); background:linear-gradient(135deg,#070807 0%,#0b0d0b 48%,#050605 100%); color:var(--text-light); padding:2rem; }
         a { color:inherit; text-decoration:none; }
@@ -193,26 +196,26 @@ $usuario = h(nomeExibicao($usuarioRaw));
         .topbar { margin-bottom:2rem; }
         .brand img { height:34px; display:block; }
         .top-actions { justify-content:flex-start; }
-        .btn { border:0; border-radius:4px; padding:0.9rem 1.2rem; color:var(--bg-main); background:var(--primary); font-family:var(--font-titles); font-size:0.82rem; font-weight:700; text-transform:uppercase; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:0.55rem; }
+        .btn { border:0; border-radius:4px; padding:0.9rem 1.2rem; color:#0A0A0A; background:var(--primary); font-family:var(--font-titles); font-size:0.82rem; font-weight:700; text-transform:uppercase; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:0.55rem; }
         .btn:hover { background:var(--primary-hover); transform:translateY(-2px); }
         .btn-outline { background:transparent; color:var(--text-white); border:1px solid var(--border); }
         .btn-outline:hover { color:var(--primary); border-color:rgba(116,201,44,0.4); background:rgba(255,255,255,0.04); }
-        .panel { min-width:0; margin-bottom:1.25rem; padding:2rem; border-radius:8px; border:1px solid var(--border); background:linear-gradient(145deg,rgba(24,24,24,0.96),rgba(17,18,17,0.94)); box-shadow:0 18px 45px rgba(0,0,0,0.22); }
+        .panel { min-width:0; margin-bottom:1.25rem; padding:2rem; border-radius:8px; border:1px solid var(--border); background:var(--panel-bg); box-shadow:0 18px 45px rgba(0,0,0,0.22); }
         h1,h2 { font-family:var(--font-titles); color:var(--text-white); text-transform:uppercase; }
         h1 { font-size:clamp(2rem,5vw,3.2rem); line-height:1; margin-bottom:0.75rem; }
         h2 { font-size:1.35rem; }
         .muted { color:var(--text-muted); line-height:1.6; }
-        .notice { margin-bottom:1rem; padding:1rem; border-radius:8px; border:1px solid rgba(255,69,58,0.35); background:rgba(255,69,58,0.08); color:#FFD1CE; }
+        .notice { margin-bottom:1rem; padding:1rem; border-radius:8px; border:1px solid var(--notice-error-border); background:var(--notice-error-bg); color:var(--notice-error-text); }
         .filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.85rem; align-items:end; margin-top:1.25rem; }
         .field label { display:block; margin-bottom:0.35rem; color:var(--text-muted); font-size:0.78rem; font-weight:700; text-transform:uppercase; }
-        .field input,.field select { width:100%; padding:0.8rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-main); color:var(--text-white); font-family:var(--font-body); }
+        .field input,.field select { width:100%; padding:0.8rem; border-radius:4px; border:1px solid var(--border); background:var(--input-bg); color:var(--text-white); font-family:var(--font-body); }
         .table-wrap { width:100%; overflow-x:auto; }
         table { width:100%; min-width:980px; border-collapse:collapse; font-size:0.88rem; }
         th,td { padding:0.75rem; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
         th { color:var(--text-white); font-family:var(--font-titles); font-size:0.75rem; text-transform:uppercase; }
         tbody tr:hover { background:rgba(116,201,44,0.045); }
         .pill { display:inline-flex; padding:0.3rem 0.55rem; border-radius:999px; background:rgba(116,201,44,0.12); color:var(--primary); font-size:0.74rem; font-weight:800; text-transform:uppercase; }
-        .pill.error { background:rgba(255,69,58,0.12); color:#FFD1CE; }
+        .pill.error { background:var(--notice-error-bg); color:var(--notice-error-text); }
         .pill.pending { background:rgba(255,255,255,0.08); color:var(--text-muted); }
         @media (max-width:700px) { body{padding:1rem;} .panel{padding:1.2rem;} .btn{width:100%;} .top-actions{width:100%;} }
     </style>
@@ -221,9 +224,10 @@ $usuario = h(nomeExibicao($usuarioRaw));
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="/" aria-label="Voltar para o site">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
             <div class="top-actions">
+                <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
                 <a class="btn btn-outline" href="historico-espelho"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de espelho</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
