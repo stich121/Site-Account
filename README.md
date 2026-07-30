@@ -251,7 +251,10 @@ Na raiz pública:
 ```bash
 composer install --no-dev --optimize-autoloader
 php -r "require 'vendor/autoload.php'; echo 'Composer OK'.PHP_EOL;"
+php corrigir-vendor-danfse.php
 ```
+
+`corrigir-vendor-danfse.php` corrige um bug de layout do pacote `mendesalexandre/php-nfse-nacional` (bloco "Descrição do Serviço" da DANFSe sobrepondo texto). Como `vendor/` não vai pro git, esse patch precisa rodar de novo sempre que `composer install` reinstalar o pacote do zero — o script é idempotente (não faz nada se já estiver corrigido).
 
 ### Bancos e configurações
 
@@ -354,7 +357,7 @@ Não versionar:
 
 ### NF-e
 
-- [ ] `composer install --no-dev` rodado no servidor real (a pasta `vendor/` não vai no `git push`, está no `.gitignore`).
+- [ ] `composer install --no-dev` rodado no servidor real (a pasta `vendor/` não vai no `git push`, está no `.gitignore`) e `php corrigir-vendor-danfse.php` rodado em seguida.
 - [ ] `nfe-diagnostico.php` sem itens vermelhos (extensões `soap`/`curl` e bibliotecas `sped-nfe`/`sped-da`).
 - [ ] Empresa com CNPJ, IE, endereço, UF e código IBGE completos; CRT configurado; série da NF-e definida.
 - [ ] Certificado A1 válido e pertencente à empresa.
