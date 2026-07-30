@@ -502,33 +502,29 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 </select>
                 <button class="btn" type="submit"><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar agora</button>
             </form>
-            <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap; gap:0.5rem 1rem;">
-                <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                    <span class="muted" style="font-size:0.8rem;">
-                        <strong><?php echo h($empresaOpcao['razao_social']); ?>:</strong>
-                        <?php echo !empty($empresaOpcao['nfse_adn_sincronizado_em']) ? 'última sincronização em ' . h(date('d/m/Y H:i', strtotime($empresaOpcao['nfse_adn_sincronizado_em']))) : 'ainda não sincronizada'; ?>
-                    </span>
-                <?php endforeach; ?>
-            </div>
-            <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap;">
-                <form method="post" onsubmit="return confirm('Reprocessar todos os documentos já baixados a partir do XML salvo? Não consulta o Portal Nacional, só recalcula os dados exibidos.');">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="reprocessar_local">
-                    <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reprocessar documentos já baixados</button>
-                </form>
-                <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
-                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
-                    <input type="hidden" name="acao" value="reparar_eventos">
-                    <select class="select-filtro" name="empresa_emissora_id" required>
-                        <option value="">Selecione a empresa para reparar</option>
-                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                            <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-wrench"></i> Corrigir documentos sem dados (afetados por eventos)</button>
-                </form>
-            </div>
-            <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Versões antigas dessa tela podiam gravar o evento de cancelamento por cima dos dados da nota original, deixando a linha sem prestador/tomador/valor. O botão "Corrigir" acima refaz a consulta por chave e restaura os dados certos, marcando também a nota como cancelada.</p>
+
+            <details style="margin-top:1rem;">
+                <summary class="muted" style="cursor:pointer;">Ferramentas de manutenção (uso ocasional)</summary>
+                <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap;">
+                    <form method="post" onsubmit="return confirm('Reprocessar todos os documentos já baixados a partir do XML salvo? Não consulta o Portal Nacional, só recalcula os dados exibidos.');">
+                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                        <input type="hidden" name="acao" value="reprocessar_local">
+                        <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reprocessar documentos já baixados</button>
+                    </form>
+                    <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
+                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                        <input type="hidden" name="acao" value="reparar_eventos">
+                        <select class="select-filtro" name="empresa_emissora_id" required>
+                            <option value="">Selecione a empresa para reparar</option>
+                            <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                                <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-wrench"></i> Corrigir documentos sem dados (afetados por eventos)</button>
+                    </form>
+                </div>
+                <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Versões antigas dessa tela podiam gravar o evento de cancelamento por cima dos dados da nota original, deixando a linha sem prestador/tomador/valor. O botão "Corrigir" acima refaz a consulta por chave e restaura os dados certos, marcando também a nota como cancelada.</p>
+            </details>
         </section>
 
         <section class="panel">
