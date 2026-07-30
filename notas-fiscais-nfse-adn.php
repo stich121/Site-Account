@@ -116,8 +116,14 @@ try {
     if (!schemaJaPreparada('notas_fiscais_nfse_adn')) {
         prepararTabelaNfseAdn($dbNotas);
         prepararColunasNsuEmpresasEmissoras($dbNotas);
-        prepararColunasCancelamentoNfseAdn($dbNotas);
         marcarSchemaPreparada('notas_fiscais_nfse_adn');
+    }
+    // Flag própria: a tabela notas_fiscais_nfse_adn já podia estar marcada como "preparada" em
+    // servidores onde o buscador rodou antes dessas colunas existirem, então essa migração
+    // precisa de um gate independente do de cima para não ficar pra sempre sem rodar.
+    if (!schemaJaPreparada('notas_fiscais_nfse_adn_cancelamento')) {
+        prepararColunasCancelamentoNfseAdn($dbNotas);
+        marcarSchemaPreparada('notas_fiscais_nfse_adn_cancelamento');
     }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
