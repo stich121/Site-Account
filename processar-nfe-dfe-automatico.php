@@ -121,20 +121,9 @@ $csrf = h($_SESSION['csrf_processar_nfe_dfe'] ?? '');
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="painel" aria-label="Voltar para o painel">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
-            <div class="menu-hamburguer">
-                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
-                    <i class="fa-solid fa-bars"></i> Menu
-                </button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a class="btn btn-outline" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
-                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas fiscais</a>
-                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
-                </div>
-            </div>
+            <?php $podeAdministrar = true; include __DIR__ . '/includes/menu-completo.php'; ?>
         </header>
 
         <section class="panel">
@@ -233,22 +222,6 @@ Cada execução do cron avança um pouco mais que uma sincronização manual, ma
         </section>
     </div>
     <script>
-        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
-        const menuDropdown = document.getElementById('menuDropdown');
-        if (btnMenuHamburguer && menuDropdown) {
-            btnMenuHamburguer.addEventListener('click', function (evento) {
-                evento.stopPropagation();
-                const aberto = menuDropdown.classList.toggle('aberto');
-                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (evento) {
-                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
-                    menuDropdown.classList.remove('aberto');
-                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
                 .finally(() => {

@@ -980,6 +980,7 @@ $rotuloMesBanco = rotuloMesBanco($dataInicio, $dataFim);
             </a>
             <div class="top-actions">
                 <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
+                <?php include __DIR__ . '/includes/menu-completo.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
             </div>

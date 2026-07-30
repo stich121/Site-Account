@@ -77,3 +77,58 @@ html, html * {
 
 .theme-toggle.girando .theme-toggle-thumb { transform: translateX(0) rotate(360deg); }
 :root[data-theme="light"] .theme-toggle.girando .theme-toggle-thumb { transform: translateX(26px) rotate(360deg); }
+
+/* ---------- Menu hamburguer com todos os caminhos (ver includes/menu-completo.php) ---------- */
+
+.menu-hamburguer { position: relative; }
+
+.menu-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    display: none;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 260px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 0.6rem;
+    background: var(--bg-card, #161616);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    z-index: 60;
+    animation: menu-pop-toggle 0.12s ease;
+}
+
+:root[data-theme="light"] .menu-dropdown {
+    box-shadow: 0 24px 60px rgba(20, 24, 26, 0.18);
+}
+
+@keyframes menu-pop-toggle {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-dropdown.aberto { display: flex; }
+.menu-dropdown .btn { justify-content: flex-start; width: 100%; }
+
+.menu-dropdown-titulo {
+    margin: 0.5rem 0 0.1rem;
+    padding: 0 0.3rem;
+    color: var(--text-muted);
+    font-family: var(--font-titles, inherit);
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.menu-dropdown-titulo:first-child { margin-top: 0; }
+
+.menu-dropdown-separador {
+    height: 1px;
+    margin: 0.4rem 0;
+    background: var(--border);
+    border: 0;
+}

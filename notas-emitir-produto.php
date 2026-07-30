@@ -626,22 +626,6 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
         }
 
-        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
-        const menuDropdown = document.getElementById('menuDropdown');
-        if (btnMenuHamburguer && menuDropdown) {
-            btnMenuHamburguer.addEventListener('click', function (evento) {
-                evento.stopPropagation();
-                const aberto = menuDropdown.classList.toggle('aberto');
-                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (evento) {
-                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
-                    menuDropdown.classList.remove('aberto');
-                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
         const catalogo = <?php echo $catalogoJson; ?>;
         const opcoesCstIcmsHtml = <?php echo json_encode($optCstIcmsHtml); ?>;
         const opcoesCstPisCofinsHtml = <?php echo json_encode($optCstPisCofinsHtml); ?>;

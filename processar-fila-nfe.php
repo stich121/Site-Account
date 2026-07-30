@@ -323,6 +323,20 @@ $csrf = h($_SESSION['csrf_processar_fila_nfe'] ?? '');
 
         .menu-dropdown.aberto { display: flex; }
         .menu-dropdown .btn { justify-content: flex-start; width: 100%; }
+        .menu-dropdown { max-height: 70vh; overflow-y: auto; gap: 0.3rem; }
+
+        .menu-dropdown-titulo {
+            margin: 0.5rem 0 0.1rem;
+            padding: 0 0.3rem;
+            color: var(--text-muted);
+            font-family: var(--font-titles);
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .menu-dropdown-titulo:first-child { margin-top: 0; }
+        .menu-dropdown-separador { height: 1px; margin: 0.4rem 0; background: var(--border); border: 0; }
 
         .notice {
             margin-bottom: 1rem;
@@ -362,25 +376,9 @@ $csrf = h($_SESSION['csrf_processar_fila_nfe'] ?? '');
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="painel" aria-label="Voltar para o painel">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
-            <div class="menu-hamburguer">
-                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
-                    <i class="fa-solid fa-bars"></i> Menu
-                </button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
-                    <a class="btn btn-outline" href="notas-emitir-produto"><i class="fa-solid fa-box"></i> Emitir NF-e</a>
-                    <a class="btn btn-outline" href="notas-clientes"><i class="fa-solid fa-user-plus"></i> Clientes</a>
-                    <a class="btn btn-outline" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
-                    <a class="btn btn-outline" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
-                    <a class="btn btn-outline" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
-                    <a class="btn btn-outline" href="processar-fila-nfe"><i class="fa-solid fa-paper-plane"></i> Processar fila NF-e</a>
-                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
-                </div>
-            </div>
+            <?php $podeAdministrar = true; include __DIR__ . '/includes/menu-completo.php'; ?>
         </header>
 
         <section class="panel">
@@ -475,22 +473,6 @@ $csrf = h($_SESSION['csrf_processar_fila_nfe'] ?? '');
     </div>
 
     <script>
-        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
-        const menuDropdown = document.getElementById('menuDropdown');
-        if (btnMenuHamburguer && menuDropdown) {
-            btnMenuHamburguer.addEventListener('click', function (evento) {
-                evento.stopPropagation();
-                const aberto = menuDropdown.classList.toggle('aberto');
-                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (evento) {
-                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
-                    menuDropdown.classList.remove('aberto');
-                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
                 .finally(() => {

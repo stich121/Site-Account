@@ -1389,22 +1389,6 @@ $usuario = h(nomeExibicao($usuarioRaw));
     </div>
 
     <script>
-        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
-        const menuDropdown = document.getElementById('menuDropdown');
-        if (btnMenuHamburguer && menuDropdown) {
-            btnMenuHamburguer.addEventListener('click', function (evento) {
-                evento.stopPropagation();
-                const aberto = menuDropdown.classList.toggle('aberto');
-                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (evento) {
-                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
-                    menuDropdown.classList.remove('aberto');
-                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
         document.addEventListener('click', function (evento) {
             const botaoAlvo = evento.target.closest('[data-acoes-toggle]');
             const menusAbertos = document.querySelectorAll('.acoes-menu-dropdown.aberto');

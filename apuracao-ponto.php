@@ -951,6 +951,7 @@ $pdfTodosUrl = 'gerar-pdf-ponto.php?' . http_build_query($pdfQuery);
             </a>
             <div class="top-actions">
                 <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
+                <?php include __DIR__ . '/includes/menu-completo.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
             </div>
         </header>

@@ -408,6 +408,7 @@ $csvUrl = 'painel?export=csv&' . http_build_query($queryDownload);
             </a>
             <div class="top-actions">
                 <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
+                <?php include __DIR__ . '/includes/menu-completo.php'; ?>
                 <a class="btn btn-outline" href="painel"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
                 <a class="btn btn-outline" href="historico-download"><i class="fa-solid fa-download"></i> Histórico de download</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>

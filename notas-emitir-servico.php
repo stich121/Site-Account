@@ -729,22 +729,6 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
         }
 
-        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
-        const menuDropdown = document.getElementById('menuDropdown');
-        if (btnMenuHamburguer && menuDropdown) {
-            btnMenuHamburguer.addEventListener('click', function (evento) {
-                evento.stopPropagation();
-                const aberto = menuDropdown.classList.toggle('aberto');
-                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (evento) {
-                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
-                    menuDropdown.classList.remove('aberto');
-                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
         const codigosTributacaoNacional = <?php echo json_encode($codigosTributacaoNacionalNfse, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         const mapaCodigosTributacaoNacional = {};
         codigosTributacaoNacional.forEach(function (item) {

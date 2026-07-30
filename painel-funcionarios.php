@@ -3783,6 +3783,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
             </a>
             <div class="top-actions">
                 <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
+                <?php include __DIR__ . '/includes/menu-completo.php'; ?>
                 <a class="btn btn-outline" href="painel?export=csv"><i class="fa-solid fa-file-arrow-down"></i> Meu CSV</a>
                 <a class="btn btn-outline" href="gerar-pdf-ponto.php?export=pdf&mes=<?php echo h(date('Y-m')); ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Meu PDF</a>
                 <?php if ($podeAdministrar): ?>

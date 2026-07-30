@@ -83,23 +83,7 @@ $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ??
             </span>
         </span>
     </button>
-    <div class="menu-hamburguer">
-        <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
-            <i class="fa-solid fa-bars"></i> Menu
-        </button>
-        <div class="menu-dropdown" id="menuDropdown">
-            <?php if ($podeAdministrar): ?>
-                <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Processar fila NFS-e</a>
-                <a class="btn btn-outline" href="processar-nfse-adn-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (ADN)</a>
-                <a class="btn btn-outline" href="processar-fila-nfe"><i class="fa-solid fa-paper-plane"></i> Processar fila NF-e</a>
-                <a class="btn btn-outline" href="processar-nfe-dfe-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (NF-e)</a>
-                <a class="btn btn-outline" href="nfe-diagnostico"><i class="fa-solid fa-stethoscope"></i> Diagnóstico NF-e</a>
-            <?php endif; ?>
-            <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-            <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-            <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
-        </div>
-    </div>
+    <?php include __DIR__ . '/menu-completo.php'; ?>
 </header>
 
 <script>

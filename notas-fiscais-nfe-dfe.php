@@ -396,9 +396,14 @@ try {
         $bind['data_fim'] = $filtroDataFim . ' 23:59:59';
     }
     if ($filtroBusca !== '') {
-        $condicoes[] = '(a.nome_emitente LIKE :busca OR a.nome_destinatario LIKE :busca OR a.cnpj_emitente LIKE :busca_doc OR a.cnpj_destinatario LIKE :busca_doc OR a.numero_nfe LIKE :busca_doc OR a.chave_acesso LIKE :busca_doc)';
-        $bind['busca'] = '%' . $filtroBusca . '%';
-        $bind['busca_doc'] = '%' . preg_replace('/\D+/', '', $filtroBusca) . '%';
+        $condicoes[] = '(a.nome_emitente LIKE :busca_nome OR a.nome_destinatario LIKE :busca_nome2 OR a.cnpj_emitente LIKE :busca_doc1 OR a.cnpj_destinatario LIKE :busca_doc2 OR a.numero_nfe LIKE :busca_doc3 OR a.chave_acesso LIKE :busca_doc4)';
+        $buscaDoc = '%' . preg_replace('/\D+/', '', $filtroBusca) . '%';
+        $bind['busca_nome'] = '%' . $filtroBusca . '%';
+        $bind['busca_nome2'] = '%' . $filtroBusca . '%';
+        $bind['busca_doc1'] = $buscaDoc;
+        $bind['busca_doc2'] = $buscaDoc;
+        $bind['busca_doc3'] = $buscaDoc;
+        $bind['busca_doc4'] = $buscaDoc;
     }
     $sqlWhere = 'WHERE ' . implode(' AND ', $condicoes);
 
@@ -456,23 +461,9 @@ $usuario = h(nomeExibicao($usuarioRaw));
     <div class="shell">
         <header class="topbar">
             <a class="brand" href="painel" aria-label="Voltar para o painel">
-                <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+                <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
             </a>
-            <div class="menu-hamburguer">
-                <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
-                    <i class="fa-solid fa-bars"></i> Menu
-                </button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a class="btn btn-outline" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
-                    <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas fiscais</a>
-                    <?php if ($podeAdministrar): ?>
-                        <a class="btn btn-outline" href="processar-nfe-dfe-automatico"><i class="fa-solid fa-rotate"></i> Sincronização automática (SEFAZ)</a>
-                    <?php endif; ?>
-                    <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
-                    <a class="btn btn-outline" href="/"><i class="fa-solid fa-house"></i> Site</a>
-                    <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
-                </div>
-            </div>
+            <?php include __DIR__ . '/includes/menu-completo.php'; ?>
         </header>
 
         <section class="panel">
@@ -698,22 +689,6 @@ $usuario = h(nomeExibicao($usuarioRaw));
         </section>
     </div>
     <script>
-        const btnMenuHamburguer = document.getElementById('btnMenuHamburguer');
-        const menuDropdown = document.getElementById('menuDropdown');
-        if (btnMenuHamburguer && menuDropdown) {
-            btnMenuHamburguer.addEventListener('click', function (evento) {
-                evento.stopPropagation();
-                const aberto = menuDropdown.classList.toggle('aberto');
-                btnMenuHamburguer.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (evento) {
-                if (!menuDropdown.contains(evento.target) && evento.target !== btnMenuHamburguer) {
-                    menuDropdown.classList.remove('aberto');
-                    btnMenuHamburguer.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
             fetch('login?logout=1', { keepalive: true })
                 .finally(() => {

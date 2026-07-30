@@ -520,6 +520,7 @@ $csrf = h($_SESSION['csrf_ponto'] ?? '');
             </a>
             <div class="top-actions">
                 <?php include __DIR__ . '/includes/theme-toggle.php'; ?>
+                <?php include __DIR__ . '/includes/menu-completo.php'; ?>
                 <a class="btn btn-outline" href="afastamentos"><i class="fa-solid fa-arrow-left"></i> Voltar aos afastamentos</a>
                 <button class="btn btn-outline" type="button" onclick="sair()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
             </div>
