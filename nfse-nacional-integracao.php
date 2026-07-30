@@ -66,6 +66,105 @@ function certificadoEmpresaDisponivel(array $empresa): array
     }
     return [true, ''];
 }
+// Consulta o CNC (Cadastro Nacional de Contribuintes) do Portal Nacional pra descobrir se um
+// CPF/CNPJ tem Inscrição Municipal registrada no mesmo município da empresa emissora - é essa
+// mesma checagem que o Sefin Nacional faz ao validar a IM do tomador/prestador na DPS (erro
+// E0116/E0228 quando deveria ter IM e não tem). Usado pra autopreencher a IM do tomador na tela
+// de emissão, sem depender do usuário digitar/saber esse dado.
+//
+// A biblioteca nfse-nacional/nfse-php tem um método pronto (Nfse::municipio()->consultarContribuinte),
+// mas ele monta a URL como path (/cnc/consulta/cad/{documento}) - diferente do endpoint oficial
+// documentado (GET /cnc/consulta/cad?inscricaoFederal=...&codMunicipio=...), então a chamada
+// direta aqui segue a especificação oficial (references/api-specs/*/API-NFS-e-CNC-Consulta-*.json).
+function consultarContribuinteCnc(array $empresa, string $documento): array
+{
+    [$disponivel, $motivo] = integracaoNfseDisponivel();
+    if (!$disponivel) {
+        return ['sucesso' => false, 'mensagem' => $motivo, 'im' => null];
+    }
+    [$certificadoOk, $motivoCertificado] = certificadoEmpresaDisponivel($empresa);
+    if (!$certificadoOk) {
+        return ['sucesso' => false, 'mensagem' => $motivoCertificado, 'im' => null];
+    }
+
+    $documento = preg_replace('/\D+/', '', $documento);
+    if (!in_array(strlen($documento), [11, 14], true)) {
+        return ['sucesso' => false, 'mensagem' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.', 'im' => null];
+    }
+
+    $codMunicipio = preg_replace('/\D+/', '', (string) ($empresa['codigo_ibge_municipio'] ?? ''));
+    if ($codMunicipio === '') {
+        return ['sucesso' => false, 'mensagem' => 'Empresa emissora sem código IBGE do município cadastrado.', 'im' => null];
+    }
+
+    try {
+        $baseUrl = ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao'
+            ? 'https://adn.nfse.gov.br'
+            : 'https://adn.producaorestrita.nfse.gov.br';
+
+        $caminhoCert = __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']);
+        $senha = descriptografarSegredo((string) $empresa['certificado_senha_cifrada']);
+
+        $client = new \GuzzleHttp\Client([
+            'base_uri' => $baseUrl,
+            'curl' => [
+                CURLOPT_SSLCERTTYPE => 'P12',
+                CURLOPT_SSLCERT => $caminhoCert,
+                CURLOPT_SSLCERTPASSWD => $senha,
+                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_TIMEOUT => 20,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_SSL_VERIFYPEER => 0,
+            ],
+            \GuzzleHttp\RequestOptions::HEADERS => ['Accept' => 'application/json'],
+        ]);
+
+        $resposta = $client->get('/cnc/consulta/cad', [
+            \GuzzleHttp\RequestOptions::QUERY => [
+                'inscricaoFederal' => $documento,
+                'codMunicipio' => $codMunicipio,
+            ],
+        ]);
+
+        $decodificado = json_decode((string) $resposta->getBody(), true);
+        $lista = $decodificado['ListaCadastroMunicipal'] ?? [];
+
+        $im = null;
+        $razaoSocial = null;
+        foreach ($lista as $registro) {
+            $infCad = $registro['InfCad'] ?? [];
+            if (!empty($infCad['InscricaoMunicipal'])) {
+                $im = (string) $infCad['InscricaoMunicipal'];
+                $razaoSocial = $infCad['RazaoSocial'] ?? null;
+                break;
+            }
+        }
+
+        return [
+            'sucesso' => true,
+            'mensagem' => $im !== null
+                ? 'Inscrição Municipal encontrada no cadastro nacional (CNC).'
+                : 'Nenhuma Inscrição Municipal registrada nesse município para esse documento - não precisa preencher.',
+            'im' => $im,
+            'razao_social' => $razaoSocial,
+        ];
+    } catch (\GuzzleHttp\Exception\ClientException $e) {
+        if ($e->getResponse() && $e->getResponse()->getStatusCode() === 404) {
+            return [
+                'sucesso' => true,
+                'mensagem' => 'Nenhuma Inscrição Municipal registrada nesse município para esse documento - não precisa preencher.',
+                'im' => null,
+            ];
+        }
+
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o CNC: ' . trim(strip_tags($e->getMessage())), 'im' => null];
+    } catch (Throwable $e) {
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o CNC: ' . trim(strip_tags($e->getMessage())), 'im' => null];
+    }
+}
+
 function normalizarChaveAcessoNfse(?string $valor): ?string
 {
     $valor = trim((string) $valor);

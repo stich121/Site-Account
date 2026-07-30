@@ -168,6 +168,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="field" id="campoTomadorInscricaoMunicipal">
                             <label for="nfse_tomador_inscricao_municipal">Inscrição Municipal do tomador</label>
                             <input id="nfse_tomador_inscricao_municipal" name="nfse_tomador_inscricao_municipal" type="text">
+                            <span class="muted" id="statusImTomador" style="font-size: 0.75rem;"></span>
                         </div>
                         <div class="field">
                             <label for="nfse_tomador_telefone">Telefone (opcional)</label>
@@ -666,12 +667,64 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             });
         }
 
+        // Busca automática da Inscrição Municipal do tomador no CNC (Cadastro Nacional de
+        // Contribuintes) do Portal Nacional, pelo CNPJ/CPF do cliente - a mesma checagem que o
+        // Sefin Nacional faz ao validar a DPS, então evita ficar tentando adivinhar/preencher
+        // esse campo na mão. Chamado toda vez que um cliente é selecionado (pelo dropdown ou
+        // pela busca por documento).
+        function buscarImTomadorCnc(documento) {
+            const campoIM = document.getElementById('nfse_tomador_inscricao_municipal');
+            const statusIM = document.getElementById('statusImTomador');
+            const empresaIdCampo = document.getElementById('empresa_emissora_id');
+            const digitos = (documento || '').replace(/\D/g, '');
+
+            if (!campoIM || !empresaIdCampo || !empresaIdCampo.value || ![11, 14].includes(digitos.length)) {
+                return;
+            }
+
+            if (statusIM) {
+                statusIM.style.color = 'var(--text-muted)';
+                statusIM.textContent = 'Consultando IM no cadastro nacional (CNC)...';
+            }
+
+            fetch('buscar-im-cnc?empresa_emissora_id=' + encodeURIComponent(empresaIdCampo.value) + '&documento=' + digitos)
+                .then(function (resposta) {
+                    return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; });
+                })
+                .then(function (resultado) {
+                    if (!statusIM) return;
+                    if (!resultado.ok) {
+                        statusIM.style.color = '#FFD1CE';
+                        statusIM.textContent = resultado.dados.erro || 'Não foi possível consultar a IM automaticamente.';
+                        return;
+                    }
+                    if (resultado.dados.im) {
+                        campoIM.value = resultado.dados.im;
+                        statusIM.style.color = 'var(--primary)';
+                        statusIM.textContent = 'IM preenchida automaticamente pelo cadastro nacional.';
+                    } else {
+                        campoIM.value = '';
+                        statusIM.style.color = 'var(--text-muted)';
+                        statusIM.textContent = 'Sem Inscrição Municipal registrada nesse município para esse documento - não precisa preencher.';
+                    }
+                })
+                .catch(function () {
+                    if (statusIM) {
+                        statusIM.style.color = '#FFD1CE';
+                        statusIM.textContent = 'Falha ao consultar a IM automaticamente; preencha na mão se souber.';
+                    }
+                });
+        }
+
         if (selectClienteId) {
             selectClienteId.addEventListener('change', function () {
                 const opcaoSelecionada = selectClienteId.options[selectClienteId.selectedIndex];
                 const campoInscricaoMunicipal = document.getElementById('nfse_tomador_inscricao_municipal');
                 if (campoInscricaoMunicipal && opcaoSelecionada) {
                     campoInscricaoMunicipal.value = opcaoSelecionada.dataset.inscricaoMunicipal || '';
+                }
+                if (opcaoSelecionada && opcaoSelecionada.dataset.documento) {
+                    buscarImTomadorCnc(opcaoSelecionada.dataset.documento);
                 }
             });
         }
