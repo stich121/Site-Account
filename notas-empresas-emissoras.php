@@ -903,9 +903,13 @@ function rotuloCrt(?int $crt): string
                         if (dados.crt_sugerido) {
                             document.getElementById('crt').value = String(dados.crt_sugerido);
                         }
+                        const campoOpcaoSimplesNfse = document.getElementById('nfse_opcao_simples_nacional');
+                        if (campoOpcaoSimplesNfse && dados.nfse_opcao_simples_sugerida) {
+                            campoOpcaoSimplesNfse.value = String(dados.nfse_opcao_simples_sugerida);
+                        }
 
                         statusEl.style.color = 'var(--primary)';
-                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira antes de salvar.';
+                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira a opção pelo Simples na NFS-e antes de salvar - o Sefin Nacional rejeita a nota se não bater com o cadastro atual na Receita Federal.';
 
                         buscarImEmpresaCnc(digitos, dados.codigo_ibge_municipio || '');
                     })

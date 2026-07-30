@@ -77,6 +77,13 @@ try {
 
     $crtSugerido = (!empty($dados['opcao_pelo_simples']) || !empty($dados['opcao_pelo_mei'])) ? 1 : 3;
 
+    // Opção NFS-e pelo Simples é um campo à parte do CRT (1 não optante / 2 MEI / 3 ME-EPP
+    // optante) - o Sefin Nacional rejeita a DPS (erro E0160) se não bater com o que a Receita
+    // Federal tem no CNPJ pra aquele mês de competência. opcao_pelo_mei/opcao_pelo_simples
+    // refletem a situação ATUAL (ex.: uma empresa que já foi MEI e não é mais vem com
+    // opcao_pelo_mei=false), então dá pra sugerir certo - mas é só sugestão, o usuário confirma.
+    $nfseOpcaoSimplesSugerida = !empty($dados['opcao_pelo_mei']) ? 2 : (!empty($dados['opcao_pelo_simples']) ? 3 : 1);
+
     echo json_encode([
         'razao_social' => $dados['razao_social'] ?? '',
         'nome_fantasia' => $dados['nome_fantasia'] ?? '',
@@ -89,6 +96,7 @@ try {
         'codigo_ibge_municipio' => $dados['codigo_municipio_ibge'] ?? '',
         'uf' => $dados['uf'] ?? '',
         'crt_sugerido' => $crtSugerido,
+        'nfse_opcao_simples_sugerida' => $nfseOpcaoSimplesSugerida,
         'situacao_cadastral' => $dados['descricao_situacao_cadastral'] ?? '',
     ]);
 } catch (Throwable $e) {
