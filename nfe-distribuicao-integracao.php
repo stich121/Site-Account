@@ -219,51 +219,58 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
         for ($lote = 0; $lote < $maximoLotes; $lote++) {
             $respostaXml = $tools->sefazDistDFe($ultimoNsu);
             $resposta = new SimpleXMLElement($respostaXml);
-            $cStat = (string) ($resposta->cStat ?? '');
+            // A resposta pode vir com um wrapper da operação SOAP por cima de retDistDFeInt (varia
+            // conforme a UF/versão), então acessar campos direto na raiz (ex.: $resposta->cStat)
+            // falha silenciosamente quando há esse wrapper. Usa xpath com local-name() - acha o nó em
+            // qualquer profundidade, sem depender de prefixo/namespace - mesmo padrão já usado em
+            // nfe-operacoes.php para as respostas de consulta/cancelamento.
+            $noCStat = $resposta->xpath('//*[local-name()="cStat"]');
+            $cStat = !empty($noCStat) ? (string) $noCStat[0] : '';
+            $noXMotivo = $resposta->xpath('//*[local-name()="xMotivo"]');
+            $xMotivo = !empty($noXMotivo) ? (string) $noXMotivo[0] : 'Resposta inesperada da SEFAZ.';
+            $noUltNsu = $resposta->xpath('//*[local-name()="ultNSU"]');
+            $docZips = $resposta->xpath('//*[local-name()="docZip"]') ?: [];
 
-            if ($cStat !== '137' && $cStat !== '138' && empty($resposta->loteDistDFeInt)) {
+            if ($cStat !== '137' && $cStat !== '138' && empty($docZips)) {
                 // Código diferente de "documentos localizados"/"nenhum documento localizado" e sem
                 // lote: trata como aviso, não erro - encerra o laço sem mais tentativas.
-                $mensagemAviso = (string) ($resposta->xMotivo ?? 'Resposta inesperada da SEFAZ.');
                 if ($totalProcessado === 0) {
-                    return ['sucesso' => true, 'mensagem' => "Portal da SEFAZ: [{$cStat}] {$mensagemAviso}", 'total' => 0];
+                    return ['sucesso' => true, 'mensagem' => "Portal da SEFAZ: [{$cStat}] {$xMotivo}", 'total' => 0];
                 }
                 break;
             }
 
-            if (!empty($resposta->loteDistDFeInt)) {
-                foreach ($resposta->loteDistDFeInt->docZip as $docZip) {
-                    $schema = (string) $docZip->attributes()->schema;
-                    $nsuDoc = (string) $docZip->attributes()->NSU;
-                    $xmlDoc = @gzdecode(base64_decode((string) $docZip));
-                    if ($xmlDoc === false || $xmlDoc === '') {
-                        continue;
-                    }
-
-                    if (str_starts_with($schema, 'resEvento') || str_starts_with($schema, 'procEventoNFe')) {
-                        aplicarEventoNfeDfe($dbNotas, $xmlDoc);
-                        continue;
-                    }
-
-                    $documentoCompleto = str_starts_with($schema, 'procNFe');
-                    if (!$documentoCompleto && !str_starts_with($schema, 'resNFe')) {
-                        continue;
-                    }
-
-                    $campos = extrairCamposNfeDfe($xmlDoc, $documentoCompleto, $cnpjEmpresa);
-                    if ($campos === null) {
-                        continue;
-                    }
-
-                    $campos['empresa_emissora_id'] = (int) $empresa['id'];
-                    $campos['nsu'] = $nsuDoc !== '' ? (int) $nsuDoc : null;
-                    $campos['xml_completo'] = $documentoCompleto ? $xmlDoc : null;
-                    $stmtUpsert->execute($campos);
-                    $totalProcessado++;
+            foreach ($docZips as $docZip) {
+                $schema = (string) $docZip->attributes()->schema;
+                $nsuDoc = (string) $docZip->attributes()->NSU;
+                $xmlDoc = @gzdecode(base64_decode((string) $docZip));
+                if ($xmlDoc === false || $xmlDoc === '') {
+                    continue;
                 }
+
+                if (str_starts_with($schema, 'resEvento') || str_starts_with($schema, 'procEventoNFe')) {
+                    aplicarEventoNfeDfe($dbNotas, $xmlDoc);
+                    continue;
+                }
+
+                $documentoCompleto = str_starts_with($schema, 'procNFe');
+                if (!$documentoCompleto && !str_starts_with($schema, 'resNFe')) {
+                    continue;
+                }
+
+                $campos = extrairCamposNfeDfe($xmlDoc, $documentoCompleto, $cnpjEmpresa);
+                if ($campos === null) {
+                    continue;
+                }
+
+                $campos['empresa_emissora_id'] = (int) $empresa['id'];
+                $campos['nsu'] = $nsuDoc !== '' ? (int) $nsuDoc : null;
+                $campos['xml_completo'] = $documentoCompleto ? $xmlDoc : null;
+                $stmtUpsert->execute($campos);
+                $totalProcessado++;
             }
 
-            $novoUltimoNsu = (int) ($resposta->ultNSU ?? $ultimoNsu);
+            $novoUltimoNsu = !empty($noUltNsu) ? (int) $noUltNsu[0] : $ultimoNsu;
             if ($novoUltimoNsu <= $ultimoNsu) {
                 $ultimoNsu = $novoUltimoNsu;
                 $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
@@ -271,7 +278,7 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             }
             $ultimoNsu = $novoUltimoNsu;
             $stmtEmpresa->execute(['nsu' => $ultimoNsu, 'id' => (int) $empresa['id']]);
-            if (empty($resposta->loteDistDFeInt)) {
+            if (empty($docZips)) {
                 break;
             }
         }
