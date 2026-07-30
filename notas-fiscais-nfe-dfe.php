@@ -494,88 +494,121 @@ $usuario = h(nomeExibicao($usuarioRaw));
         </details>
 
         <section class="panel">
-            <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente com a SEFAZ</h2>
-            <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
+            <h2><i class="fa-solid fa-rotate"></i> Sincronizar manualmente</h2>
+            <form method="post" class="filtro-form">
                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                 <input type="hidden" name="acao" value="sincronizar">
-                <select class="select-filtro" name="empresa_emissora_id" required>
-                    <option value="">Selecione a empresa para sincronizar</option>
-                    <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                        <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $empresaSincronizarId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="field field-lg">
+                    <label for="syncEmpresaId">Empresa</label>
+                    <select id="syncEmpresaId" name="empresa_emissora_id" required>
+                        <option value="">Selecione a empresa</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $empresaSincronizarId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 <button class="btn" type="submit"><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar agora</button>
             </form>
 
-            <details style="margin-top:1rem;">
-                <summary class="muted" style="cursor:pointer;">Ferramentas de manutenção (uso ocasional)</summary>
-                <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap; align-items:center;">
-                    <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;" onsubmit="return confirm('Reiniciar a sincronização dessa empresa do zero (NSU = 0)? Isso vai buscar todo o histórico de novo desde o início, aos poucos, respeitando o limite de requisições da SEFAZ.');">
+            <details class="acoes-secundarias">
+                <summary>Ferramentas de manutenção (uso ocasional)</summary>
+                <div class="corpo">
+                    <form method="post" class="filtro-form" onsubmit="return confirm('Reiniciar a sincronização dessa empresa do zero (NSU = 0)? Isso vai buscar todo o histórico de novo desde o início, aos poucos, respeitando o limite de requisições da SEFAZ.');">
                         <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                         <input type="hidden" name="acao" value="reiniciar_nsu">
-                        <select class="select-filtro" name="empresa_emissora_id" required>
-                            <option value="">Selecione a empresa para reiniciar</option>
-                            <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                                <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <div class="field field-lg">
+                            <label for="reiniciarEmpresaId">Empresa</label>
+                            <select id="reiniciarEmpresaId" name="empresa_emissora_id" required>
+                                <option value="">Selecione a empresa para reiniciar</option>
+                                <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                                    <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reiniciar sincronização do zero</button>
                     </form>
+                    <p class="muted" style="font-size:0.8rem;">Um bug já corrigido fazia notas emitidas (que vêm como documento completo, não resumo) serem descartadas silenciosamente em algumas sincronizações antigas - e como o ponteiro de posição (NSU) já tinha avançado, elas ficaram pra trás e não vão aparecer sozinhas. Use "Reiniciar sincronização do zero" na empresa afetada para buscar tudo de novo desde o início.</p>
                 </div>
-                <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Um bug já corrigido fazia notas emitidas (que vêm como documento completo, não resumo) serem descartadas silenciosamente em algumas sincronizações antigas - e como o ponteiro de posição (NSU) já tinha avançado, elas ficaram pra trás e não vão aparecer sozinhas. Use "Reiniciar sincronização do zero" na empresa afetada para buscar tudo de novo desde o início.</p>
             </details>
         </section>
 
         <section class="panel">
-            <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-                <h2 style="margin-bottom:0;"><i class="fa-solid fa-magnifying-glass"></i> Buscar documentos</h2>
-                <form method="get" class="row-actions" style="flex-wrap:wrap;">
-                    <input class="select-filtro" type="text" name="busca" value="<?php echo h($filtroBusca); ?>" placeholder="Nome, CNPJ, nº NF-e ou chave" style="min-width:220px;">
-                    <input class="select-filtro" type="date" name="data_inicio" value="<?php echo h($filtroDataInicio); ?>" aria-label="Data inicial">
-                    <span class="muted">até</span>
-                    <input class="select-filtro" type="date" name="data_fim" value="<?php echo h($filtroDataFim); ?>" aria-label="Data final">
-                    <select class="select-filtro" name="empresa_emissora_id">
-                        <option value="">Todas as empresas</option>
+            <h2><i class="fa-solid fa-magnifying-glass"></i> Buscar documentos</h2>
+            <form method="get" class="filtro-form">
+                <div class="field field-lg">
+                    <label for="filtroBusca">Nome, CNPJ, nº ou chave</label>
+                    <input id="filtroBusca" type="text" name="busca" value="<?php echo h($filtroBusca); ?>" placeholder="Digite para buscar">
+                </div>
+                <div class="field field-sm">
+                    <label for="filtroDataInicio">Data inicial</label>
+                    <input id="filtroDataInicio" type="date" name="data_inicio" value="<?php echo h($filtroDataInicio); ?>">
+                </div>
+                <div class="field field-sm">
+                    <label for="filtroDataFim">Data final</label>
+                    <input id="filtroDataFim" type="date" name="data_fim" value="<?php echo h($filtroDataFim); ?>">
+                </div>
+                <div class="field">
+                    <label for="filtroEmpresaId">Empresa</label>
+                    <select id="filtroEmpresaId" name="empresa_emissora_id">
+                        <option value="">Todas</option>
                         <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
                             <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $filtroEmpresaId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <select class="select-filtro" name="tipo">
+                </div>
+                <div class="field">
+                    <label for="filtroTipo">Tipo</label>
+                    <select id="filtroTipo" name="tipo">
                         <option value="">Emitidas e recebidas</option>
                         <option value="emitida" <?php echo $filtroTipo === 'emitida' ? 'selected' : ''; ?>>Somente emitidas</option>
                         <option value="recebida" <?php echo $filtroTipo === 'recebida' ? 'selected' : ''; ?>>Somente recebidas</option>
                     </select>
-                    <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
-                </form>
-            </div>
-        </section>
-
-        <section class="panel">
-            <h2><i class="fa-solid fa-file-zipper"></i> Exportar em lote</h2>
-            <p class="muted" style="margin-top:0;">Baixe em ZIP os documentos com XML completo sincronizados de uma data exata até outra (resumos sem XML completo não entram). Escolha se quer o XML e o DANFE juntos no mesmo ZIP, ou cada formato em um ZIP separado.</p>
-            <form method="get" action="notas-fiscais-nfe-dfe" class="row-actions" style="flex-wrap:wrap; align-items:center;">
-                <input type="hidden" name="zip_export" value="1">
-                <input class="select-filtro" type="date" name="zip_data_inicio" required aria-label="Data inicial da exportação">
-                <span class="muted">até</span>
-                <input class="select-filtro" type="date" name="zip_data_fim" required aria-label="Data final da exportação">
-                <select class="select-filtro" name="zip_empresa_emissora_id">
-                    <option value="">Todas as empresas</option>
-                    <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                        <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <select class="select-filtro" name="zip_tipo">
-                    <option value="">Emitidas e recebidas</option>
-                    <option value="emitida">Somente emitidas</option>
-                    <option value="recebida">Somente recebidas</option>
-                </select>
-                <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> ZIP: XML + DANFE juntos</button>
-                <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="xml"><i class="fa-solid fa-file-zipper"></i> ZIP: só XML</button>
-                <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> ZIP: só DANFE</button>
+                </div>
+                <button class="btn btn-outline" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
             </form>
         </section>
 
         <section class="panel">
+            <h2><i class="fa-solid fa-file-zipper"></i> Exportar em lote</h2>
+            <p class="muted secao-descricao">Baixe em ZIP os documentos com XML completo sincronizados de uma data exata até outra (resumos sem XML completo não entram). Escolha se quer o XML e o DANFE juntos no mesmo ZIP, ou cada formato em um ZIP separado.</p>
+            <form method="get" action="notas-fiscais-nfe-dfe" class="filtro-form">
+                <input type="hidden" name="zip_export" value="1">
+                <div class="field field-sm">
+                    <label for="zipDataInicio">Data inicial</label>
+                    <input id="zipDataInicio" type="date" name="zip_data_inicio" required>
+                </div>
+                <div class="field field-sm">
+                    <label for="zipDataFim">Data final</label>
+                    <input id="zipDataFim" type="date" name="zip_data_fim" required>
+                </div>
+                <div class="field">
+                    <label for="zipEmpresaId">Empresa</label>
+                    <select id="zipEmpresaId" name="zip_empresa_emissora_id">
+                        <option value="">Todas</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="zipTipo">Tipo</label>
+                    <select id="zipTipo" name="zip_tipo">
+                        <option value="">Emitidas e recebidas</option>
+                        <option value="emitida">Somente emitidas</option>
+                        <option value="recebida">Somente recebidas</option>
+                    </select>
+                </div>
+                <div class="row-actions" style="flex:none;">
+                    <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> XML + DANFE</button>
+                    <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="xml"><i class="fa-solid fa-file-zipper"></i> Só XML</button>
+                    <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> Só DANFE</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2><i class="fa-solid fa-list-check"></i> Resultados</h2>
+            <p class="resultado-contagem"><?php echo (int) $totalDocumentos; ?> documento(s) encontrado(s).</p>
             <div class="table-wrap">
                 <table class="lista">
                     <thead>
@@ -601,35 +634,33 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                         <?php echo $documento['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida'; ?>
                                     </span>
                                     <?php if (!empty($documento['cancelada']) || $documento['situacao'] !== 'autorizada'): ?>
-                                        <div class="muted" style="font-size:0.7rem; margin-top:0.25rem;">
+                                        <span class="cel-sub">
                                             <span class="status-pill status-rejeitada"><?php echo !empty($documento['cancelada']) ? 'Cancelada' : ucfirst((string) $documento['situacao']); ?></span>
                                             <?php if (!empty($documento['data_cancelamento'])): ?>
-                                                <div><?php echo h(date('d/m/Y H:i', strtotime($documento['data_cancelamento']))); ?></div>
+                                                <?php echo h(date('d/m/Y H:i', strtotime($documento['data_cancelamento']))); ?>
                                             <?php endif; ?>
-                                        </div>
+                                        </span>
                                     <?php endif; ?>
                                     <?php if (empty($documento['tem_documento_completo'])): ?>
-                                        <div class="muted" style="font-size:0.65rem; margin-top:0.25rem;">
-                                            <?php echo !empty($documento['manifestada']) ? 'Só resumo (ciência enviada, aguardando XML)' : 'Só resumo'; ?>
-                                        </div>
+                                        <span class="cel-sub"><?php echo !empty($documento['manifestada']) ? 'Só resumo (ciência enviada, aguardando XML)' : 'Só resumo'; ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php echo h($documento['nome_emitente'] ?? '—'); ?>
-                                    <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_emitente'] ?? ''); ?></div>
+                                    <span class="cel-principal"><?php echo h($documento['nome_emitente'] ?? '—'); ?></span>
+                                    <span class="cel-sub"><?php echo h($documento['cnpj_emitente'] ?? ''); ?></span>
                                 </td>
                                 <td>
-                                    <?php echo h($documento['nome_destinatario'] ?? '—'); ?>
-                                    <div class="muted" style="font-size:0.7rem;"><?php echo h($documento['cnpj_destinatario'] ?? ''); ?></div>
+                                    <span class="cel-principal"><?php echo h($documento['nome_destinatario'] ?? '—'); ?></span>
+                                    <span class="cel-sub"><?php echo h($documento['cnpj_destinatario'] ?? ''); ?></span>
                                 </td>
                                 <td>
-                                    <?php echo h((string) ($documento['numero_nfe'] ?? '—')); ?><?php echo !empty($documento['serie']) ? ' / ' . h((string) $documento['serie']) : ''; ?>
-                                    <div class="muted" style="font-size:0.65rem;">Chave: <?php echo h($documento['chave_acesso']); ?></div>
+                                    <span class="cel-principal"><?php echo h((string) ($documento['numero_nfe'] ?? '—')); ?><?php echo !empty($documento['serie']) ? ' / ' . h((string) $documento['serie']) : ''; ?></span>
+                                    <span class="cel-sub">Chave: <?php echo h($documento['chave_acesso']); ?></span>
                                 </td>
                                 <td>R$ <?php echo number_format((float) ($documento['valor_nfe'] ?? 0), 2, ',', '.'); ?></td>
                                 <td>
                                     <?php if (!empty($documento['tem_documento_completo'])): ?>
-                                        <div class="row-actions" style="flex-wrap:nowrap;">
+                                        <div class="tabela-acoes">
                                             <a class="btn btn-outline btn-small" href="notas-fiscais-nfe-dfe?xml_nfe_dfe=<?php echo (int) $documento['id']; ?>"><i class="fa-solid fa-code"></i> XML</a>
                                             <a class="btn btn-outline btn-small" href="notas-fiscais-nfe-dfe?pdf_nfe_dfe=<?php echo (int) $documento['id']; ?>" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> DANFE</a>
                                         </div>
@@ -645,11 +676,11 @@ $usuario = h(nomeExibicao($usuarioRaw));
 
             <?php if ($totalPaginas > 1): ?>
                 <?php $paginasExibir = paginasParaExibirNfeDfe($paginaAtual, $totalPaginas); ?>
-                <div class="row-actions" style="justify-content:center; margin-top:1rem;">
+                <div class="paginacao">
                     <?php $paginaAnterior = 0; ?>
                     <?php foreach ($paginasExibir as $p): ?>
                         <?php if ($p - $paginaAnterior > 1): ?>
-                            <span class="muted" style="padding:0 0.25rem;">…</span>
+                            <span class="reticencias">…</span>
                         <?php endif; ?>
                         <a class="btn <?php echo $p === $paginaAtual ? '' : 'btn-outline'; ?> btn-small"
                            href="notas-fiscais-nfe-dfe?<?php echo h(http_build_query(array_filter([
