@@ -136,6 +136,39 @@ function aplicarEventoNfeDfe(PDO $dbNotas, string $xmlConteudo): bool
     return true;
 }
 
+// Manifestação do Destinatário - Ciência da Operação (evento 210210). A SEFAZ só libera o XML
+// completo (procNFe) de uma NF-e recebida de terceiros DEPOIS desse evento; até lá só manda o
+// resumo (resNFe). É o mesmo mecanismo que sistemas como o SIEG usam para conseguir "tudo".
+// Não confirma nem valida a operação - só declara que a empresa está ciente de que ela existe.
+function manifestarCienciaNfe(array $empresa, string $chave): array
+{
+    [$ok, $erro, $tools] = montarToolsNfe($empresa);
+    if (!$ok) {
+        return ['sucesso' => false, 'mensagem' => $erro];
+    }
+
+    try {
+        $resposta = $tools->sefazManifesta($chave, \NFePHP\NFe\Tools::EVT_CIENCIA);
+        $std = new SimpleXMLElement($resposta);
+        $retEvento = $std->xpath('//*[local-name()="retEvento"]');
+        $infEvento = !empty($retEvento)
+            ? ($retEvento[0]->children('http://www.portalfiscal.inf.br/nfe')->infEvento ?? $retEvento[0]->infEvento)
+            : null;
+        $cStat = $infEvento !== null ? (string) $infEvento->cStat : '';
+        $xMotivo = $infEvento !== null ? (string) $infEvento->xMotivo : 'Retorno inesperado da SEFAZ.';
+
+        // 135/136: evento registrado. 573: já tinha sido manifestada antes (duplicidade) - também
+        // conta como sucesso, só não faz sentido tentar de novo depois.
+        if (in_array($cStat, ['135', '136', '573'], true)) {
+            return ['sucesso' => true, 'mensagem' => "[{$cStat}] {$xMotivo}"];
+        }
+
+        return ['sucesso' => false, 'mensagem' => "[{$cStat}] {$xMotivo}"];
+    } catch (Throwable $e) {
+        return ['sucesso' => false, 'mensagem' => 'Falha ao manifestar ciência: ' . trim(strip_tags($e->getMessage()))];
+    }
+}
+
 function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 {
     [$ok, $erro, $tools] = montarToolsNfe($empresa);
@@ -243,7 +276,30 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             }
         }
 
+        // Manifesta Ciência da Operação nas notas recebidas que só têm resumo (sem XML completo)
+        // e ainda não foram manifestadas - isso é o que faz a SEFAZ liberar o documento completo
+        // numa sincronização futura. Lote pequeno pra não estourar limite de eventos por minuto.
+        $totalManifestado = 0;
+        $stmtPendentesManifestacao = $dbNotas->prepare(
+            "SELECT id, chave_acesso FROM notas_fiscais_nfe_dfe
+             WHERE empresa_emissora_id = :empresa_emissora_id AND tipo_documento = 'recebida'
+               AND tem_documento_completo = 0 AND manifestada = 0
+             LIMIT 5"
+        );
+        $stmtPendentesManifestacao->execute(['empresa_emissora_id' => (int) $empresa['id']]);
+        $stmtMarcarManifestada = $dbNotas->prepare('UPDATE notas_fiscais_nfe_dfe SET manifestada = 1, data_manifestacao = NOW() WHERE id = :id');
+        foreach ($stmtPendentesManifestacao->fetchAll() as $pendente) {
+            $resultadoManifesto = manifestarCienciaNfe($empresa, (string) $pendente['chave_acesso']);
+            if ($resultadoManifesto['sucesso']) {
+                $stmtMarcarManifestada->execute(['id' => (int) $pendente['id']]);
+                $totalManifestado++;
+            }
+        }
+
         $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
+        if ($totalManifestado > 0) {
+            $mensagem .= " Ciência da Operação enviada para {$totalManifestado} nota(s) recebida(s); o XML completo delas deve aparecer numa próxima sincronização.";
+        }
         if ($totalProcessado > 0) {
             $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
         }

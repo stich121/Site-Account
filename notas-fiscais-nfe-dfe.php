@@ -81,6 +81,8 @@ function prepararTabelaNfeDfe(PDO $db): void
             valor_nfe DECIMAL(14,2) NULL,
             protocolo_autorizacao VARCHAR(30) NULL,
             tem_documento_completo TINYINT(1) NOT NULL DEFAULT 0,
+            manifestada TINYINT(1) NOT NULL DEFAULT 0,
+            data_manifestacao DATETIME NULL,
             xml_completo MEDIUMTEXT NULL,
             criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -104,6 +106,16 @@ function prepararColunasNsuNfeEmpresasEmissoras(PDO $db): void
     }
 }
 
+function prepararColunasManifestacaoNfeDfe(PDO $db): void
+{
+    if (!colunaExisteNfeDfe($db, 'notas_fiscais_nfe_dfe', 'manifestada')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfe_dfe ADD COLUMN manifestada TINYINT(1) NOT NULL DEFAULT 0 AFTER tem_documento_completo');
+    }
+    if (!colunaExisteNfeDfe($db, 'notas_fiscais_nfe_dfe', 'data_manifestacao')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfe_dfe ADD COLUMN data_manifestacao DATETIME NULL AFTER manifestada');
+    }
+}
+
 try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
@@ -112,6 +124,12 @@ try {
         prepararTabelaNfeDfe($dbNotas);
         prepararColunasNsuNfeEmpresasEmissoras($dbNotas);
         marcarSchemaPreparada('notas_fiscais_nfe_dfe');
+    }
+    // Flag própria: essa tabela pode já ter sido criada por uma visita anterior à página, antes
+    // dessas colunas de manifestação existirem - mesmo cuidado tomado para o buscador de NFS-e.
+    if (!schemaJaPreparada('notas_fiscais_nfe_dfe_manifestacao')) {
+        prepararColunasManifestacaoNfeDfe($dbNotas);
+        marcarSchemaPreparada('notas_fiscais_nfe_dfe_manifestacao');
     }
 
     $stmt = $db->prepare('SELECT permite_notas_fiscais, usuario FROM funcionarios WHERE id = :id LIMIT 1');
@@ -441,7 +459,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
         <?php endif; ?>
 
         <div class="notice warning">
-            <strong>Como funciona:</strong> a SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis); para NF-e recebidas de terceiros, às vezes só chega um <strong>resumo</strong> (chave, emitente, valor, data) sem XML completo — nesse caso XML e DANFE não ficam disponíveis, só os dados na tabela.
+            <strong>Como funciona:</strong> a SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis) direto. Para NF-e recebidas de terceiros, a SEFAZ manda primeiro só um <strong>resumo</strong> (chave, emitente, valor, data) — a sincronização já envia sozinha a <strong>Ciência da Operação</strong> (evento oficial que declara que a empresa está ciente da nota) pra cada resumo pendente, e a partir daí o XML completo passa a vir numa sincronização seguinte, liberando XML e DANFE. Até isso acontecer, a nota aparece com "Só resumo" na tabela.
         </div>
 
         <section class="panel">
@@ -542,7 +560,9 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                         </div>
                                     <?php endif; ?>
                                     <?php if (empty($documento['tem_documento_completo'])): ?>
-                                        <div class="muted" style="font-size:0.65rem; margin-top:0.25rem;">Só resumo</div>
+                                        <div class="muted" style="font-size:0.65rem; margin-top:0.25rem;">
+                                            <?php echo !empty($documento['manifestada']) ? 'Só resumo (ciência enviada, aguardando XML)' : 'Só resumo'; ?>
+                                        </div>
                                     <?php endif; ?>
                                 </td>
                                 <td>
