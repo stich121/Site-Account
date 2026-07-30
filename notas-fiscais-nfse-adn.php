@@ -30,6 +30,18 @@ function nomeExibicao(?string $usuario): string
     return trim(str_replace('.', ' ', $usuario ?? ''));
 }
 
+function paginasParaExibirAdn(int $paginaAtual, int $totalPaginas): array
+{
+    $paginas = array_unique(array_filter(array_merge(
+        [1, 2],
+        range(max(1, $paginaAtual - 1), min($totalPaginas, $paginaAtual + 1)),
+        range(max(1, $totalPaginas - 2), $totalPaginas)
+    ), static fn (int $p): bool => $p >= 1 && $p <= $totalPaginas));
+    sort($paginas);
+
+    return $paginas;
+}
+
 function colunaExisteNotasAdn(PDO $db, string $tabela, string $coluna): bool
 {
     $stmt = $db->prepare(
@@ -379,8 +391,13 @@ $usuario = h(nomeExibicao($usuarioRaw));
             </div>
 
             <?php if ($totalPaginas > 1): ?>
+                <?php $paginasExibir = paginasParaExibirAdn($paginaAtual, $totalPaginas); ?>
                 <div class="row-actions" style="justify-content:center; margin-top:1rem;">
-                    <?php for ($p = 1; $p <= $totalPaginas; $p++): ?>
+                    <?php $paginaAnterior = 0; ?>
+                    <?php foreach ($paginasExibir as $p): ?>
+                        <?php if ($p - $paginaAnterior > 1): ?>
+                            <span class="muted" style="padding:0 0.25rem;">…</span>
+                        <?php endif; ?>
                         <a class="btn <?php echo $p === $paginaAtual ? '' : 'btn-outline'; ?> btn-small"
                            href="notas-fiscais-nfse-adn?<?php echo h(http_build_query(array_filter([
                                'busca' => $filtroBusca,
@@ -390,7 +407,8 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                'tipo' => $filtroTipo,
                                'pagina' => $p,
                            ], static fn ($v) => $v !== null && $v !== ''))); ?>"><?php echo $p; ?></a>
-                    <?php endfor; ?>
+                        <?php $paginaAnterior = $p; ?>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </section>
