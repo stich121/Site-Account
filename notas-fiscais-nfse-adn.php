@@ -352,6 +352,8 @@ try {
             $empresaSincronizar = $stmtEmpresa->fetch();
             if (!$empresaSincronizar) {
                 $erro = 'Selecione uma empresa emissora válida para sincronizar.';
+            } elseif (!empty($empresaSincronizar['nfse_adn_bloqueado_ate']) && strtotime($empresaSincronizar['nfse_adn_bloqueado_ate']) > time()) {
+                $erro = "O Portal Nacional ainda está bloqueando essa empresa por excesso de requisições (aguarde até " . date('d/m/Y H:i', strtotime($empresaSincronizar['nfse_adn_bloqueado_ate'])) . "). Tentar de novo antes disso só reinicia o bloqueio.";
             } else {
                 $resultadoSync = sincronizarNfseAdn($dbNotas, $empresaSincronizar);
                 if ($resultadoSync['sucesso']) {

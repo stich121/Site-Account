@@ -343,6 +343,8 @@ try {
             $empresaSincronizar = $stmtEmpresa->fetch();
             if (!$empresaSincronizar) {
                 $erro = 'Selecione uma empresa emissora válida para sincronizar.';
+            } elseif (!empty($empresaSincronizar['nfe_dfe_bloqueado_ate']) && strtotime($empresaSincronizar['nfe_dfe_bloqueado_ate']) > time()) {
+                $erro = "A SEFAZ ainda está bloqueando essa empresa por excesso de requisições (aguarde até " . date('d/m/Y H:i', strtotime($empresaSincronizar['nfe_dfe_bloqueado_ate'])) . "). Tentar de novo antes disso só reinicia o bloqueio.";
             } else {
                 $resultadoSync = sincronizarNfeDfe($dbNotas, $empresaSincronizar);
                 if ($resultadoSync['sucesso']) {
