@@ -13,8 +13,22 @@ require_once __DIR__ . '/config_db_notas.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $nivelAcesso = atualizarNivelAcessoSessao(obterConexao(), $funcionarioId);
+$podeAdministrar = $nivelAcesso >= 3;
 
-if ($nivelAcesso < 3) {
+// Cadastrar/editar empresa emissora agora é liberado pra qualquer funcionário com acesso à área
+// fiscal (mesma checagem de permite_notas_fiscais usada em notas-fiscais.php/notas-clientes.php),
+// não só administradores. Desativar/reativar/excluir continuam exigindo nível de administrador
+// (checado mais abaixo, dentro de cada ação) por serem ações mais delicadas.
+$dbFuncionarios = obterConexao();
+if (!schemaJaPreparada('funcionarios_permite_notas_fiscais')) {
+    prepararColunaPermiteNotasFiscais($dbFuncionarios);
+    marcarSchemaPreparada('funcionarios_permite_notas_fiscais');
+}
+$stmtPermissao = $dbFuncionarios->prepare('SELECT permite_notas_fiscais FROM funcionarios WHERE id = :id LIMIT 1');
+$stmtPermissao->execute(['id' => $funcionarioId]);
+$permiteNotas = (int) ($stmtPermissao->fetchColumn() ?: 0) === 1;
+
+if (!$permiteNotas) {
     header('Location: painel');
     exit;
 }
@@ -25,6 +39,18 @@ $sucesso = '';
 function h(string $valor): string
 {
     return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
+}
+
+function prepararColunaPermiteNotasFiscais(PDO $db): void
+{
+    $stmt = $db->prepare(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'funcionarios' AND COLUMN_NAME = 'permite_notas_fiscais'"
+    );
+    $stmt->execute();
+    if ((int) $stmt->fetchColumn() === 0) {
+        $db->exec('ALTER TABLE funcionarios ADD COLUMN permite_notas_fiscais TINYINT(1) NOT NULL DEFAULT 1 AFTER permite_ponto');
+    }
 }
 
 function cnpjEmpresaValido(string $documento): bool
@@ -323,6 +349,8 @@ try {
 
                 $sucesso = 'Empresa emissora salva com sucesso.';
             }
+        } elseif (($_POST['acao'] ?? '') === 'desativar' && !$podeAdministrar) {
+            $erro = 'Só administradores podem desativar uma empresa emissora.';
         } elseif (($_POST['acao'] ?? '') === 'desativar') {
             $id = (int) ($_POST['empresa_id'] ?? 0);
             if ($id > 0) {
@@ -330,6 +358,8 @@ try {
                 $stmt->execute(['id' => $id]);
                 $sucesso = 'Empresa desativada. Ela deixa de aparecer para escolha em novas notas.';
             }
+        } elseif (($_POST['acao'] ?? '') === 'reativar' && !$podeAdministrar) {
+            $erro = 'Só administradores podem reativar uma empresa emissora.';
         } elseif (($_POST['acao'] ?? '') === 'reativar') {
             $id = (int) ($_POST['empresa_id'] ?? 0);
             if ($id > 0) {
@@ -337,6 +367,8 @@ try {
                 $stmt->execute(['id' => $id]);
                 $sucesso = 'Empresa reativada com sucesso.';
             }
+        } elseif (($_POST['acao'] ?? '') === 'excluir' && !$podeAdministrar) {
+            $erro = 'Só administradores podem excluir uma empresa emissora.';
         } elseif (($_POST['acao'] ?? '') === 'excluir') {
             $id = (int) ($_POST['empresa_id'] ?? 0);
             $confirmado = ($_POST['confirmar_exclusao'] ?? '') === 'sim';
@@ -457,7 +489,7 @@ function rotuloCrt(?int $crt): string
 </head>
 <body>
     <div class="shell">
-        <?php $paginaAtivaNotas = 'empresas'; $podeAdministrar = true; include __DIR__ . '/includes/notas-nav.php'; ?>
+        <?php $paginaAtivaNotas = 'empresas'; include __DIR__ . '/includes/notas-nav.php'; ?>
 
         <section class="panel">
             <h1>Empresas emissoras</h1>
@@ -706,14 +738,14 @@ function rotuloCrt(?int $crt): string
                                 <td>
                                     <div class="row-actions">
                                         <a class="btn btn-outline" href="notas-empresas-emissoras?editar=<?php echo h((string) $empresa['id']); ?>#razao_social"><i class="fa-solid fa-pen"></i> Editar</a>
-                                        <?php if ((int) $empresa['ativo'] === 1): ?>
+                                        <?php if ($podeAdministrar && (int) $empresa['ativo'] === 1): ?>
                                             <form method="post">
                                                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                                                 <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">
                                                 <input type="hidden" name="acao" value="desativar">
                                                 <button class="btn btn-danger" type="submit"><i class="fa-solid fa-ban"></i> Desativar</button>
                                             </form>
-                                        <?php else: ?>
+                                        <?php elseif ($podeAdministrar): ?>
                                             <form method="post">
                                                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                                                 <input type="hidden" name="empresa_id" value="<?php echo h((string) $empresa['id']); ?>">

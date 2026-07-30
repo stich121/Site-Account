@@ -92,8 +92,8 @@ $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ??
     <a class="<?php echo $abaClasse('emitir_servico'); ?>" href="notas-emitir-servico"><i class="fa-solid fa-file-circle-plus"></i> Emitir NFS-e</a>
     <a class="<?php echo $abaClasse('clientes'); ?>" href="notas-clientes"><i class="fa-solid fa-users"></i> Clientes</a>
     <a class="<?php echo $abaClasse('certificados'); ?>" href="notas-certificados"><i class="fa-solid fa-key"></i> Certificado digital</a>
+    <a class="<?php echo $abaClasse('empresas'); ?>" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
     <?php if ($podeAdministrar): ?>
-        <a class="<?php echo $abaClasse('empresas'); ?>" href="notas-empresas-emissoras"><i class="fa-solid fa-building"></i> Empresas emissoras</a>
         <a class="<?php echo $abaClasse('produtos'); ?>" href="notas-produtos-servicos"><i class="fa-solid fa-boxes-stacked"></i> Produtos/Serviços</a>
     <?php endif; ?>
 </nav>
