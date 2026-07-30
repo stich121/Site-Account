@@ -380,6 +380,18 @@ try {
                     $erro = $resultadoReparo['mensagem'];
                 }
             }
+        } elseif (($_POST['acao'] ?? '') === 'reiniciar_nsu') {
+            $empresaSincronizarId = (int) ($_POST['empresa_emissora_id'] ?? 0);
+            $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+            $stmtEmpresa->execute(['id' => $empresaSincronizarId]);
+            $empresaReiniciar = $stmtEmpresa->fetch();
+            if (!$empresaReiniciar) {
+                $erro = 'Selecione uma empresa emissora válida para reiniciar.';
+            } else {
+                $dbNotas->prepare('UPDATE empresas_emissoras SET nfse_adn_ultimo_nsu = 0, nfse_adn_bloqueado_ate = NULL WHERE id = :id')
+                    ->execute(['id' => (int) $empresaReiniciar['id']]);
+                $sucesso = "Sincronização de {$empresaReiniciar['razao_social']} reiniciada do zero. Clique em \"Sincronizar agora\" (ou aguarde a automática/cron) para buscar todo o histórico de novo.";
+            }
         }
     }
 
@@ -549,6 +561,22 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-wrench"></i> Corrigir documentos sem dados (afetados por eventos)</button>
                     </form>
                     <p class="muted" style="font-size:0.8rem;">Versões antigas dessa tela podiam gravar o evento de cancelamento por cima dos dados da nota original, deixando a linha sem prestador/tomador/valor. O botão "Corrigir" acima refaz a consulta por chave e restaura os dados certos, marcando também a nota como cancelada.</p>
+
+                    <form method="post" class="filtro-form" onsubmit="return confirm('Reiniciar a sincronização dessa empresa do zero (NSU = 0)? Isso vai buscar todo o histórico de novo desde o início, aos poucos, respeitando o limite de requisições do Portal Nacional.');">
+                        <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                        <input type="hidden" name="acao" value="reiniciar_nsu">
+                        <div class="field field-lg">
+                            <label for="reiniciarEmpresaId">Empresa</label>
+                            <select id="reiniciarEmpresaId" name="empresa_emissora_id" required>
+                                <option value="">Selecione a empresa para reiniciar</option>
+                                <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                                    <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reiniciar sincronização do zero</button>
+                    </form>
+                    <p class="muted" style="font-size:0.8rem;">Se uma empresa emitir notas todo mês mas o buscador continuar dizendo que "já está em dia" com a última nota parada em meses/anos atrás, o ponteiro de posição (NSU) dela provavelmente ficou preso num ponto antigo. Use "Reiniciar sincronização do zero" na empresa afetada para buscar tudo de novo desde o início - documentos já salvos não duplicam.</p>
                 </div>
             </details>
         </section>
