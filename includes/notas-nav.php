@@ -49,9 +49,17 @@ if (
 $empresaEmissoraAtivaId = (int) $_SESSION['nfse_empresa_emissora_ativa_id'];
 $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ?? 'notas-fiscais'), ENT_QUOTES, 'UTF-8');
 ?>
+<script>
+(function () {
+    var temaSalvo = localStorage.getItem('notas_tema');
+    if (temaSalvo === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+})();
+</script>
 <header class="topbar">
     <a class="brand" href="painel" aria-label="Voltar para o painel">
-        <img src="logo-branca.png" alt="ACCOUNT Contabilidade">
+        <img src="logo-branca.png" alt="ACCOUNT Contabilidade" id="logoTopo">
     </a>
     <?php if (!empty($empresasEmissorasNav)): ?>
         <form class="empresa-ativa-form" method="post" action="notas-selecionar-empresa" aria-label="Selecionar empresa prestadora para emissão">
@@ -67,6 +75,14 @@ $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ??
             </select>
         </form>
     <?php endif; ?>
+    <button class="theme-toggle" type="button" id="btnAlternarTema" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+        <span class="theme-toggle-track">
+            <span class="theme-toggle-thumb">
+                <i class="fa-solid fa-sun theme-icon-sun"></i>
+                <i class="fa-solid fa-moon theme-icon-moon"></i>
+            </span>
+        </span>
+    </button>
     <div class="menu-hamburguer">
         <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
             <i class="fa-solid fa-bars"></i> Menu
@@ -85,6 +101,32 @@ $redirecionarEmpresaAtiva = htmlspecialchars(basename($_SERVER['REQUEST_URI'] ??
         </div>
     </div>
 </header>
+
+<script>
+(function () {
+    var logo = document.getElementById('logoTopo');
+    var botao = document.getElementById('btnAlternarTema');
+
+    function aplicarLogo(tema) {
+        if (!logo) return;
+        logo.src = tema === 'light' ? 'logo Preta.png' : 'logo-branca.png';
+    }
+
+    aplicarLogo(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+
+    botao.addEventListener('click', function () {
+        var atual = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+        var novo = atual === 'light' ? 'dark' : 'light';
+
+        botao.classList.add('girando');
+        setTimeout(function () { botao.classList.remove('girando'); }, 500);
+
+        document.documentElement.setAttribute('data-theme', novo);
+        localStorage.setItem('notas_tema', novo);
+        aplicarLogo(novo);
+    });
+})();
+</script>
 
 <nav class="notas-nav" aria-label="Navegação da área fiscal">
     <a class="<?php echo $abaClasse('notas'); ?>" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</a>
