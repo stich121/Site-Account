@@ -29,7 +29,10 @@ if ($viaCli) {
         exit(0);
     }
 
-    $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas);
+    // CLI não tem o limite de ~30s de uma requisição via navegador; orçamento maior aqui ajuda a
+    // dar conta de um catch-up retroativo grande (ex.: 3 meses de histórico) em poucas execuções.
+    set_time_limit(180);
+    $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas, 40, 150);
     if (empty($resultados)) {
         echo "Nenhuma empresa com certificado A1 válido para sincronizar.\n";
         exit(0);
@@ -79,7 +82,10 @@ try {
         if (!hash_equals($_SESSION['csrf_processar_nfe_dfe'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
         } else {
-            $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas);
+            // Orçamento de tempo curto aqui: requisição via navegador costuma ter limite de
+            // execução de ~30s. Pra um catch-up retroativo grande, use o cron via CLI (mais acima
+            // nesta página) ou clique em "Sincronizar todas agora" várias vezes.
+            $resultados = sincronizarTodasEmpresasNfeDfe($dbNotas, 15, 20);
             $sucesso = !empty($resultados)
                 ? ('Sincronização concluída: ' . count($resultados) . ' empresa(s) verificada(s).')
                 : 'Nenhuma empresa com certificado A1 válido para sincronizar.';
@@ -151,6 +157,7 @@ $csrf = h($_SESSION['csrf_processar_nfe_dfe'] ?? '');
         <div class="notice warning">
             <strong>Para rodar sozinho, sem depender de ninguém abrir esta página:</strong> configure no hPanel da Hostinger (Avançado &gt; Cron Jobs) uma tarefa a cada 10-15 minutos executando:
             <code>php <?php echo h(__DIR__); ?>/processar-nfe-dfe-automatico.php --cli</code>
+            Cada execução do cron busca bem mais fundo que uma sincronização manual (até 150 segundos de tentativas por empresa), então um histórico retroativo grande (ex.: 3 meses numa empresa que nunca sincronizou) tende a ficar em dia em poucas execuções, sem precisar de nada manual.
         </div>
 
         <?php if (!empty($resultados)): ?>

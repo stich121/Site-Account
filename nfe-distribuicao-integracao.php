@@ -312,16 +312,33 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 
 // Coloca em dia TODAS as empresas com certificado válido para NF-e (mesma checagem de
 // certificado usada na NFS-e - certificadoEmpresaDisponivel() não é específica de nenhuma delas).
-function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpresa = 5): array
+//
+// $maxTentativasPorEmpresa alto (cada tentativa já busca até 5 lotes) e $tempoLimiteSegundos
+// existem pra dar conta de um catch-up retroativo grande (ex.: 3 meses de histórico numa empresa
+// que nunca sincronizou) num único cron, sem depender de dezenas de execuções - mas sem correr o
+// risco de estourar o tempo de execução do PHP. Não aumenta o número de chamadas feitas à SEFAZ
+// além do necessário: cada empresa já para sozinha assim que não há mais documento novo ou dá erro
+// (ex.: rate limit) - o limite alto só permite ir mais fundo quando o backlog é grande de verdade.
+function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpresa = 40, int $tempoLimiteSegundos = 90): array
 {
     $resultados = [];
+    $inicio = microtime(true);
 
     foreach (empresasComCertificadoValidoAdn($dbNotas) as $empresa) {
+        if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
+            break; // orçamento de tempo estourado - as empresas restantes ficam pra próxima execução
+        }
+
         $totalEmpresa = 0;
         $ultimaMensagem = '';
         $ultimoSucesso = true;
 
         for ($tentativa = 0; $tentativa < $maxTentativasPorEmpresa; $tentativa++) {
+            if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
+                $ultimaMensagem .= ' (parou por orçamento de tempo; continua na próxima execução)';
+                break;
+            }
+
             $resultado = sincronizarNfeDfe($dbNotas, $empresa);
             $ultimaMensagem = $resultado['mensagem'];
             $ultimoSucesso = $resultado['sucesso'];

@@ -512,16 +512,33 @@ function empresasComCertificadoValidoAdn(PDO $dbNotas): array
 // erro, ou esgotar $maxTentativasPorEmpresa. Usado tanto pela sincronização automática ao abrir
 // o buscador (uma empresa por vez) quanto pelo script de cron processar-nfse-adn-automatico.php
 // (todas de uma vez, pra funcionar sem ninguém precisar abrir a página).
-function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpresa = 5): array
+//
+// $maxTentativasPorEmpresa alto e $tempoLimiteSegundos existem pra dar conta de um catch-up
+// retroativo grande (ex.: 3 meses de histórico numa empresa que nunca sincronizou) num único
+// cron, sem precisar de dezenas de execuções - mas sem risco de estourar o tempo de execução do
+// PHP. Não aumenta o número de chamadas ao Portal Nacional além do necessário: cada empresa já
+// para sozinha assim que não há mais documento novo ou dá erro (ex.: rate limit) - o limite alto
+// só permite ir mais fundo quando o backlog é grande de verdade.
+function sincronizarTodasEmpresasNfseAdn(PDO $dbNotas, int $maxTentativasPorEmpresa = 40, int $tempoLimiteSegundos = 90): array
 {
     $resultados = [];
+    $inicio = microtime(true);
 
     foreach (empresasComCertificadoValidoAdn($dbNotas) as $empresa) {
+        if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
+            break; // orçamento de tempo estourado - as empresas restantes ficam pra próxima execução
+        }
+
         $totalEmpresa = 0;
         $ultimaMensagem = '';
         $ultimoSucesso = true;
 
         for ($tentativa = 0; $tentativa < $maxTentativasPorEmpresa; $tentativa++) {
+            if ((microtime(true) - $inicio) > $tempoLimiteSegundos) {
+                $ultimaMensagem .= ' (parou por orçamento de tempo; continua na próxima execução)';
+                break;
+            }
+
             $resultado = sincronizarNfseAdn($dbNotas, $empresa);
             $ultimaMensagem = $resultado['mensagem'];
             $ultimoSucesso = $resultado['sucesso'];
