@@ -530,12 +530,13 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <select id="syncEmpresaId" name="empresa_emissora_id" required>
                         <option value="">Selecione a empresa</option>
                         <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                            <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $empresaSincronizarId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $empresaSincronizarId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?> (<?php echo ($empresaOpcao['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação'; ?>)</option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <button class="btn" type="submit"><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar agora</button>
             </form>
+            <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Se uma empresa emite notas de verdade em Produção mas está marcada como "Homologação" aqui, a sincronização sempre vai consultar o ambiente de testes e nunca vai achar essas notas. Confira/troque em <a href="notas-empresas-emissoras">Empresas emissoras</a>.</p>
 
             <details class="acoes-secundarias">
                 <summary>Ferramentas de manutenção (uso ocasional)</summary>

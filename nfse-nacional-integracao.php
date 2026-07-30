@@ -500,10 +500,16 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
     }
 
     $totalProcessado = 0;
+    // Se a empresa estiver cadastrada como "Homologação" mas as notas reais dela forem emitidas
+    // (por qualquer meio) em Produção no Portal Nacional, essa sincronização consulta o ambiente
+    // de testes - que não tem nada a ver com o real - e sempre vai parecer "em dia" mesmo faltando
+    // meses de notas de verdade. Guarda aqui pra deixar isso visível na mensagem de retorno, em vez
+    // de um "está tudo certo" enganoso.
+    $ambienteUsado = ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? 'Produção' : 'Homologação';
 
     try {
         $context = new \Nfse\Http\NfseContext(
-            ambiente: ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? \Nfse\Enums\TipoAmbiente::Producao : \Nfse\Enums\TipoAmbiente::Homologacao,
+            ambiente: $ambienteUsado === 'Produção' ? \Nfse\Enums\TipoAmbiente::Producao : \Nfse\Enums\TipoAmbiente::Homologacao,
             certificatePath: __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']),
             certificatePassword: descriptografarSegredo((string) $empresa['certificado_senha_cifrada'])
         );
@@ -602,7 +608,7 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
             }
         }
 
-        $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
+        $mensagem = "Sincronização concluída ({$ambienteUsado}): {$totalProcessado} documento(s) novo(s)/atualizado(s).";
         if ($totalProcessado > 0 || $maisDocumentosPendentes) {
             $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
         }
@@ -615,7 +621,15 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
         $semDocumentoNovo = str_contains((string) $e->getRawResponse(), 'NENHUM_DOCUMENTO_LOCALIZADO')
             || (bool) array_filter($e->getErrors(), static fn ($erro): bool => ($erro->codigo ?? '') === 'E2220');
         if ($semDocumentoNovo) {
-            return ['sucesso' => true, 'mensagem' => 'Nenhum documento novo encontrado no Portal Nacional. A empresa já está em dia.', 'total' => $totalProcessado];
+            $mensagemSemDocumento = "Nenhum documento novo encontrado no Portal Nacional ({$ambienteUsado}). A empresa já está em dia.";
+            if (($empresa['nfse_adn_ultimo_nsu'] ?? 0) == 0 && $ambienteUsado === 'Homologação') {
+                // Buscando desde o início (NSU=0) e mesmo assim nada: se a empresa realmente emite
+                // notas todo mês em Produção mas está cadastrada como "Homologação" (padrão do
+                // cadastro), a consulta cai no ambiente de testes - que nunca vai ter essas notas.
+                $mensagemSemDocumento .= ' Atenção: essa consulta foi feita em Homologação (ambiente de testes). Se essa empresa emite notas de verdade em Produção, confira o campo "Ambiente" no cadastro dela em Empresas emissoras - provavelmente precisa trocar para Produção.';
+            }
+
+            return ['sucesso' => true, 'mensagem' => $mensagemSemDocumento, 'total' => $totalProcessado];
         }
 
         if ($e->getCode() === 429) {
