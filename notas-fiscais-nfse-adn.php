@@ -99,6 +99,16 @@ function prepararColunasNsuEmpresasEmissoras(PDO $db): void
     }
 }
 
+function prepararColunasCancelamentoNfseAdn(PDO $db): void
+{
+    if (!colunaExisteNotasAdn($db, 'notas_fiscais_nfse_adn', 'cancelada')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfse_adn ADD COLUMN cancelada TINYINT(1) NOT NULL DEFAULT 0 AFTER codigo_status');
+    }
+    if (!colunaExisteNotasAdn($db, 'notas_fiscais_nfse_adn', 'data_cancelamento')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfse_adn ADD COLUMN data_cancelamento DATETIME NULL AFTER cancelada');
+    }
+}
+
 try {
     $db = obterConexao();
     $dbNotas = obterConexaoNotas();
@@ -106,6 +116,7 @@ try {
     if (!schemaJaPreparada('notas_fiscais_nfse_adn')) {
         prepararTabelaNfseAdn($dbNotas);
         prepararColunasNsuEmpresasEmissoras($dbNotas);
+        prepararColunasCancelamentoNfseAdn($dbNotas);
         marcarSchemaPreparada('notas_fiscais_nfse_adn');
     }
 
@@ -309,6 +320,21 @@ try {
         } elseif (($_POST['acao'] ?? '') === 'reprocessar_local') {
             $totalReprocessado = reprocessarNfseAdnLocal($dbNotas);
             $sucesso = "{$totalReprocessado} documento(s) reprocessado(s) a partir do XML já salvo (sem consultar o Portal Nacional de novo).";
+        } elseif (($_POST['acao'] ?? '') === 'reparar_eventos') {
+            $empresaSincronizarId = (int) ($_POST['empresa_emissora_id'] ?? 0);
+            $stmtEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id LIMIT 1');
+            $stmtEmpresa->execute(['id' => $empresaSincronizarId]);
+            $empresaReparar = $stmtEmpresa->fetch();
+            if (!$empresaReparar) {
+                $erro = 'Selecione uma empresa emissora válida para reparar.';
+            } else {
+                $resultadoReparo = repararNotasCorrompidasPorEventoAdn($dbNotas, $empresaReparar);
+                if ($resultadoReparo['sucesso']) {
+                    $sucesso = $resultadoReparo['mensagem'];
+                } else {
+                    $erro = $resultadoReparo['mensagem'];
+                }
+            }
         }
     }
 
@@ -453,13 +479,25 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     </span>
                 <?php endforeach; ?>
             </div>
-            <div class="row-actions" style="margin-top:0.75rem;">
+            <div class="row-actions" style="margin-top:0.75rem; flex-wrap:wrap;">
                 <form method="post" onsubmit="return confirm('Reprocessar todos os documentos já baixados a partir do XML salvo? Não consulta o Portal Nacional, só recalcula os dados exibidos.');">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="acao" value="reprocessar_local">
                     <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-arrows-rotate"></i> Reprocessar documentos já baixados</button>
                 </form>
+                <form method="post" class="row-actions" style="flex-wrap:wrap; align-items:center;">
+                    <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                    <input type="hidden" name="acao" value="reparar_eventos">
+                    <select class="select-filtro" name="empresa_emissora_id" required>
+                        <option value="">Selecione a empresa para reparar</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-outline btn-small" type="submit"><i class="fa-solid fa-wrench"></i> Corrigir documentos sem dados (afetados por eventos)</button>
+                </form>
             </div>
+            <p class="muted" style="font-size:0.8rem; margin-top:0.5rem;">Versões antigas dessa tela podiam gravar o evento de cancelamento por cima dos dados da nota original, deixando a linha sem prestador/tomador/valor. O botão "Corrigir" acima refaz a consulta por chave e restaura os dados certos, marcando também a nota como cancelada.</p>
         </section>
 
         <section class="panel">
@@ -536,6 +574,14 @@ $usuario = h(nomeExibicao($usuarioRaw));
                                     <span class="status-pill <?php echo $documento['tipo_documento'] === 'emitida' ? 'status-autorizada' : 'status-pendente_envio'; ?>">
                                         <?php echo $documento['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida'; ?>
                                     </span>
+                                    <?php if (!empty($documento['cancelada'])): ?>
+                                        <div class="muted" style="font-size:0.7rem; margin-top:0.25rem;">
+                                            <span class="status-pill status-rejeitada">Cancelada</span>
+                                            <?php if (!empty($documento['data_cancelamento'])): ?>
+                                                <div><?php echo h(date('d/m/Y H:i', strtotime($documento['data_cancelamento']))); ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php echo h($documento['nome_prestador'] ?? '—'); ?>

@@ -191,6 +191,11 @@ function extrairCamposNfseAdn(\Nfse\Dto\Nfse\NfseData $nfseData, string $cnpjEmp
 // Reprocessa os documentos já baixados (xml_completo salvo) sem chamar o Portal Nacional de
 // novo. Usado depois de corrigir/melhorar extrairCamposNfseAdn(), para os documentos antigos
 // ganharem os campos novos/corrigidos sem precisar re-sincronizar (e sem esbarrar no rate limit).
+//
+// Um mesmo chave_acesso pode aparecer na Distribuição de DFe mais de uma vez: primeiro como a
+// NFS-e completa (infNFSe) e depois como um EVENTO (infEvento) — ex.: cancelamento. Só a NFS-e
+// completa tem prestador/tomador/valores; o evento só referencia a chave e o tipo do evento. Por
+// isso todo lugar que lê o XML salvo/baixado precisa checar infNfse primeiro.
 function reprocessarNfseAdnLocal(PDO $dbNotas): int
 {
     $parser = new \Nfse\Xml\NfseXmlParser();
@@ -220,6 +225,13 @@ function reprocessarNfseAdnLocal(PDO $dbNotas): int
             continue;
         }
 
+        // XML de evento salvo por engano (versão antiga do código, antes dessa checagem existir):
+        // não há prestador/tomador/valores pra extrair, só aplica o cancelamento se for o caso.
+        if (($nfseData->infNfse ?? null) === null) {
+            aplicarEventoNfseAdn($dbNotas, $nfseData);
+            continue;
+        }
+
         $campos = extrairCamposNfseAdn($nfseData, $cnpjEmpresa);
         $campos['id'] = (int) $linha['id'];
         $stmtAtualizar->execute($campos);
@@ -227,6 +239,109 @@ function reprocessarNfseAdnLocal(PDO $dbNotas): int
     }
 
     return $total;
+}
+
+// Códigos de evento (tabela oficial SEFIN Nacional) que significam "esta NFS-e foi cancelada".
+const NFSE_ADN_CODIGOS_EVENTO_CANCELAMENTO = ['101101', '105102', '305101'];
+
+// Aplica um evento (infEvento) recebido do ADN: hoje só nos interessa marcar cancelamento na nota
+// já sincronizada (identificada pela chave que o próprio evento referencia). Eventos de outro tipo
+// (confirmação/rejeição do tomador etc.) são ignorados — não corrigem/alteram a nota.
+// Retorna true se o XML era mesmo um evento (então não deve ser tratado como NFS-e completa).
+function aplicarEventoNfseAdn(PDO $dbNotas, \Nfse\Dto\Nfse\NfseData $nfseData): bool
+{
+    $infPedReg = $nfseData->infEvento?->pedRegEvento?->infPedReg ?? null;
+    if ($infPedReg === null) {
+        return false;
+    }
+
+    $chaveEvento = normalizarChaveAcessoNfse($infPedReg->chaveNfse);
+    if ($chaveEvento !== null && in_array($infPedReg->tipoEvento, NFSE_ADN_CODIGOS_EVENTO_CANCELAMENTO, true)) {
+        $stmt = $dbNotas->prepare(
+            'UPDATE notas_fiscais_nfse_adn
+             SET cancelada = 1, data_cancelamento = COALESCE(data_cancelamento, :data_evento), atualizado_em = NOW()
+             WHERE chave_acesso = :chave_acesso'
+        );
+        $stmt->execute([
+            'data_evento' => !empty($infPedReg->dataHoraEvento) ? date('Y-m-d H:i:s', strtotime($infPedReg->dataHoraEvento)) : date('Y-m-d H:i:s'),
+            'chave_acesso' => $chaveEvento,
+        ]);
+    }
+
+    return true;
+}
+
+// Corrige documentos cuja linha ficou sem prestador/tomador/valores porque, numa sincronização
+// antiga (antes da checagem infNfse/infEvento existir), um evento sobrescreveu por engano os dados
+// da NFS-e original. Refaz a consulta por chave (endpoint de consulta direta, não a distribuição por
+// NSU) e regrava os dados corretos, sem precisar re-sincronizar tudo do zero.
+function repararNotasCorrompidasPorEventoAdn(PDO $dbNotas, array $empresa): array
+{
+    [$disponivel, $motivo] = integracaoNfseDisponivel();
+    if (!$disponivel) {
+        return ['sucesso' => false, 'mensagem' => $motivo, 'total' => 0];
+    }
+
+    [$certificadoOk, $motivoCertificado] = certificadoEmpresaDisponivel($empresa);
+    if (!$certificadoOk) {
+        return ['sucesso' => false, 'mensagem' => $motivoCertificado, 'total' => 0];
+    }
+
+    $cnpjEmpresa = preg_replace('/\D+/', '', (string) ($empresa['cnpj'] ?? ''));
+
+    $stmtBuscar = $dbNotas->prepare(
+        'SELECT id, chave_acesso FROM notas_fiscais_nfse_adn
+         WHERE empresa_emissora_id = :empresa_emissora_id AND numero_nfse IS NULL
+         LIMIT 10'
+    );
+    $stmtBuscar->execute(['empresa_emissora_id' => (int) $empresa['id']]);
+    $linhas = $stmtBuscar->fetchAll();
+
+    if (empty($linhas)) {
+        return ['sucesso' => true, 'mensagem' => 'Nenhum documento corrompido encontrado para essa empresa.', 'total' => 0];
+    }
+
+    try {
+        $context = new \Nfse\Http\NfseContext(
+            ambiente: ($empresa['ambiente_emissao'] ?? 'homologacao') === 'producao' ? \Nfse\Enums\TipoAmbiente::Producao : \Nfse\Enums\TipoAmbiente::Homologacao,
+            certificatePath: __DIR__ . '/certificados-nfse/' . basename((string) $empresa['certificado_arquivo']),
+            certificatePassword: descriptografarSegredo((string) $empresa['certificado_senha_cifrada'])
+        );
+        $nfse = new \Nfse\Nfse($context);
+
+        $stmtAtualizar = $dbNotas->prepare(
+            'UPDATE notas_fiscais_nfse_adn SET
+                tipo_documento = :tipo_documento, numero_nfse = :numero_nfse, codigo_status = :codigo_status,
+                cnpj_prestador = :cnpj_prestador, nome_prestador = :nome_prestador,
+                cnpj_tomador = :cnpj_tomador, nome_tomador = :nome_tomador,
+                descricao_servico = :descricao_servico, data_emissao = :data_emissao, competencia = :competencia,
+                valor_servico = :valor_servico, valor_liquido = :valor_liquido, xml_completo = :xml_completo,
+                atualizado_em = NOW()
+             WHERE id = :id'
+        );
+
+        $total = 0;
+        foreach ($linhas as $linha) {
+            try {
+                $nfseData = $nfse->contribuinte()->consultar((string) $linha['chave_acesso']);
+            } catch (Throwable $e) {
+                continue;
+            }
+            if ($nfseData === null || ($nfseData->infNfse ?? null) === null) {
+                continue;
+            }
+
+            $campos = extrairCamposNfseAdn($nfseData, $cnpjEmpresa);
+            $campos['id'] = (int) $linha['id'];
+            $campos['xml_completo'] = $nfseData->nfseXml;
+            $stmtAtualizar->execute($campos);
+            $total++;
+        }
+
+        return ['sucesso' => true, 'mensagem' => "{$total} documento(s) corrigido(s) a partir do Portal Nacional.", 'total' => $total];
+    } catch (Throwable $e) {
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar o Portal Nacional: ' . trim(strip_tags($e->getMessage())), 'total' => 0];
+    }
 }
 
 // Buscador de NFS-e: usa a Distribuição de DFe do ADN (/contribuintes/DFe/{nsu}) para baixar,
@@ -303,6 +418,15 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
                 try {
                     $nfseData = $parser->parse($xml);
                 } catch (Throwable $e) {
+                    continue;
+                }
+
+                // A Distribuição de DFe traz tanto a NFS-e completa (infNFSe) quanto eventos
+                // (infEvento, ex.: cancelamento) referenciando uma NFS-e já sincronizada antes.
+                // Evento não tem prestador/tomador/valores - só aplica o cancelamento na nota
+                // existente e não mexe no restante dos dados dela.
+                if (($nfseData->infNfse ?? null) === null) {
+                    aplicarEventoNfseAdn($dbNotas, $nfseData);
                     continue;
                 }
 
