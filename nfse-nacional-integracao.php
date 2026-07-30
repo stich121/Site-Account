@@ -485,8 +485,19 @@ function sincronizarNfseAdn(PDO $dbNotas, array $empresa): array
 
 // Empresas emissoras ativas que já têm CNPJ + certificado A1 válido cadastrado - ou seja, aptas a
 // sincronizar com o ADN sem precisar de nenhuma ação manual do usuário.
+//
+// certificadoEmpresaDisponivel() usa descriptografarSegredo(), que só existe depois que
+// config_app_key.php é carregado dentro de integracaoNfseDisponivel(). Por isso essa checagem
+// vem sempre primeiro aqui dentro - não dá pra confiar que quem chama essa função já fez isso
+// (foi exatamente esse esquecimento, numa das telas, que fazia toda empresa aparecer sem
+// certificado válido mesmo com o certificado certo cadastrado).
 function empresasComCertificadoValidoAdn(PDO $dbNotas): array
 {
+    [$integracaoOk] = integracaoNfseDisponivel();
+    if (!$integracaoOk) {
+        return [];
+    }
+
     $empresas = $dbNotas->query('SELECT * FROM empresas_emissoras WHERE ativo = 1')->fetchAll();
 
     return array_values(array_filter($empresas, static function (array $empresa): bool {
