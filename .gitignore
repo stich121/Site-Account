@@ -19,3 +19,5 @@ importar_funcionarios_acesso.sql
 atualizar_dados_folha_funcionarios.sql
 documentos-fiscais-privados/*
 !documentos-fiscais-privados/.htaccess
+cache/*
+!cache/.htaccess

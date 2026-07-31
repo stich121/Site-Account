@@ -3,6 +3,7 @@ $autoloadNfse = __DIR__ . '/vendor/autoload.php';
 if (is_file($autoloadNfse)) {
     require_once $autoloadNfse;
 }
+require_once __DIR__ . '/includes/cache-util.php';
 require_once __DIR__ . '/nfse-dps-fiscal.php';
 // Integração com o Portal Nacional da NFS-e (SEFIN Nacional / ADN), via
 // nfse-nacional/nfse-php (https://github.com/nfse-nacional/nfse-php).

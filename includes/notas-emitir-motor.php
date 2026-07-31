@@ -25,6 +25,7 @@ require_once __DIR__ . '/../config_db.php';
 require_once __DIR__ . '/../config_db_notas.php';
 require_once __DIR__ . '/../nfse-codigos-tributacao-nacional.php';
 require_once __DIR__ . '/nfe-impostos.php';
+require_once __DIR__ . '/cache-util.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -48,10 +49,9 @@ function codigoMunicipioIbgeValido(string $codigo): bool
 {
     static $codigos = null;
     if ($codigos === null) {
-        $arquivo = __DIR__ . '/../ibge-municipios.json';
-        $municipios = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
+        $municipios = cacheJsonArquivo(__DIR__ . '/../ibge-municipios.json');
         $codigos = [];
-        foreach (is_array($municipios) ? $municipios : [] as $municipio) {
+        foreach ($municipios as $municipio) {
             $codigos[(string) ($municipio['codigo'] ?? '')] = true;
         }
     }
@@ -63,9 +63,7 @@ function catalogoIbsCbsNfse(): array
 {
     static $catalogo = null;
     if ($catalogo === null) {
-        $arquivo = __DIR__ . '/../nfse-ibs-catalogos.json';
-        $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
-        $catalogo = is_array($conteudo) ? $conteudo : [];
+        $catalogo = cacheJsonArquivo(__DIR__ . '/../nfse-ibs-catalogos.json');
     }
 
     return $catalogo;
@@ -75,9 +73,7 @@ function catalogoCfopNfe(): array
 {
     static $catalogo = null;
     if ($catalogo === null) {
-        $arquivo = __DIR__ . '/../cfop-codigos.json';
-        $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
-        $catalogo = is_array($conteudo) ? $conteudo : [];
+        $catalogo = cacheJsonArquivo(__DIR__ . '/../cfop-codigos.json');
     }
 
     return $catalogo;
@@ -87,9 +83,7 @@ function catalogoCorrelacaoNbsNfse(): array
 {
     static $catalogo = null;
     if ($catalogo === null) {
-        $arquivo = __DIR__ . '/../nfse-nbs-correlacao.json';
-        $conteudo = is_file($arquivo) ? json_decode((string) file_get_contents($arquivo), true) : [];
-        $catalogo = is_array($conteudo) ? $conteudo : [];
+        $catalogo = cacheJsonArquivo(__DIR__ . '/../nfse-nbs-correlacao.json');
     }
 
     return $catalogo;

@@ -55,6 +55,7 @@ Options -Indexes
     RewriteRule ^certificados-nfse/ - [F,L]
     RewriteRule ^documentos-fiscais-privados/ - [F,L]
     RewriteRule ^\.security/ - [F,L]
+    RewriteRule ^cache/ - [F,L]
 
     RewriteCond %{DOCUMENT_ROOT}/$1.php -f
     RewriteRule ^([A-Za-z0-9_-]+)/?$ $1.php [L,QSA]
