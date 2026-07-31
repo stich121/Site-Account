@@ -855,62 +855,83 @@ function rotuloCrt(?int $crt): string
         aplicarMascara('cep', formatarCep);
 
         const btnBuscarCnpj = document.getElementById('btnBuscarCnpj');
+        let ultimoCnpjBuscadoAutomaticamente = '';
+
+        function buscarCnpjEPreencher(digitos) {
+            const statusEl = document.getElementById('statusBuscaCnpj');
+
+            if (digitos.length !== 14) {
+                statusEl.textContent = 'Informe um CNPJ com 14 dígitos antes de buscar.';
+                statusEl.style.color = '#FFD1CE';
+                return;
+            }
+
+            statusEl.textContent = 'Buscando...';
+            statusEl.style.color = '';
+            if (btnBuscarCnpj) btnBuscarCnpj.disabled = true;
+
+            fetch('buscar-cnpj?cnpj=' + digitos)
+                .then(function (resposta) { return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; }); })
+                .then(function (resultado) {
+                    if (!resultado.ok) {
+                        statusEl.textContent = resultado.dados.erro || 'Não foi possível buscar o CNPJ.';
+                        statusEl.style.color = '#FFD1CE';
+                        return;
+                    }
+
+                    const dados = resultado.dados;
+                    document.getElementById('razao_social').value = dados.razao_social || '';
+                    document.getElementById('nome_fantasia').value = dados.nome_fantasia || '';
+                    document.getElementById('logradouro').value = dados.logradouro || '';
+                    document.getElementById('numero').value = dados.numero || '';
+                    document.getElementById('complemento').value = dados.complemento || '';
+                    document.getElementById('bairro').value = dados.bairro || '';
+                    document.getElementById('cep').value = formatarCep(dados.cep || '');
+                    document.getElementById('municipio').value = dados.municipio || '';
+                    document.getElementById('codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
+                    document.getElementById('uf').value = dados.uf || '';
+                    if (dados.crt_sugerido) {
+                        document.getElementById('crt').value = String(dados.crt_sugerido);
+                    }
+                    const campoOpcaoSimplesNfse = document.getElementById('nfse_opcao_simples_nacional');
+                    if (campoOpcaoSimplesNfse && dados.nfse_opcao_simples_sugerida) {
+                        campoOpcaoSimplesNfse.value = String(dados.nfse_opcao_simples_sugerida);
+                    }
+
+                    statusEl.style.color = 'var(--primary)';
+                    statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira a opção pelo Simples na NFS-e antes de salvar - o Sefin Nacional rejeita a nota se não bater com o cadastro atual na Receita Federal.';
+
+                    buscarImEmpresaCnc(digitos, dados.codigo_ibge_municipio || '');
+                })
+                .catch(function () {
+                    statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
+                    statusEl.style.color = '#FFD1CE';
+                })
+                .finally(function () {
+                    if (btnBuscarCnpj) btnBuscarCnpj.disabled = false;
+                });
+        }
+
         if (btnBuscarCnpj) {
             btnBuscarCnpj.addEventListener('click', function () {
-                const campoCnpj = document.getElementById('cnpj');
-                const statusEl = document.getElementById('statusBuscaCnpj');
-                const digitos = (campoCnpj.value || '').replace(/\D/g, '');
+                const digitos = (document.getElementById('cnpj').value || '').replace(/\D/g, '');
+                ultimoCnpjBuscadoAutomaticamente = digitos;
+                buscarCnpjEPreencher(digitos);
+            });
+        }
 
-                if (digitos.length !== 14) {
-                    statusEl.textContent = 'Informe um CNPJ com 14 dígitos antes de buscar.';
-                    statusEl.style.color = '#FFD1CE';
-                    return;
+        // Assim que o CNPJ completar 14 dígitos digitados (ou colados), busca sozinho — sem
+        // precisar clicar em "Buscar CNPJ" — e preenche razão social, endereço, CRT e Opção pelo
+        // Simples na NFS-e. Só dispara uma vez por CNPJ (evita repetir a busca a cada tecla depois
+        // que já completou, ou se o usuário editar outro campo sem mexer no CNPJ).
+        const campoCnpjAutoBusca = document.getElementById('cnpj');
+        if (campoCnpjAutoBusca) {
+            campoCnpjAutoBusca.addEventListener('input', function () {
+                const digitos = (campoCnpjAutoBusca.value || '').replace(/\D/g, '');
+                if (digitos.length === 14 && digitos !== ultimoCnpjBuscadoAutomaticamente) {
+                    ultimoCnpjBuscadoAutomaticamente = digitos;
+                    buscarCnpjEPreencher(digitos);
                 }
-
-                statusEl.textContent = 'Buscando...';
-                statusEl.style.color = '';
-                btnBuscarCnpj.disabled = true;
-
-                fetch('buscar-cnpj?cnpj=' + digitos)
-                    .then(function (resposta) { return resposta.json().then(function (dados) { return { ok: resposta.ok, dados: dados }; }); })
-                    .then(function (resultado) {
-                        if (!resultado.ok) {
-                            statusEl.textContent = resultado.dados.erro || 'Não foi possível buscar o CNPJ.';
-                            statusEl.style.color = '#FFD1CE';
-                            return;
-                        }
-
-                        const dados = resultado.dados;
-                        document.getElementById('razao_social').value = dados.razao_social || '';
-                        document.getElementById('nome_fantasia').value = dados.nome_fantasia || '';
-                        document.getElementById('logradouro').value = dados.logradouro || '';
-                        document.getElementById('numero').value = dados.numero || '';
-                        document.getElementById('complemento').value = dados.complemento || '';
-                        document.getElementById('bairro').value = dados.bairro || '';
-                        document.getElementById('cep').value = formatarCep(dados.cep || '');
-                        document.getElementById('municipio').value = dados.municipio || '';
-                        document.getElementById('codigo_ibge_municipio').value = dados.codigo_ibge_municipio || '';
-                        document.getElementById('uf').value = dados.uf || '';
-                        if (dados.crt_sugerido) {
-                            document.getElementById('crt').value = String(dados.crt_sugerido);
-                        }
-                        const campoOpcaoSimplesNfse = document.getElementById('nfse_opcao_simples_nacional');
-                        if (campoOpcaoSimplesNfse && dados.nfse_opcao_simples_sugerida) {
-                            campoOpcaoSimplesNfse.value = String(dados.nfse_opcao_simples_sugerida);
-                        }
-
-                        statusEl.style.color = 'var(--primary)';
-                        statusEl.textContent = 'Dados preenchidos (' + (dados.situacao_cadastral || 'situação não informada') + '). Confira a opção pelo Simples na NFS-e antes de salvar - o Sefin Nacional rejeita a nota se não bater com o cadastro atual na Receita Federal.';
-
-                        buscarImEmpresaCnc(digitos, dados.codigo_ibge_municipio || '');
-                    })
-                    .catch(function () {
-                        statusEl.textContent = 'Erro ao buscar o CNPJ. Tente novamente.';
-                        statusEl.style.color = '#FFD1CE';
-                    })
-                    .finally(function () {
-                        btnBuscarCnpj.disabled = false;
-                    });
             });
         }
 
