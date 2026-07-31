@@ -58,6 +58,20 @@ try {
         $_SESSION['csrf_notas_nfce_config'] = bin2hex(random_bytes(32));
     }
 
+    // Mesmo padrão de notas-nfce-produtos.php: a tela só enxerga a empresa ativa da sessão
+    // ("Vendendo por", no topo) — cada empresa só vê e só altera a própria configuração.
+    $idsEmpresasAtivas = array_map(
+        'intval',
+        array_column($dbNotas->query('SELECT id FROM empresas_emissoras WHERE ativo = 1')->fetchAll(), 'id')
+    );
+    if (
+        empty($_SESSION['nfse_empresa_emissora_ativa_id'])
+        || !in_array((int) $_SESSION['nfse_empresa_emissora_ativa_id'], $idsEmpresasAtivas, true)
+    ) {
+        $_SESSION['nfse_empresa_emissora_ativa_id'] = $idsEmpresasAtivas[0] ?? 0;
+    }
+    $empresaEmissoraAtivaId = (int) $_SESSION['nfse_empresa_emissora_ativa_id'];
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
         if (!hash_equals($_SESSION['csrf_notas_nfce_config'], $csrf)) {
@@ -65,7 +79,9 @@ try {
         } elseif (!$podeAdministrar) {
             $erro = 'Somente administradores podem alterar a configuração de NFC-e.';
         } else {
-            $empresaId = (int) ($_POST['empresa_emissora_id'] ?? 0);
+            // Ignora qualquer empresa_emissora_id vindo do POST: só a empresa ativa da
+            // sessão pode ser alterada por aqui, mesmo que o campo oculto seja adulterado.
+            $empresaId = $empresaEmissoraAtivaId;
             $serie = trim((string) ($_POST['nfce_serie'] ?? '1'));
             $numeroBase = (int) ($_POST['nfce_numero_base'] ?? 0);
             $cscId = trim((string) ($_POST['nfce_csc_id'] ?? ''));
@@ -112,11 +128,13 @@ try {
         }
     }
 
-    $stmt = $dbNotas->query(
+    $stmt = $dbNotas->prepare(
         'SELECT id, razao_social, ambiente_emissao, nfce_serie, nfce_numero_base, nfce_csc_id, nfce_csc_atualizado_em
-         FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC'
+         FROM empresas_emissoras WHERE ativo = 1 AND id = :id LIMIT 1'
     );
-    $empresasConfig = $stmt->fetchAll();
+    $stmt->execute(['id' => $empresaEmissoraAtivaId]);
+    $empresaConfigAtiva = $stmt->fetch() ?: null;
+    $empresasConfig = $empresaConfigAtiva ? [$empresaConfigAtiva] : [];
 } catch (PDOException $e) {
     $erro = 'Erro ao carregar a configuração de NFC-e: ' . $e->getMessage();
     $empresasConfig = [];
