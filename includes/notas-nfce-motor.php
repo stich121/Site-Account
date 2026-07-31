@@ -129,7 +129,7 @@ try {
         'SELECT id, empresa_emissora_id, tipo, descricao, ncm, cfop, cst_csosn, unidade, valor_unitario_padrao,
                 aliquota_icms, aliquota_pis, aliquota_cofins, aliquota_ipi, ipi_cst, cean,
                 icms_origem, cest, cnpj_fabricante, indicador_escala_relevante, codigo_beneficio_fiscal
-         FROM notas_produtos_servicos WHERE ativo = 1 AND tipo = \'produto\' ORDER BY descricao ASC'
+         FROM notas_produtos_servicos WHERE ativo = 1 AND tipo = \'nfce\' ORDER BY descricao ASC'
     );
     $catalogoCompleto = $stmt->fetchAll();
     // O catálogo é global na tabela (sem filtro por empresa na consulta, mesmo padrão de

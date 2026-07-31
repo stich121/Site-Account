@@ -50,6 +50,26 @@ function prepararEnumTipoNotaNfce(PDO $db): void
 }
 
 /**
+ * Amplia o ENUM notas_produtos_servicos.tipo para incluir 'nfce' — o catálogo de produtos
+ * da NFC-e (notas-nfce-produtos.php) fica em linhas próprias, com tipo='nfce', totalmente
+ * separadas das linhas tipo='produto'/'servico' usadas por notas-produtos-servicos.php
+ * (NF-e/NFS-e). Mudança aditiva, não quebra os === 'produto'/=== 'servico' existentes.
+ */
+function prepararEnumTipoProdutoNfce(PDO $db): void
+{
+    $stmt = $db->prepare(
+        "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notas_produtos_servicos' AND COLUMN_NAME = 'tipo'"
+    );
+    $stmt->execute();
+    $tipoColuna = (string) $stmt->fetchColumn();
+
+    if ($tipoColuna !== '' && strpos($tipoColuna, "'nfce'") === false) {
+        $db->exec("ALTER TABLE notas_produtos_servicos MODIFY COLUMN tipo ENUM('produto','servico','nfce') NOT NULL");
+    }
+}
+
+/**
  * Colunas de série/numeração/CSC da NFC-e em empresas_emissoras, paralelas às
  * nfe_serie/nfe_numero_base já existentes para NF-e. nfce_csc_cifrado guarda o token CSC
  * cifrado com o mesmo padrão de certificado_senha_cifrada (criptografarSegredo()/
@@ -134,6 +154,7 @@ function prepararSchemaNfce(PDO $db): void
     }
 
     prepararEnumTipoNotaNfce($db);
+    prepararEnumTipoProdutoNfce($db);
     prepararColunasNfceEmpresasEmissoras($db);
     prepararTabelaNotasFiscaisNfce($db);
     prepararTabelaNotasFiscaisNfcePagamentos($db);

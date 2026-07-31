@@ -70,7 +70,7 @@ require_once __DIR__ . '/includes/notas-nfce-motor.php';
         <?php if ($empresaAtiva === null): ?>
             <div class="notice error">Nenhuma empresa emissora ativa selecionada. Escolha uma em "Vendendo por" no topo da página.</div>
         <?php elseif (empty($catalogo)): ?>
-            <div class="notice error">Nenhum produto cadastrado para esta empresa. Cadastre em <a href="notas-produtos-servicos" style="text-decoration:underline;">Produtos/Serviços</a>.</div>
+            <div class="notice error">Nenhum produto cadastrado para esta empresa. Cadastre em <a href="notas-nfce-produtos" style="text-decoration:underline;">Produtos NFC-e</a>.</div>
         <?php else: ?>
             <section class="panel">
                 <h2><i class="fa-solid fa-cash-register"></i> Nova venda</h2>
