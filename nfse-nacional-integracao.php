@@ -282,14 +282,30 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa)
         );
 
         $nfse = new \Nfse\Nfse($context);
-        $dps = new \Nfse\Dto\Nfse\DpsData($dpsMontada['dados']);
+        $dadosDps = $dpsMontada['dados'];
+        $dps = new \Nfse\Dto\Nfse\DpsData($dadosDps);
         if (class_exists(\Nfse\Validator\DpsValidator::class)) {
             $validacao = (new \Nfse\Validator\DpsValidator())->validate($dps);
             if (!$validacao->isValid) {
                 return ['sucesso' => false, 'status' => 'rejeitada', 'motivo_rejeicao' => 'DPS inválida: ' . implode(' ', $validacao->errors), 'chave_acesso' => null, 'protocolo_autorizacao' => null, 'xml_gerado' => null];
             }
         }
-        $nfseData = $nfse->contribuinte()->emitir($dps);
+
+        try {
+            $nfseData = $nfse->contribuinte()->emitir($dps);
+        } catch (\Nfse\Http\Exceptions\NfseApiException $e) {
+            // A checagem prévia no CNC (ajustarImPrestadorConformeCnc) já tenta prever isso, mas o
+            // que vale de verdade é a resposta do próprio Sefin Nacional: se ele rejeitar com E0120
+            // (IM do prestador enviada sem ter informações complementares registradas no CNC pra
+            // aquele município), reenvia uma única vez sem a IM em vez de deixar a nota travada.
+            if (!empty($dadosDps['infDPS']['prest']['IM']) && erroNfseContemCodigo($e, 'E0120')) {
+                unset($dadosDps['infDPS']['prest']['IM']);
+                $dps = new \Nfse\Dto\Nfse\DpsData($dadosDps);
+                $nfseData = $nfse->contribuinte()->emitir($dps);
+            } else {
+                throw $e;
+            }
+        }
 
         return [
             'sucesso' => true,
@@ -309,6 +325,20 @@ function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa)
             'xml_gerado' => null,
         ];
     }
+}
+
+// Confere se uma NfseApiException veio com um código de erro específico do Sefin Nacional (ex.:
+// "E0120"). NfseApiException::getErrors() retorna os MensagemProcessamentoDto já decodificados da
+// resposta - mais confiável que procurar o código dentro da mensagem de texto (que o Guzzle trunca).
+function erroNfseContemCodigo(\Nfse\Http\Exceptions\NfseApiException $e, string $codigo): bool
+{
+    foreach ($e->getErrors() as $erro) {
+        if (($erro->codigo ?? '') === $codigo) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Extrai os campos gravados em notas_fiscais_nfse_adn a partir do XML já parseado.
