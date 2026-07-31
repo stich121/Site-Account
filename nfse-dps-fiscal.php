@@ -1,7 +1,12 @@
 <?php
 /** Montagem fiscal defensiva da DPS 1.01, compatível com nfse-php v1.21. */
 function nfseDig($v): ?string { $v=preg_replace('/\D/','',(string)($v??'')); return $v===''?null:$v; }
-function nfseTxt($v): ?string { $v=trim((string)($v??'')); return $v===''?null:$v; }
+// Quebras de linha/tab dentro do texto (ex.: usuário aperta Enter num <textarea> como "Informações
+// complementares" ou "Descreva o serviço") quebram a assinatura da DPS: o assinador
+// (vendor/nfse-nacional/nfse-php) calcula o hash ANTES de remover \n/\r/\t do XML final, então o
+// Sefin Nacional recalcula um hash diferente do que foi assinado e rejeita com "erro na assinatura"
+// (E0714). Normalizando pra espaço aqui, na origem, evita isso pra qualquer campo de texto da DPS.
+function nfseTxt($v): ?string { $v=trim(preg_replace('/[\r\n\t]+/', ' ', (string)($v??''))); return $v===''?null:$v; }
 // Inscrição Municipal: varia por prefeitura e algumas usam dígito verificador alfanumérico (ex.:
 // Belo Horizonte termina em "X", como no CPF). nfseDig (só números) cortaria essa letra e quebraria
 // a IM; nfseTxt manteria pontuação digitada (pontos/barra/traço) que o cadastro nacional (CNC) não
