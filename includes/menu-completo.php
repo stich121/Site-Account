@@ -4,8 +4,7 @@
  * buscador de notas, fila de envio e painel de ponto), pra dar pra ir de qualquer tela pra
  * qualquer uma dessas sem precisar voltar pro painel. Navegação DENTRO de cada área já existe na
  * própria tela (ex.: abas de notas-nav.php, botões do painel de ponto) - aqui é só o atalho entre
- * as áreas. Os links de "Enviar fila" só aparecem pra quem tem nível de acesso 3+ (mesma trava das
- * próprias páginas de processar-fila-nfe.php/processar-fila-nfse.php).
+ * as áreas. Os links de "Enviar fila" ficam visíveis pra todo mundo logado.
  *
  * Requer que o CSS de assets/css/notas-fiscais.css OU assets/css/theme-toggle.css já esteja
  * carregado (ambos têm as classes .menu-hamburguer/.menu-dropdown). Não depende de nenhuma
@@ -15,7 +14,6 @@
  * menu - a página só precisa incluir isso dentro do <header>, sem precisar declarar o próprio
  * botão de menu.
  */
-$podeAdministrarMenu = ((int) ($_SESSION['funcionario_nivel_acesso'] ?? 1)) >= 3;
 ?>
 <div class="menu-hamburguer">
     <button class="btn btn-outline" type="button" id="btnMenuHamburguer" aria-haspopup="true" aria-expanded="false" aria-label="Abrir menu">
@@ -25,10 +23,8 @@ $podeAdministrarMenu = ((int) ($_SESSION['funcionario_nivel_acesso'] ?? 1)) >= 3
         <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas</a>
         <a class="btn btn-outline" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
         <a class="btn btn-outline" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
-        <?php if ($podeAdministrarMenu): ?>
-            <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Enviar fila NFS-e</a>
-            <a class="btn btn-outline" href="processar-fila-nfe"><i class="fa-solid fa-paper-plane"></i> Enviar fila NF-e</a>
-        <?php endif; ?>
+        <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Enviar fila NFS-e</a>
+        <a class="btn btn-outline" href="processar-fila-nfe"><i class="fa-solid fa-paper-plane"></i> Enviar fila NF-e</a>
         <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>
 
         <hr class="menu-dropdown-separador">

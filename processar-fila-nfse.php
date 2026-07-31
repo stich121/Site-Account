@@ -206,12 +206,6 @@ if (!isset($_SESSION['funcionario_id'])) {
 }
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
-$nivelAcesso = (int) ($_SESSION['funcionario_nivel_acesso'] ?? 1);
-
-if ($nivelAcesso < 3) {
-    header('Location: painel');
-    exit;
-}
 
 $erro = '';
 $sucesso = '';
