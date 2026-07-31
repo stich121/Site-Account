@@ -9,7 +9,9 @@
  * Ao final da inclusão, ficam disponíveis para a página: $erro, $sucesso, $notaEmEdicao,
  * $nfseEmEdicao, $nfeEmEdicao, $itensEmEdicao, $dadosRestaurar, $empresasAtivas, $clientes, $catalogo,
  * $csrf, $usuario, $catalogoJson, $edicaoJson, $restaurarJson, $codigosTributacaoNacionalNfse,
- * $correlacaoNbsNfse, $cfopCodigosNfe, $db, $dbNotas, $funcionarioId, $usuarioRaw, $nivelAcesso, $podeAdministrar.
+ * $correlacaoNbsNfse, $cfopCodigosNfe, $db, $dbNotas, $funcionarioId, $usuarioRaw, $nivelAcesso, $podeAdministrar,
+ * $ultimaNfseModelo, $ultimaNfseModeloJson (só em notas-emitir-servico.php, numa nota nova: descrição,
+ * códigos e IBS/CBS da última NFS-e da empresa emissora ativa, pra pré-preencher o formulário).
  */
 
 require_once __DIR__ . '/../seguranca.php';
@@ -1460,11 +1462,35 @@ try {
          FROM notas_produtos_servicos WHERE ativo = 1 ORDER BY descricao ASC'
     );
     $catalogo = $stmt->fetchAll();
+
+    // Modelo pra pré-preencher descrição do serviço, códigos (tributação nacional/municipal, NBS) e
+    // o grupo IBS/CBS numa NFS-e nova com o que foi usado na última nota da mesma empresa emissora —
+    // só entra em jogo numa nota nova (não na edição de uma já existente) e o usuário pode mudar
+    // qualquer campo livremente. Não se aplica à emissão de NF-e (produto).
+    $ultimaNfseModelo = null;
+    if ($tipoNotaFixo === 'nfse' && !$notaEmEdicao) {
+        $empresaParaModelo = (int) ($_SESSION['nfse_empresa_emissora_ativa_id'] ?? 0);
+        if ($empresaParaModelo > 0) {
+            $stmt = $dbNotas->prepare(
+                'SELECT nfse.codigo_tributacao_nacional, nfse.codigo_tributacao_municipal, nfse.item_nbs, nfse.descricao_servico,
+                        nfse.ibscbs_finalidade, nfse.ibscbs_ind_final, nfse.ibscbs_codigo_indicador_operacao,
+                        nfse.ibscbs_ind_destinatario, nfse.ibscbs_cst, nfse.ibscbs_classificacao_tributaria
+                 FROM notas_fiscais n
+                 INNER JOIN notas_fiscais_nfse nfse ON nfse.nota_id = n.id
+                 WHERE n.empresa_emissora_id = :empresa_emissora_id AND n.tipo_nota = \'nfse\'
+                 ORDER BY n.criado_em DESC
+                 LIMIT 1'
+            );
+            $stmt->execute(['empresa_emissora_id' => $empresaParaModelo]);
+            $ultimaNfseModelo = $stmt->fetch() ?: null;
+        }
+    }
 } catch (PDOException $e) {
     $erro = 'Erro ao carregar dados para emissão: ' . $e->getMessage();
     $empresasAtivas = [];
     $clientes = [];
     $catalogo = [];
+    $ultimaNfseModelo = null;
 }
 
 $csrf = h($_SESSION['csrf_notas_emitir'] ?? '');
@@ -1472,6 +1498,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
 $catalogoJson = json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]';
 $edicaoJson = json_encode(['nota' => $notaEmEdicao, 'nfse' => $nfseEmEdicao, 'nfe' => $nfeEmEdicao, 'itens' => $itensEmEdicao], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '{"nota":null,"nfse":null,"nfe":null,"itens":[]}';
 $restaurarJson = json_encode($dadosRestaurar, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
+$ultimaNfseModeloJson = json_encode($ultimaNfseModelo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?: 'null';
 $codigosTributacaoNacionalNfse = obterCodigosTributacaoNacionalNfse();
 $correlacaoNbsNfse = catalogoCorrelacaoNbsNfse();
 $cfopCodigosNfe = catalogoCfopNfe();

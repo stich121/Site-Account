@@ -42,6 +42,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
             <section class="panel">
                 <h2><i class="fa-solid <?php echo $notaEmEdicao ? 'fa-pen-to-square' : 'fa-file-invoice'; ?>"></i> <?php echo $notaEmEdicao ? 'Corrigir NFS-e nº ' . h((string) $notaEmEdicao['numero_interno']) : 'Nova nota (rascunho)'; ?></h2>
+                <?php if (!$notaEmEdicao && $ultimaNfseModelo): ?>
+                    <p class="muted" style="font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-circle-info"></i> Descrição do serviço, códigos e IBS/CBS pré-preenchidos com base na última NFS-e desta empresa. Ajuste o que for diferente.</p>
+                <?php endif; ?>
                 <form method="post" id="formNota">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="acao" value="<?php echo $notaEmEdicao ? 'salvar_edicao' : 'criar_nota'; ?>">
@@ -610,6 +613,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
     <script>
         const dadosEdicaoNota = <?php echo $edicaoJson; ?>;
         const dadosRestaurar = <?php echo $restaurarJson; ?>;
+        const dadosUltimaNfse = <?php echo $ultimaNfseModeloJson; ?>;
         function aplicarDadosEdicao() {
             if (!dadosEdicaoNota || !dadosEdicaoNota.nota) return;
             const form = document.getElementById('formNota');
@@ -726,6 +730,33 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             CAMPOS_MOEDA_NFSE.forEach(function (id) { formatarCampoMoeda(document.getElementById(id)); });
         }
         restaurarCamposSimplesDoErro();
+
+        // Nota nova (não edição, não reaproveitando uma tentativa que falhou agora): pré-preenche
+        // descrição do serviço, código de tributação nacional e o grupo IBS/CBS com o que foi usado
+        // na última NFS-e desta empresa emissora — tudo continua editável. Código de tributação
+        // municipal e NBS não entram aqui porque são <select> dependentes, montados mais abaixo (o
+        // valor da última nota entra como fallback de "codigoMunicipalSalvoEdicao"/"nbsSalvaEdicao").
+        function aplicarUltimaNfseComoModelo() {
+            if (dadosEdicaoNota && dadosEdicaoNota.nota) return;
+            if (dadosRestaurar && dadosRestaurar.nfse) return;
+            if (!dadosUltimaNfse) return;
+            const form = document.getElementById('formNota');
+            const camposModelo = [
+                'descricao_servico', 'codigo_tributacao_nacional',
+                'ibscbs_finalidade', 'ibscbs_ind_final', 'ibscbs_codigo_indicador_operacao',
+                'ibscbs_ind_destinatario', 'ibscbs_cst', 'ibscbs_classificacao_tributaria'
+            ];
+            camposModelo.forEach(function (chave) {
+                const campo = form.elements.namedItem('nfse_' + chave);
+                if (!campo || dadosUltimaNfse[chave] == null) return;
+                campo.value = dadosUltimaNfse[chave];
+            });
+            const cindopBusca = document.getElementById('nfse_ibscbs_codigo_indicador_operacao_busca');
+            if (cindopBusca && dadosUltimaNfse.ibscbs_codigo_indicador_operacao) cindopBusca.value = dadosUltimaNfse.ibscbs_codigo_indicador_operacao;
+            const cclassBusca = document.getElementById('nfse_ibscbs_classificacao_tributaria_busca');
+            if (cclassBusca && dadosUltimaNfse.ibscbs_classificacao_tributaria) cclassBusca.value = dadosUltimaNfse.ibscbs_classificacao_tributaria;
+        }
+        aplicarUltimaNfseComoModelo();
 
         function formatarCnpjOuCpf(valor, tipoPessoa) {
             const digitos = (valor || '').replace(/\D/g, '');
@@ -873,6 +904,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
         const codigoMunicipalSalvoEdicao = String(
             (dadosEdicaoNota && dadosEdicaoNota.nfse && dadosEdicaoNota.nfse.codigo_tributacao_municipal)
             || (dadosRestaurar && dadosRestaurar.nfse && dadosRestaurar.nfse.codigo_tributacao_municipal)
+            || (dadosUltimaNfse && dadosUltimaNfse.codigo_tributacao_municipal)
             || ''
         ).replace(/\D/g, '');
         const campoNbs = document.getElementById('nfse_item_nbs');
@@ -880,6 +912,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
         const nbsSalvaEdicao = String(
             (dadosEdicaoNota && dadosEdicaoNota.nfse && dadosEdicaoNota.nfse.item_nbs)
             || (dadosRestaurar && dadosRestaurar.nfse && dadosRestaurar.nfse.item_nbs)
+            || (dadosUltimaNfse && dadosUltimaNfse.item_nbs)
             || ''
         ).replace(/\D/g, '');
         function atualizarNbsPorServico() {
