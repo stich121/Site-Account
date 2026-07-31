@@ -369,7 +369,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="field" id="campoPercentualRetencaoIssqn" style="display:none;">
                             <label for="nfse_percentual_retencao_issqn">Alíquota de retenção do ISSQN (%)</label>
                             <input id="nfse_percentual_retencao_issqn" name="nfse_percentual_retencao_issqn" type="text" inputmode="decimal" placeholder="Ex.: 2,50" maxlength="6">
-                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">No Simples Nacional, a retenção costuma ter alíquota mínima de 1,8% quando não há benefício municipal. No Lucro Presumido/Real, use a alíquota fixa do serviço prestado no município de incidência (varia por serviço). Limite do Portal Nacional: até 5%.</p>
+                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">No Simples Nacional, a retenção costuma ter alíquota mínima de 1,8% quando não há benefício municipal. No Lucro Presumido/Real, use a alíquota fixa do serviço (código de tributação municipal informado acima) no município de incidência — consulte em <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">Consulta de Código de Tributação Municipal e Alíquotas (BHISS Digital)</a>. Limite do Portal Nacional: até 5%.</p>
                         </div>
                         <div class="field">
                             <label for="nfse_beneficio_municipal">Este serviço está amparado por algum benefício municipal?</label>
