@@ -145,12 +145,29 @@ try {
         $_SESSION['csrf_notas_produtos_servicos'] = bin2hex(random_bytes(32));
     }
 
+    // Cada empresa emissora só vê (e só cadastra) os próprios itens: o catálogo fica sempre
+    // travado na empresa ativa da sessão ("Emitindo por", no topo), igual em notas-fiscais.php.
+    $idsEmpresasAtivas = array_map(
+        'intval',
+        array_column($db->query('SELECT id FROM empresas_emissoras WHERE ativo = 1')->fetchAll(), 'id')
+    );
+    if (
+        empty($_SESSION['nfse_empresa_emissora_ativa_id'])
+        || !in_array((int) $_SESSION['nfse_empresa_emissora_ativa_id'], $idsEmpresasAtivas, true)
+    ) {
+        $_SESSION['nfse_empresa_emissora_ativa_id'] = $idsEmpresasAtivas[0] ?? 0;
+    }
+    $empresaEmissoraAtivaId = (int) $_SESSION['nfse_empresa_emissora_ativa_id'];
+    $stmtEmpresaAtiva = $db->prepare('SELECT razao_social FROM empresas_emissoras WHERE id = :id LIMIT 1');
+    $stmtEmpresaAtiva->execute(['id' => $empresaEmissoraAtivaId]);
+    $empresaEmissoraAtivaNome = (string) ($stmtEmpresaAtiva->fetchColumn() ?: '');
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
         if (!hash_equals($_SESSION['csrf_notas_produtos_servicos'], $csrf)) {
             $erro = 'Sessão expirada. Atualize a página e tente novamente.';
         } elseif (($_POST['acao'] ?? '') === 'adicionar') {
-            $empresaId = (int) ($_POST['empresa_emissora_id'] ?? 0);
+            $empresaId = $empresaEmissoraAtivaId;
             $tipo = ($_POST['tipo'] ?? 'produto') === 'servico' ? 'servico' : 'produto';
             $descricao = trim($_POST['descricao'] ?? '');
             $codigoInterno = trim($_POST['codigo_interno'] ?? '');
@@ -248,9 +265,10 @@ try {
                         aliquota_cofins = :aliquota_cofins, ipi_cst = :ipi_cst, aliquota_ipi = :aliquota_ipi, cean = :cean,
                         icms_origem = :icms_origem, cest = :cest, cnpj_fabricante = :cnpj_fabricante,
                         indicador_escala_relevante = :indicador_escala_relevante, codigo_beneficio_fiscal = :codigo_beneficio_fiscal
-                     WHERE id = :id'
+                     WHERE id = :id AND empresa_emissora_id = :empresa_emissora_id'
                 );
                 $stmt->execute([
+                    'empresa_emissora_id' => $empresaEmissoraAtivaId,
                     'tipo' => $tipo,
                     'descricao' => $descricao,
                     'codigo_interno' => $codigoInterno !== '' ? $codigoInterno : null,
@@ -279,15 +297,15 @@ try {
         } elseif (($_POST['acao'] ?? '') === 'desativar') {
             $id = (int) ($_POST['item_id'] ?? 0);
             if ($id > 0) {
-                $stmt = $db->prepare('UPDATE notas_produtos_servicos SET ativo = 0 WHERE id = :id');
-                $stmt->execute(['id' => $id]);
+                $stmt = $db->prepare('UPDATE notas_produtos_servicos SET ativo = 0 WHERE id = :id AND empresa_emissora_id = :empresa_emissora_id');
+                $stmt->execute(['id' => $id, 'empresa_emissora_id' => $empresaEmissoraAtivaId]);
                 $sucesso = 'Item desativado.';
             }
         } elseif (($_POST['acao'] ?? '') === 'reativar') {
             $id = (int) ($_POST['item_id'] ?? 0);
             if ($id > 0) {
-                $stmt = $db->prepare('UPDATE notas_produtos_servicos SET ativo = 1 WHERE id = :id');
-                $stmt->execute(['id' => $id]);
+                $stmt = $db->prepare('UPDATE notas_produtos_servicos SET ativo = 1 WHERE id = :id AND empresa_emissora_id = :empresa_emissora_id');
+                $stmt->execute(['id' => $id, 'empresa_emissora_id' => $empresaEmissoraAtivaId]);
                 $sucesso = 'Item reativado.';
             }
         }
@@ -296,7 +314,7 @@ try {
     $stmt = $db->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
     $empresasAtivas = $stmt->fetchAll();
 
-    $stmt = $db->query(
+    $stmt = $db->prepare(
         'SELECT ps.id, ps.empresa_emissora_id, ps.tipo, ps.descricao, ps.codigo_interno, ps.ncm, ps.cfop,
                 ps.cst_csosn, ps.codigo_servico_municipal, ps.unidade, ps.valor_unitario_padrao,
                 ps.aliquota_icms, ps.aliquota_pis, ps.aliquota_cofins, ps.ipi_cst, ps.aliquota_ipi, ps.cean, ps.ativo,
@@ -304,8 +322,10 @@ try {
                 e.razao_social AS empresa_razao_social
          FROM notas_produtos_servicos ps
          INNER JOIN empresas_emissoras e ON e.id = ps.empresa_emissora_id
-         ORDER BY e.razao_social ASC, ps.ativo DESC, ps.descricao ASC'
+         WHERE ps.empresa_emissora_id = :empresa_emissora_id
+         ORDER BY ps.ativo DESC, ps.descricao ASC'
     );
+    $stmt->execute(['empresa_emissora_id' => $empresaEmissoraAtivaId]);
     $itens = $stmt->fetchAll();
 
     $itemEmEdicao = null;
@@ -323,6 +343,7 @@ try {
     $empresasAtivas = [];
     $itens = [];
     $itemEmEdicao = null;
+    $empresaEmissoraAtivaNome = $empresaEmissoraAtivaNome ?? '';
 }
 
 $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
@@ -371,17 +392,8 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                     <div class="form-grid">
                         <div class="field">
                             <label for="empresa_emissora_id">Empresa emissora</label>
-                            <?php if ($itemEmEdicao): ?>
-                                <div class="campo-fixo"><?php echo h($itemEmEdicao['empresa_razao_social']); ?></div>
-                                <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">A empresa emissora não pode ser alterada nesta edição.</p>
-                            <?php else: ?>
-                                <select id="empresa_emissora_id" name="empresa_emissora_id" required>
-                                    <option value="">Selecione</option>
-                                    <?php foreach ($empresasAtivas as $empresa): ?>
-                                        <option value="<?php echo h((string) $empresa['id']); ?>"><?php echo h($empresa['razao_social']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            <?php endif; ?>
+                            <div class="campo-fixo"><?php echo h($empresaEmissoraAtivaNome); ?></div>
+                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">O item é cadastrado na empresa ativa (selecionada em "Emitindo por", no topo).</p>
                         </div>
                         <div class="field">
                             <label for="tipo">Tipo</label>
@@ -508,12 +520,11 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
         <?php endif; ?>
 
         <section class="panel">
-            <h2>Itens cadastrados</h2>
+            <h2>Itens cadastrados <span class="muted" style="font-weight:400; text-transform:none;">— <?php echo h($empresaEmissoraAtivaNome !== '' ? $empresaEmissoraAtivaNome : 'nenhuma empresa selecionada'); ?></span></h2>
             <div class="table-wrap">
                 <table>
                     <thead>
                         <tr>
-                            <th>Empresa</th>
                             <th>Tipo</th>
                             <th>Descrição</th>
                             <th>NCM/CFOP/CST</th>
@@ -527,7 +538,6 @@ $csrf = h($_SESSION['csrf_notas_produtos_servicos'] ?? '');
                     <tbody>
                         <?php foreach ($itens as $item): ?>
                             <tr>
-                                <td><?php echo h($item['empresa_razao_social']); ?></td>
                                 <td><?php echo $item['tipo'] === 'servico' ? 'Serviço' : 'Produto'; ?></td>
                                 <td><?php echo h($item['descricao']); ?></td>
                                 <td><?php echo h(($item['ncm'] ?? '—') . ' / ' . ($item['cfop'] ?? '—') . ' / ' . ($item['cst_csosn'] ?? '—')); ?></td>
