@@ -212,7 +212,32 @@ function nfseIdDpsValido(string $idDps): bool
 }
 function dpsAPartirDaNota(array $nota, array $empresa, array $cliente, array $itens, ?array $nfse = null): array
 {
+    $empresa = ajustarImPrestadorConformeCnc($empresa);
+
     return nfseMontarDps($nota, $empresa, $cliente, $itens, $nfse);
+}
+
+// Confere no CNC se o município da própria empresa emissora realmente tem registro complementar
+// pra ela antes de mandar a IM na DPS - o Sefin Nacional rejeita com erro E0120 quando a IM é
+// enviada mas não existe cadastro complementar pra aquele documento+município (o espelho do
+// E0116, que é a falta da IM quando ela é exigida). A IM cadastrada na empresa pode ficar
+// desatualizada em relação ao CNC (foi digitada na mão, ou o registro no CNC mudou depois) - por
+// isso a checagem é feita de novo aqui, na hora de montar a DPS, e não só uma vez no cadastro.
+// Se a consulta ao CNC não tiver sucesso (rede fora, certificado ainda não configurado etc.),
+// mantém a IM cadastrada - não vale a pena arriscar quebrar a emissão por causa dessa checagem
+// extra.
+function ajustarImPrestadorConformeCnc(array $empresa): array
+{
+    if (empty($empresa['inscricao_municipal']) || empty($empresa['cnpj']) || empty($empresa['codigo_ibge_municipio'])) {
+        return $empresa;
+    }
+
+    $resultado = consultarContribuinteCnc($empresa, (string) $empresa['cnpj'], (string) $empresa['codigo_ibge_municipio']);
+    if ($resultado['sucesso'] && $resultado['im'] === null) {
+        $empresa['inscricao_municipal'] = null;
+    }
+
+    return $empresa;
 }
 
 function enviarNfseNacional(array $dpsMontada, string $ambiente, array $empresa): array
