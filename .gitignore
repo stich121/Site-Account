@@ -21,3 +21,5 @@ documentos-fiscais-privados/*
 !documentos-fiscais-privados/.htaccess
 cache/*
 !cache/.htaccess
+backups/*
+!backups/.htaccess

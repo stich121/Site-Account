@@ -114,3 +114,58 @@ function enviarArquivoGoogleDrive(string $caminhoArquivo, string $nomeArquivo, s
 
     return $dados;
 }
+
+function listarArquivosGoogleDrivePorPrefixo(string $prefixo): array
+{
+    $config = googleDriveConfig();
+    $accessToken = googleDriveAccessToken();
+    $prefixoEscapado = str_replace("'", "\\'", $prefixo);
+    $query = "'" . $config['folder_id'] . "' in parents and name contains '{$prefixoEscapado}' and trashed = false";
+
+    $ch = curl_init('https://www.googleapis.com/drive/v3/files?' . http_build_query([
+        'q' => $query,
+        'fields' => 'files(id,name,createdTime)',
+        'orderBy' => 'createdTime desc',
+        'pageSize' => 100,
+    ]));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $accessToken],
+        CURLOPT_TIMEOUT => 30,
+    ]);
+
+    $response = curl_exec($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $erro = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $status < 200 || $status >= 300) {
+        throw new RuntimeException('Falha ao listar arquivos do Google Drive. ' . ($erro ?: $response));
+    }
+
+    $dados = json_decode($response, true);
+
+    return is_array($dados['files'] ?? null) ? $dados['files'] : [];
+}
+
+function excluirArquivoGoogleDrive(string $fileId): void
+{
+    $accessToken = googleDriveAccessToken();
+
+    $ch = curl_init('https://www.googleapis.com/drive/v3/files/' . rawurlencode($fileId));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST => 'DELETE',
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $accessToken],
+        CURLOPT_TIMEOUT => 30,
+    ]);
+
+    $response = curl_exec($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $erro = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || ($status < 200 || $status >= 300) && $status !== 404) {
+        throw new RuntimeException('Falha ao excluir arquivo do Google Drive. ' . ($erro ?: $response));
+    }
+}

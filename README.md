@@ -194,6 +194,13 @@ Tabelas principais:
 
 O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios` deve ser executada somente no banco principal, conforme os comentários do próprio arquivo.
 
+### Backup automático
+
+`backup-banco-dados.php` gera um dump completo (estrutura + dados) de cada um dos dois bancos, comprime em `.sql.gz` e envia pro Google Drive (mesma configuração de `google_drive_config.php` usada pelos downloads). Não depende de `mysqldump`/`shell_exec` — o dump é montado via PDO, o que funciona em hospedagem compartilhada. Mantém só os 14 backups mais recentes de cada banco no Drive.
+
+- Botão manual: acesse a página logado como administrador (nível de acesso 3+).
+- Automático: configure no hPanel da Hostinger (Avançado > Cron Jobs) uma tarefa diária executando `php /caminho/do/site/backup-banco-dados.php --cli`.
+
 ## Arquivos importantes
 
 | Arquivo | Finalidade |
@@ -227,6 +234,8 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `nfe-diagnostico.php` | Diagnóstico do ambiente (extensões PHP e libs) para NF-e |
 | `notas-fiscais-schema.sql` | Schema fiscal |
 | `seguranca.php` | Sessão, CSRF e segurança |
+| `backup-banco-dados.php` | Backup diário dos dois bancos (dump via PDO) para o Google Drive |
+| `google_drive_service.php` | Autenticação OAuth e upload/listagem/exclusão de arquivos no Google Drive |
 | `assets/css/notas-fiscais.css` | Design system e componentes de UI (inclui o botão "i" de ajuda) compartilhados pelas telas do emissor |
 
 ## Instalação
