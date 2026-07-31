@@ -493,6 +493,9 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
     white-space: normal;
 }
 .info-tooltip-box.aberto { display: block; }
+/* Quando o campo fica perto da borda direita do painel, a caixa é ancorada
+   pela direita (em vez da esquerda) via JS, para não ser cortada pela tela. */
+.info-tooltip-box.alinhar-direita { left: auto; right: 0; }
 
 /* Campo somente leitura: mostra um valor definido em outro lugar (ex.: empresa emissora no cabeçalho) */
 .campo-fixo {

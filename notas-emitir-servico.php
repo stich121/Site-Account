@@ -1198,8 +1198,13 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     outroBotao.setAttribute('aria-expanded', 'false');
                 });
                 if (!jaAberta) {
+                    caixaInfo.classList.remove('alinhar-direita');
                     caixaInfo.classList.add('aberto');
                     botaoInfo.setAttribute('aria-expanded', 'true');
+                    const limite = caixaInfo.getBoundingClientRect();
+                    if (limite.right > window.innerWidth - 12) {
+                        caixaInfo.classList.add('alinhar-direita');
+                    }
                 }
             });
         });
