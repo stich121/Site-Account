@@ -571,12 +571,12 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
     padding: 0.35rem;
     border: 1px solid var(--border);
     border-radius: 0.65rem;
-    background: #111;
-    box-shadow: 0 16px 35px rgba(0, 0, 0, 0.38);
-    /* Sem isso, o navegador desenha a barra de rolagem padrão (clara), que destoa
-       do tema escuro e "vaza" visualmente para fora do cantos arredondados. */
+    background: var(--bg-card);
+    box-shadow: var(--shadow-pop);
+    /* Sem isso, o navegador desenha a barra de rolagem padrão, que destoa
+       do tema (claro ou escuro) e "vaza" visualmente para fora dos cantos arredondados. */
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+    scrollbar-color: var(--border) transparent;
 }
 
 .municipio-sugestoes::-webkit-scrollbar,
@@ -585,11 +585,11 @@ h3 { font-size: 1rem; margin-bottom: 0.75rem; }
 .catalogo-sugestoes::-webkit-scrollbar-track { background: transparent; }
 .municipio-sugestoes::-webkit-scrollbar-thumb,
 .catalogo-sugestoes::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.22);
+    background: var(--border);
     border-radius: 999px;
 }
 .municipio-sugestoes::-webkit-scrollbar-thumb:hover,
-.catalogo-sugestoes::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.35); }
+.catalogo-sugestoes::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 .municipio-sugestoes.aberto,
 .catalogo-sugestoes.aberto { display: grid; }

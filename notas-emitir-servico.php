@@ -367,9 +367,18 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field" id="campoPercentualRetencaoIssqn" style="display:none;">
-                            <label for="nfse_percentual_retencao_issqn">Alíquota de retenção do ISSQN (%)</label>
+                            <label for="nfse_percentual_retencao_issqn">
+                                Alíquota de retenção do ISSQN (%)
+                                <span class="info-tooltip-wrap">
+                                    <button type="button" class="info-btn" data-info-target="infoPercentualRetencaoIssqn" aria-expanded="false" aria-label="Mais informações sobre este campo">
+                                        <i class="fa-solid fa-info"></i>
+                                    </button>
+                                    <span class="info-tooltip-box" id="infoPercentualRetencaoIssqn" role="tooltip">
+                                        No Simples Nacional, a retenção costuma ter alíquota mínima de 1,8% quando não há benefício municipal. No Lucro Presumido/Real, use a alíquota fixa do serviço (código de tributação municipal informado acima) no município de incidência — consulte em <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">Consulta de Código de Tributação Municipal e Alíquotas (BHISS Digital)</a>. Limite do Portal Nacional: até 5%.
+                                    </span>
+                                </span>
+                            </label>
                             <input id="nfse_percentual_retencao_issqn" name="nfse_percentual_retencao_issqn" type="text" inputmode="decimal" placeholder="Ex.: 2,50" maxlength="6">
-                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">No Simples Nacional, a retenção costuma ter alíquota mínima de 1,8% quando não há benefício municipal. No Lucro Presumido/Real, use a alíquota fixa do serviço (código de tributação municipal informado acima) no município de incidência — consulte em <a href="https://bhissdigital.pbh.gov.br/atde/pages/codigoTributacaoMunicipal.jsf" target="_blank" rel="noopener" style="text-decoration:underline;">Consulta de Código de Tributação Municipal e Alíquotas (BHISS Digital)</a>. Limite do Portal Nacional: até 5%.</p>
                         </div>
                         <div class="field">
                             <label for="nfse_beneficio_municipal">Este serviço está amparado por algum benefício municipal?</label>
@@ -1175,6 +1184,34 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             selectIssqnRetido.addEventListener('change', atualizarVisibilidadeRetencaoIssqn);
             atualizarVisibilidadeRetencaoIssqn();
         }
+
+        document.querySelectorAll('.info-btn').forEach(function (botaoInfo) {
+            const caixaInfo = document.getElementById(botaoInfo.dataset.infoTarget);
+            if (!caixaInfo) return;
+            botaoInfo.addEventListener('click', function (evento) {
+                evento.stopPropagation();
+                const jaAberta = caixaInfo.classList.contains('aberto');
+                document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (outra) {
+                    outra.classList.remove('aberto');
+                });
+                document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (outroBotao) {
+                    outroBotao.setAttribute('aria-expanded', 'false');
+                });
+                if (!jaAberta) {
+                    caixaInfo.classList.add('aberto');
+                    botaoInfo.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+        document.addEventListener('click', function (evento) {
+            if (evento.target.closest('.info-tooltip-wrap')) return;
+            document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (caixa) {
+                caixa.classList.remove('aberto');
+            });
+            document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (botao) {
+                botao.setAttribute('aria-expanded', 'false');
+            });
+        });
 
         const selectTributosModo = document.getElementById('nfse_tributos_modo');
         const blocoTributosPercentuais = document.getElementById('tributosPercentuais');
