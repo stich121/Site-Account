@@ -366,6 +366,11 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                 <option value="intermediario">Intermediário</option>
                             </select>
                         </div>
+                        <div class="field" id="campoPercentualRetencaoIssqn" style="display:none;">
+                            <label for="nfse_percentual_retencao_issqn">Alíquota de retenção do ISSQN (%)</label>
+                            <input id="nfse_percentual_retencao_issqn" name="nfse_percentual_retencao_issqn" type="text" inputmode="decimal" placeholder="Ex.: 2,50" maxlength="6">
+                            <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;">No Simples Nacional, a retenção costuma ter alíquota mínima de 1,8% quando não há benefício municipal. No Lucro Presumido/Real, use a alíquota fixa do serviço prestado no município de incidência (varia por serviço). Limite do Portal Nacional: até 5%.</p>
+                        </div>
                         <div class="field">
                             <label for="nfse_beneficio_municipal">Este serviço está amparado por algum benefício municipal?</label>
                             <select id="nfse_beneficio_municipal" name="nfse_beneficio_municipal">
@@ -1160,11 +1165,15 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
 
         const selectIssqnRetido = document.getElementById('nfse_issqn_retido');
         const campoIssqnRetidoPor = document.getElementById('campoIssqnRetidoPor');
+        const campoPercentualRetencaoIssqn = document.getElementById('campoPercentualRetencaoIssqn');
         if (selectIssqnRetido && campoIssqnRetidoPor) {
-            selectIssqnRetido.addEventListener('change', function () {
-                campoIssqnRetidoPor.style.display = selectIssqnRetido.value === 'sim' ? '' : 'none';
-            });
-            campoIssqnRetidoPor.style.display = selectIssqnRetido.value === 'sim' ? '' : 'none';
+            const atualizarVisibilidadeRetencaoIssqn = function () {
+                const exibir = selectIssqnRetido.value === 'sim' ? '' : 'none';
+                campoIssqnRetidoPor.style.display = exibir;
+                if (campoPercentualRetencaoIssqn) campoPercentualRetencaoIssqn.style.display = exibir;
+            };
+            selectIssqnRetido.addEventListener('change', atualizarVisibilidadeRetencaoIssqn);
+            atualizarVisibilidadeRetencaoIssqn();
         }
 
         const selectTributosModo = document.getElementById('nfse_tributos_modo');

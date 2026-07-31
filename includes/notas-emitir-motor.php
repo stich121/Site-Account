@@ -620,6 +620,17 @@ function prepararColunasFase3bNotasFiscaisNfse(PDO $db): void
     }
 }
 
+function prepararColunaPercentualRetencaoIssqn(PDO $db): void
+{
+    // Percentual de retenção do ISSQN (campo oficial pAliq da DPS) - editável quando há retenção
+    // pelo tomador/intermediário. Coluna nova adicionada depois que "notas_emitir_motor" já podia
+    // estar marcada como preparada em servidores existentes, por isso tem flag própria (ver
+    // schemaJaPreparada() logo abaixo de onde essa função é chamada).
+    if (!colunaExisteNotas($db, 'notas_fiscais_nfse', 'percentual_retencao_issqn')) {
+        $db->exec('ALTER TABLE notas_fiscais_nfse ADD COLUMN percentual_retencao_issqn DECIMAL(5,2) NULL AFTER issqn_retido_por');
+    }
+}
+
 function prepararColunaInscricaoMunicipalClientes(PDO $db): void
 {
     // Guarda a última Inscrição Municipal informada para o cliente, para
@@ -705,6 +716,10 @@ try {
         prepararColunasImpostoProdutosServicosNotas($dbNotas);
         prepararColunaPermiteNotasFiscais($db);
         marcarSchemaPreparada('notas_emitir_motor');
+    }
+    if (!schemaJaPreparada('notas_fiscais_nfse_percentual_retencao')) {
+        prepararColunaPercentualRetencaoIssqn($dbNotas);
+        marcarSchemaPreparada('notas_fiscais_nfse_percentual_retencao');
     }
     semearEmpresasEmissorasNotas($dbNotas);
 
@@ -846,6 +861,7 @@ try {
                 $numeroProcessoSuspensao = $exigibilidadeSuspensa === 'sim' ? trim($_POST['nfse_numero_processo_suspensao'] ?? '') : '';
                 $issqnRetido = ($_POST['nfse_issqn_retido'] ?? '') === 'sim' ? 'sim' : 'nao';
                 $issqnRetidoPor = $issqnRetido === 'sim' ? (($_POST['nfse_issqn_retido_por'] ?? '') === 'intermediario' ? 'intermediario' : 'tomador') : null;
+                $percentualRetencaoIssqn = $issqnRetido === 'sim' ? $numerico('nfse_percentual_retencao_issqn') : null;
                 $beneficioMunicipal = ($_POST['nfse_beneficio_municipal'] ?? '') === 'sim' ? 'sim' : 'nao';
                 $codigoBeneficioMunicipal = $beneficioMunicipal === 'sim' ? trim($_POST['nfse_codigo_beneficio_municipal'] ?? '') : '';
                 $deducaoReducaoBase = $numerico('nfse_deducao_reducao_base');
@@ -919,6 +935,7 @@ try {
                     'numero_processo_suspensao' => $numeroProcessoSuspensao !== '' ? $numeroProcessoSuspensao : null,
                     'issqn_retido' => $issqnRetido,
                     'issqn_retido_por' => $issqnRetidoPor,
+                    'percentual_retencao_issqn' => $percentualRetencaoIssqn,
                     'beneficio_municipal' => $beneficioMunicipal,
                     'codigo_beneficio_municipal' => $codigoBeneficioMunicipal !== '' ? $codigoBeneficioMunicipal : null,
                     'deducao_reducao_base_calculo' => $deducaoReducaoBase,
@@ -1319,7 +1336,7 @@ try {
                                 imune_exportacao_nao_incidencia, item_nbs, descricao_servico, documento_responsabilidade_tecnica,
                                 documento_referencia, informacoes_complementares, numero_pedido_b2b, valor_recebido_intermediario,
                                 desconto_incondicionado, desconto_condicionado, tributacao_issqn, regime_especial_tributacao,
-                                exigibilidade_issqn_suspensa, tipo_suspensao_issqn, numero_processo_suspensao, issqn_retido, issqn_retido_por, beneficio_municipal, codigo_beneficio_municipal, deducao_reducao_base_calculo,
+                                exigibilidade_issqn_suspensa, tipo_suspensao_issqn, numero_processo_suspensao, issqn_retido, issqn_retido_por, percentual_retencao_issqn, beneficio_municipal, codigo_beneficio_municipal, deducao_reducao_base_calculo,
                                 situacao_tributaria_pis_cofins, tipo_retencao_pis_cofins_csll, irrf, contribuicoes_sociais_retidas,
                                 contribuicao_previdenciaria_retida, tributos_modo, tributos_federal_percentual, tributos_estadual_percentual,
                                 tributos_municipal_percentual, tributos_federal_valor, tributos_estadual_valor, tributos_municipal_valor,
@@ -1332,7 +1349,7 @@ try {
                                 :imune_exportacao_nao_incidencia, :item_nbs, :descricao_servico, :documento_responsabilidade_tecnica,
                                 :documento_referencia, :informacoes_complementares, :numero_pedido_b2b, :valor_recebido_intermediario,
                                 :desconto_incondicionado, :desconto_condicionado, :tributacao_issqn, :regime_especial_tributacao,
-                                :exigibilidade_issqn_suspensa, :tipo_suspensao_issqn, :numero_processo_suspensao, :issqn_retido, :issqn_retido_por, :beneficio_municipal, :codigo_beneficio_municipal, :deducao_reducao_base_calculo,
+                                :exigibilidade_issqn_suspensa, :tipo_suspensao_issqn, :numero_processo_suspensao, :issqn_retido, :issqn_retido_por, :percentual_retencao_issqn, :beneficio_municipal, :codigo_beneficio_municipal, :deducao_reducao_base_calculo,
                                 :situacao_tributaria_pis_cofins, :tipo_retencao_pis_cofins_csll, :irrf, :contribuicoes_sociais_retidas,
                                 :contribuicao_previdenciaria_retida, :tributos_modo, :tributos_federal_percentual, :tributos_estadual_percentual,
                                 :tributos_municipal_percentual, :tributos_federal_valor, :tributos_estadual_valor, :tributos_municipal_valor,
