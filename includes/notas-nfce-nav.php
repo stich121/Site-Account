@@ -111,6 +111,46 @@ $redirecionarEmpresaAtivaNfce = htmlspecialchars(basename($_SERVER['REQUEST_URI'
 })();
 </script>
 
+<script>
+(function () {
+    // Faz os ícones "i" (campoInfo()) abrirem/fecharem o balão de ajuda — mesmo
+    // comportamento de notas-emitir-produto.php/notas-emitir-servico.php, mas centralizado
+    // aqui pra valer em toda página da área NFC-e sem precisar repetir em cada uma.
+    document.addEventListener('click', function (evento) {
+        var botaoInfo = evento.target.closest('.info-btn');
+        if (botaoInfo) {
+            evento.stopPropagation();
+            var wrap = botaoInfo.closest('.info-tooltip-wrap');
+            var caixaInfo = wrap ? wrap.querySelector('.info-tooltip-box') : null;
+            if (!caixaInfo) return;
+            var jaAberta = caixaInfo.classList.contains('aberto');
+            document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (outra) {
+                outra.classList.remove('aberto', 'alinhar-direita');
+            });
+            document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (outroBotao) {
+                outroBotao.setAttribute('aria-expanded', 'false');
+            });
+            if (!jaAberta) {
+                caixaInfo.classList.add('aberto');
+                botaoInfo.setAttribute('aria-expanded', 'true');
+                var limite = caixaInfo.getBoundingClientRect();
+                if (limite.right > window.innerWidth - 12) {
+                    caixaInfo.classList.add('alinhar-direita');
+                }
+            }
+            return;
+        }
+        if (evento.target.closest('.info-tooltip-wrap')) return;
+        document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (caixa) {
+            caixa.classList.remove('aberto');
+        });
+        document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (botao) {
+            botao.setAttribute('aria-expanded', 'false');
+        });
+    });
+})();
+</script>
+
 <nav class="notas-nav" aria-label="Navegação da área de NFC-e">
     <a class="<?php echo $abaClasseNfce('vendas'); ?>" href="notas-nfce-vendas"><i class="fa-solid fa-cash-register"></i> Vendas (NFC-e)</a>
     <a class="<?php echo $abaClasseNfce('emitir'); ?>" href="notas-nfce-emitir"><i class="fa-solid fa-plus"></i> Emitir NFC-e</a>
