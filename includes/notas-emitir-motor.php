@@ -45,6 +45,23 @@ function h(string $valor): string
     return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Ícone "i" clicável ao lado de um rótulo, com um texto explicativo em um
+ * balão flutuante. $textoHtml já deve vir com o HTML pronto (não é
+ * escapado aqui) porque os textos são sempre literais escritos no código,
+ * nunca dado de usuário — permite usar <a>/<strong> no texto de ajuda.
+ * O balão não depende de um id único: o JS localiza a caixa mais próxima
+ * dentro do mesmo .info-tooltip-wrap, então a mesma função pode ser usada
+ * também dentro de itens repetidos gerados dinamicamente.
+ */
+function campoInfo(string $textoHtml): string
+{
+    return '<span class="info-tooltip-wrap">'
+        . '<button type="button" class="info-btn" aria-expanded="false" aria-label="Mais informações sobre este campo"><i class="fa-solid fa-info"></i></button>'
+        . '<span class="info-tooltip-box" role="tooltip">' . $textoHtml . '</span>'
+        . '</span>';
+}
+
 function codigoMunicipioIbgeValido(string $codigo): bool
 {
     static $codigos = null;

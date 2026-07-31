@@ -74,7 +74,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;"><?php echo $notaEmEdicao ? 'A empresa emissora não pode ser alterada nesta correção.' : 'Para trocar, use "Emitindo por" no topo da página.'; ?> <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF</label>
+                            <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF
+                                <?php echo campoInfo('Atalho para localizar rapidamente um cliente já cadastrado. Digite o CNPJ ou CPF (só números ou formatado) e clique em "Buscar" — se encontrado, ele é selecionado automaticamente no campo "Cliente destinatário" abaixo. Se não existir, cadastre um novo cliente na aba Clientes.'); ?>
+                            </label>
                             <div class="row-actions">
                                 <input id="busca_cliente_documento" type="text" style="flex: 1;" placeholder="Digite o CNPJ ou CPF do cliente já cadastrado">
                                 <button class="btn btn-outline btn-small" type="button" id="btnBuscarClienteDocumento"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
@@ -82,7 +84,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <span class="muted" id="statusBuscaClienteDocumento" style="font-size: 0.78rem;"></span>
                         </div>
                         <div class="field">
-                            <label for="cliente_id">Cliente destinatário (tomador) <span class="marca-obrigatoria">*</span></label>
+                            <label for="cliente_id">Cliente destinatário (tomador) <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('O "tomador" é quem contratou e vai pagar pelo serviço prestado — a empresa ou pessoa para quem a nota fiscal está sendo emitida. Escolha um cliente já cadastrado na lista; se ainda não existir, cadastre-o antes em "Clientes".'); ?>
+                            </label>
                             <select id="cliente_id" name="cliente_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($clientes as $cliente): ?>
@@ -91,23 +95,33 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field">
-                            <label for="natureza_operacao">Natureza da operação <span class="marca-obrigatoria">*</span></label>
+                            <label for="natureza_operacao">Natureza da operação <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Descrição curta do tipo de operação que está sendo praticada, exigida em toda nota fiscal. Para serviços, use algo direto como "Prestação de serviço" ou uma frase mais específica (ex.: "Prestação de serviço de consultoria").'); ?>
+                            </label>
                             <input id="natureza_operacao" name="natureza_operacao" type="text" placeholder="Ex.: Prestação de serviço" required>
                         </div>
                         <div class="field">
-                            <label for="forma_pagamento">Forma de pagamento</label>
+                            <label for="forma_pagamento">Forma de pagamento
+                                <?php echo campoInfo('Campo livre e opcional, só para controle interno/exibição na nota (não é validado pela prefeitura). Ex.: "Pix", "Boleto", "Cartão de crédito em 3x".'); ?>
+                            </label>
                             <input id="forma_pagamento" name="forma_pagamento" type="text" placeholder="Pix, boleto, cartão...">
                         </div>
                         <div class="field">
-                            <label for="data_emissao">Data de emissão</label>
+                            <label for="data_emissao">Data de emissão
+                                <?php echo campoInfo('Data em que a nota está sendo emitida. Já vem preenchida com a data de hoje; normalmente não precisa alterar.'); ?>
+                            </label>
                             <input id="data_emissao" name="data_emissao" type="date" value="<?php echo h(date('Y-m-d')); ?>">
                         </div>
                         <div class="field">
-                            <label for="data_saida_entrada">Data de saída/entrada</label>
+                            <label for="data_saida_entrada">Data de saída/entrada
+                                <?php echo campoInfo('Opcional. Use apenas se a data de conclusão/entrega do serviço for diferente da data de emissão da nota — por exemplo, quando o serviço foi executado em um dia e a nota só é emitida depois.'); ?>
+                            </label>
                             <input id="data_saida_entrada" name="data_saida_entrada" type="date">
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="informacoes_frete">Frete/transporte (opcional)</label>
+                            <label for="informacoes_frete">Frete/transporte (opcional)
+                                <?php echo campoInfo('Preencha só se houver transporte associado ao serviço prestado (ex.: entrega de material usado na prestação). Informe transportadora, placa do veículo, volume e peso, se aplicável. Deixe em branco se não houver frete.'); ?>
+                            </label>
                             <textarea id="informacoes_frete" name="informacoes_frete" placeholder="Transportadora, placa, volume, peso..."></textarea>
                         </div>
                     </div>
@@ -131,21 +145,28 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_data_competencia">Data de competência</label>
+                            <label for="nfse_data_competencia">Data de competência
+                                <?php echo campoInfo('Mês/ano em que o serviço deve ser considerado para fins fiscais (apuração de impostos), que pode ser diferente da data de emissão da nota. Na maioria dos casos, mantenha igual à data de hoje.'); ?>
+                            </label>
                             <input id="nfse_data_competencia" name="nfse_data_competencia" type="date" value="<?php echo h(date('Y-m-d')); ?>">
                         </div>
                         <label class="check-row">
                             <input type="checkbox" id="nfse_informar_dps" name="nfse_informar_dps">
                             Informar série e número da DPS
+                            <?php echo campoInfo('A DPS (Declaração de Prestação de Serviços) é o documento que a sua empresa envia ao Sefin Nacional para gerar a NFS-e. Deixe desmarcado para o sistema numerar automaticamente. Marque apenas se precisar controlar manualmente a série/numeração da DPS (ex.: para manter sequência de um sistema anterior).'); ?>
                         </label>
                     </div>
                     <div class="form-grid" id="camposDpsManual" style="display:none;">
                         <div class="field">
-                            <label for="nfse_serie_dps">Série da DPS</label>
+                            <label for="nfse_serie_dps">Série da DPS
+                                <?php echo campoInfo('Identificador da série de numeração da DPS. Só é necessário se você optou por controlar a numeração manualmente (checkbox acima); a maioria dos contribuintes usa a série padrão.'); ?>
+                            </label>
                             <input id="nfse_serie_dps" name="nfse_serie_dps" type="text" maxlength="5">
                         </div>
                         <div class="field">
-                            <label for="nfse_numero_dps">Número da DPS</label>
+                            <label for="nfse_numero_dps">Número da DPS
+                                <?php echo campoInfo('Número sequencial da DPS dentro da série informada. Só é necessário se você optou por controlar a numeração manualmente (checkbox acima).'); ?>
+                            </label>
                             <input id="nfse_numero_dps" name="nfse_numero_dps" type="text" maxlength="15">
                         </div>
                     </div>
@@ -158,7 +179,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     <p class="muted" style="margin-bottom: 0.75rem;">Documento, nome e e-mail do tomador vêm do cliente destinatário selecionado acima.</p>
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_tomador_local">Onde está localizado o estabelecimento/domicílio?</label>
+                            <label for="nfse_tomador_local">Onde está localizado o estabelecimento/domicílio?
+                                <?php echo campoInfo('Indica se o tomador (cliente) está no Brasil, no exterior, ou se essa informação não se aplica/não é conhecida. Na grande maioria dos casos, deixe "Brasil".'); ?>
+                            </label>
                             <select id="nfse_tomador_local" name="nfse_tomador_local">
                                 <option value="nao_informado">Tomador não informado</option>
                                 <option value="brasil" selected>Brasil</option>
@@ -166,12 +189,16 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field" id="campoTomadorInscricaoMunicipal">
-                            <label for="nfse_tomador_inscricao_municipal">Inscrição Municipal do tomador</label>
+                            <label for="nfse_tomador_inscricao_municipal">Inscrição Municipal do tomador
+                                <?php echo campoInfo('Número de cadastro do cliente na prefeitura do município dele, quando existir. O sistema tenta preencher automaticamente ao selecionar o cliente, consultando o Cadastro Nacional de Contribuintes (CNC). Se a consulta não encontrar nada, pode deixar em branco.'); ?>
+                            </label>
                             <input id="nfse_tomador_inscricao_municipal" name="nfse_tomador_inscricao_municipal" type="text">
                             <span class="muted" id="statusImTomador" style="font-size: 0.75rem;"></span>
                         </div>
                         <div class="field">
-                            <label for="nfse_tomador_telefone">Telefone (opcional)</label>
+                            <label for="nfse_tomador_telefone">Telefone (opcional)
+                                <?php echo campoInfo('Telefone de contato do tomador, apenas informativo. Não é obrigatório.'); ?>
+                            </label>
                             <input id="nfse_tomador_telefone" name="nfse_tomador_telefone" type="text">
                         </div>
                     </div>
@@ -184,21 +211,28 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     <label class="check-row" style="margin-top: 0;">
                         <input type="checkbox" id="nfse_intermediario_incluido" name="nfse_intermediario_incluido">
                         Esta NFS-e tem intermediário
+                        <?php echo campoInfo('Marque apenas se um terceiro (uma plataforma, marketplace ou agenciador) intermediou a contratação do serviço entre você e o tomador — por exemplo, um app que cobra do cliente e repassa parte do valor para você. Se o serviço foi contratado diretamente com o cliente, deixe desmarcado.'); ?>
                     </label>
                     <div class="form-grid" id="camposIntermediario" style="display:none; margin-top: 1rem;">
                         <div class="field">
-                            <label for="nfse_intermediario_local">Onde está localizado o estabelecimento/domicílio?</label>
+                            <label for="nfse_intermediario_local">Onde está localizado o estabelecimento/domicílio?
+                                <?php echo campoInfo('Indica se o intermediário está no Brasil ou se essa informação não se aplica.'); ?>
+                            </label>
                             <select id="nfse_intermediario_local" name="nfse_intermediario_local">
                                 <option value="nao_informado">Intermediário não informado</option>
                                 <option value="brasil">Brasil</option>
                             </select>
                         </div>
                         <div class="field">
-                            <label for="nfse_intermediario_cpf_cnpj">CPF/CNPJ do intermediário</label>
+                            <label for="nfse_intermediario_cpf_cnpj">CPF/CNPJ do intermediário
+                                <?php echo campoInfo('Documento de identificação de quem intermediou a operação (a plataforma ou agenciador).'); ?>
+                            </label>
                             <input id="nfse_intermediario_cpf_cnpj" name="nfse_intermediario_cpf_cnpj" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_intermediario_nome">Nome/Razão social do intermediário</label>
+                            <label for="nfse_intermediario_nome">Nome/Razão social do intermediário
+                                <?php echo campoInfo('Nome ou razão social de quem intermediou a operação.'); ?>
+                            </label>
                             <input id="nfse_intermediario_nome" name="nfse_intermediario_nome" type="text">
                         </div>
                     </div>
@@ -210,11 +244,15 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_pais_prestacao">País</label>
+                            <label for="nfse_pais_prestacao">País
+                                <?php echo campoInfo('País onde o serviço foi efetivamente prestado. Para a grande maioria das empresas brasileiras prestando serviço no Brasil, mantenha "Brasil".'); ?>
+                            </label>
                             <input id="nfse_pais_prestacao" name="nfse_pais_prestacao" type="text" value="Brasil">
                         </div>
                         <div class="field municipio-autocomplete">
-                            <label for="nfse_municipio_prestacao_busca">Município <span class="marca-obrigatoria">*</span></label>
+                            <label for="nfse_municipio_prestacao_busca">Município <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Município onde o serviço foi prestado — importante porque define qual prefeitura tem direito ao ISSQN da operação (pode ser diferente do município da sua empresa, dependendo do tipo de serviço). Digite as primeiras letras e escolha na lista.'); ?>
+                            </label>
                             <input id="nfse_municipio_prestacao_busca" type="search" required placeholder="Digite o início do município" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_municipio_prestacao_opcoes" aria-expanded="false">
                             <input id="nfse_municipio_prestacao" name="nfse_municipio_prestacao" type="hidden">
                             <div id="nfse_municipio_prestacao_opcoes" class="municipio-sugestoes" role="listbox"></div>
@@ -229,7 +267,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116) <span class="marca-obrigatoria">*</span></label>
+                            <label for="nfse_codigo_tributacao_nacional">Código de Tributação Nacional (LC 116) <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Código oficial (Lei Complementar 116) que classifica qual tipo de serviço está sendo prestado — define a tributação municipal aplicável. Digite parte da descrição ou do código para buscar na lista oficial. Ao escolher, a descrição do serviço abaixo é sugerida automaticamente.'); ?>
+                            </label>
                             <input id="nfse_codigo_tributacao_nacional" name="nfse_codigo_tributacao_nacional" type="text" required placeholder="Digite para buscar. Ex.: 17.19.01" list="datalistCodigosNacionais" autocomplete="off">
                             <datalist id="datalistCodigosNacionais">
                                 <?php foreach ($codigosTributacaoNacionalNfse as $codigoNacional): ?>
@@ -238,7 +278,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </datalist>
                         </div>
                         <div class="field">
-                            <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal</label>
+                            <label for="nfse_codigo_tributacao_municipal">Código Complementar Municipal
+                                <?php echo campoInfo('Detalhamento do código nacional específico da sua prefeitura, usado para aplicar a alíquota/benefício correto no seu município. O sistema preenche automaticamente com o código padrão nacional (.001); só troque se sua prefeitura exigir um subcódigo próprio — confira no site dela.'); ?>
+                            </label>
                             <select id="nfse_codigo_tributacao_municipal" name="nfse_codigo_tributacao_municipal">
                                 <option value="">Escolha primeiro o código de tributação nacional</option>
                             </select>
@@ -246,18 +288,24 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         </div>
 
                         <div class="field">
-                            <label for="nfse_item_nbs">NBS do serviço (cNBS)</label>
+                            <label for="nfse_item_nbs">NBS do serviço (cNBS)
+                                <?php echo campoInfo('Código da Nomenclatura Brasileira de Serviços correspondente, exigido pela Reforma Tributária (IBS/CBS). É preenchido automaticamente a partir do código de tributação nacional escolhido acima; se houver mais de uma NBS possível, escolha a que melhor descreve o serviço.'); ?>
+                            </label>
                             <select id="nfse_item_nbs" name="nfse_item_nbs" disabled>
                                 <option value="">Escolha primeiro o serviço prestado</option>
                             </select>
                             <span class="muted" id="nfse_item_nbs_status" style="font-size: 0.78rem;">A NBS será definida conforme a correlação oficial da NFS-e.</span>
                         </div>
                         <div class="field">
-                            <label for="nfse_codigo_interno_contribuinte">Código interno do contribuinte <span class="marca-obrigatoria">*</span></label>
+                            <label for="nfse_codigo_interno_contribuinte">Código interno do contribuinte <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Um código de controle definido por você mesmo (livre), usado internamente para identificar este item de serviço nos seus próprios registros. Não é validado pela prefeitura nem precisa seguir um padrão — pode repetir o próprio código de tributação, por exemplo.'); ?>
+                            </label>
                             <input id="nfse_codigo_interno_contribuinte" name="nfse_codigo_interno_contribuinte" type="text" required placeholder="Seu código de controle interno para este serviço">
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="nfse_descricao_servico">Descrição do serviço <span class="marca-obrigatoria">*</span></label>
+                            <label for="nfse_descricao_servico">Descrição do serviço <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Texto que vai aparecer na nota descrevendo o serviço prestado ao cliente. É sugerido automaticamente ao escolher o código de tributação nacional, mas pode (e deve) ser ajustado para descrever com mais detalhe o que foi feito.'); ?>
+                            </label>
                             <textarea id="nfse_descricao_servico" name="nfse_descricao_servico" maxlength="2000" required placeholder="Descreva o serviço prestado"></textarea>
                         </div>
                     </div>
@@ -269,19 +317,31 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <p class="muted">Pesquise e selecione os códigos das tabelas oficiais. Ao escolher a classificação tributária, o CST correspondente é preenchido automaticamente.</p>
                     <div class="form-grid">
-                        <div class="field"><label for="nfse_ibscbs_finalidade">Finalidade</label><select id="nfse_ibscbs_finalidade" name="nfse_ibscbs_finalidade"><option value="0" selected>0 - NFS-e regular</option><option value="1">1 - Crédito</option><option value="2">2 - Débito</option></select></div>
-                        <div class="field"><label for="nfse_ibscbs_ind_final">Operação com consumidor final?</label><select id="nfse_ibscbs_ind_final" name="nfse_ibscbs_ind_final"><option value="">Selecione</option><option value="0">0 - Não</option><option value="1">1 - Sim</option></select></div>
+                        <div class="field"><label for="nfse_ibscbs_finalidade">Finalidade
+                                <?php echo campoInfo('Indica o propósito desta NFS-e perante o novo modelo do IBS/CBS. Use "0 - NFS-e regular" na grande maioria das emissões normais. As opções "Crédito"/"Débito" são para casos específicos de ajuste, orientados pelo seu contador.'); ?>
+                            </label><select id="nfse_ibscbs_finalidade" name="nfse_ibscbs_finalidade"><option value="0" selected>0 - NFS-e regular</option><option value="1">1 - Crédito</option><option value="2">2 - Débito</option></select></div>
+                        <div class="field"><label for="nfse_ibscbs_ind_final">Operação com consumidor final?
+                                <?php echo campoInfo('Indica se o tomador do serviço é o consumidor final (não vai revender/reaproveitar o serviço na cadeia produtiva) ou não. Para prestação de serviço a pessoas físicas ou empresas que apenas consomem o serviço, normalmente é "Sim".'); ?>
+                            </label><select id="nfse_ibscbs_ind_final" name="nfse_ibscbs_ind_final"><option value="">Selecione</option><option value="0">0 - Não</option><option value="1">1 - Sim</option></select></div>
                         <div class="field catalogo-autocomplete">
-                            <label for="nfse_ibscbs_codigo_indicador_operacao_busca">Código do indicador da operação (cIndOp)</label>
+                            <label for="nfse_ibscbs_codigo_indicador_operacao_busca">Código do indicador da operação (cIndOp)
+                                <?php echo campoInfo('Classifica o tipo de operação sob a ótica do IBS/CBS (ex.: operação padrão, operação com bem imóvel, etc.), conforme a tabela oficial da Reforma Tributária. Pesquise pela descrição do que mais se aproxima do seu caso; na dúvida, consulte seu contador.'); ?>
+                            </label>
                             <input id="nfse_ibscbs_codigo_indicador_operacao_busca" type="search" placeholder="Pesquise pelo código ou descrição" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_ibscbs_codigo_indicador_operacao_opcoes" aria-expanded="false">
                             <input id="nfse_ibscbs_codigo_indicador_operacao" name="nfse_ibscbs_codigo_indicador_operacao" type="hidden">
                             <div id="nfse_ibscbs_codigo_indicador_operacao_opcoes" class="catalogo-sugestoes" role="listbox"></div>
                             <span class="muted" id="nfse_ibscbs_codigo_indicador_operacao_status" style="font-size: 0.78rem;">Selecione uma opção da tabela oficial.</span>
                         </div>
-                        <div class="field"><label for="nfse_ibscbs_ind_destinatario">Indicador do destinatário</label><select id="nfse_ibscbs_ind_destinatario" name="nfse_ibscbs_ind_destinatario"><option value="">Selecione</option><option value="0">0 - Destinatário é o tomador</option><option value="1">1 - Destinatário diferente do tomador</option></select></div>
-                        <div class="field"><label for="nfse_ibscbs_cst">CST IBS/CBS</label><input id="nfse_ibscbs_cst" name="nfse_ibscbs_cst" type="text" inputmode="numeric" pattern="\d{3}" maxlength="3" placeholder="Preenchido pelo cClassTrib" readonly aria-readonly="true"><span class="muted" id="nfse_ibscbs_cst_status" style="font-size: 0.78rem;">Será definido automaticamente.</span></div>
+                        <div class="field"><label for="nfse_ibscbs_ind_destinatario">Indicador do destinatário
+                                <?php echo campoInfo('Indica se quem efetivamente recebe/usa o serviço (o "destinatário" para fins de IBS/CBS) é a mesma pessoa que contratou (o tomador) ou não. No caso comum, é o próprio tomador.'); ?>
+                            </label><select id="nfse_ibscbs_ind_destinatario" name="nfse_ibscbs_ind_destinatario"><option value="">Selecione</option><option value="0">0 - Destinatário é o tomador</option><option value="1">1 - Destinatário diferente do tomador</option></select></div>
+                        <div class="field"><label for="nfse_ibscbs_cst">CST IBS/CBS
+                                <?php echo campoInfo('Código da Situação Tributária do IBS/CBS (tributação normal, isenção, imunidade, etc.). É preenchido automaticamente a partir da Classificação Tributária (cClassTrib) escolhida ao lado — não precisa (e não pode) ser digitado manualmente.'); ?>
+                            </label><input id="nfse_ibscbs_cst" name="nfse_ibscbs_cst" type="text" inputmode="numeric" pattern="\d{3}" maxlength="3" placeholder="Preenchido pelo cClassTrib" readonly aria-readonly="true"><span class="muted" id="nfse_ibscbs_cst_status" style="font-size: 0.78rem;">Será definido automaticamente.</span></div>
                         <div class="field catalogo-autocomplete">
-                            <label for="nfse_ibscbs_classificacao_tributaria_busca">Classificação tributária (cClassTrib)</label>
+                            <label for="nfse_ibscbs_classificacao_tributaria_busca">Classificação tributária (cClassTrib)
+                                <?php echo campoInfo('Detalha a situação tributária específica da operação perante o IBS/CBS (ex.: tributação integral, redução de alíquota, isenção específica). Pesquise pela descrição que melhor corresponde ao seu serviço; ao escolher, o CST correspondente é preenchido automaticamente ao lado.'); ?>
+                            </label>
                             <input id="nfse_ibscbs_classificacao_tributaria_busca" type="search" placeholder="Pesquise pelo código ou descrição" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="nfse_ibscbs_classificacao_tributaria_opcoes" aria-expanded="false">
                             <input id="nfse_ibscbs_classificacao_tributaria" name="nfse_ibscbs_classificacao_tributaria" type="hidden">
                             <div id="nfse_ibscbs_classificacao_tributaria_opcoes" class="catalogo-sugestoes" role="listbox"></div>
@@ -296,19 +356,27 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_documento_responsabilidade_tecnica">Nº do documento de responsabilidade técnica</label>
+                            <label for="nfse_documento_responsabilidade_tecnica">Nº do documento de responsabilidade técnica
+                                <?php echo campoInfo('Opcional. Preencha apenas se o serviço exigir um documento de responsabilidade técnica (ex.: ART/RRT de engenharia e arquitetura, ou similar de outras categorias profissionais regulamentadas).'); ?>
+                            </label>
                             <input id="nfse_documento_responsabilidade_tecnica" name="nfse_documento_responsabilidade_tecnica" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_numero_pedido_b2b">Nº do Pedido/OC/OS/Projeto (B2B)</label>
+                            <label for="nfse_numero_pedido_b2b">Nº do Pedido/OC/OS/Projeto (B2B)
+                                <?php echo campoInfo('Opcional. Número de referência do pedido de compra, ordem de serviço ou projeto do cliente, usado em negociações empresa-a-empresa (B2B) para facilitar a conciliação da nota do lado do cliente.'); ?>
+                            </label>
                             <input id="nfse_numero_pedido_b2b" name="nfse_numero_pedido_b2b" type="text">
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="nfse_documento_referencia">Documento de referência</label>
+                            <label for="nfse_documento_referencia">Documento de referência
+                                <?php echo campoInfo('Opcional. Use para citar um documento relacionado a esta nota — por exemplo, um contrato, uma nota anterior que está sendo complementada/corrigida, ou um número de proposta.'); ?>
+                            </label>
                             <textarea id="nfse_documento_referencia" name="nfse_documento_referencia"></textarea>
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="nfse_informacoes_complementares">Informações complementares</label>
+                            <label for="nfse_informacoes_complementares">Informações complementares
+                                <?php echo campoInfo('Texto livre e opcional que aparece impresso na nota, com qualquer informação adicional útil ao cliente (ex.: condições do serviço, observações contratuais, dados bancários para pagamento).'); ?>
+                            </label>
                             <textarea id="nfse_informacoes_complementares" name="nfse_informacoes_complementares" maxlength="2000"></textarea>
                         </div>
                     </div>
@@ -320,19 +388,27 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_valor_servico">Valor do serviço prestado <span class="marca-obrigatoria">*</span></label>
+                            <label for="nfse_valor_servico">Valor do serviço prestado <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Valor total cobrado pelo serviço, em reais, antes de descontos e retenções. É a base de cálculo principal para o ISSQN e demais tributos da nota.'); ?>
+                            </label>
                             <input id="nfse_valor_servico" name="nfse_valor_servico" type="text" required value="0,00">
                         </div>
                         <div class="field">
-                            <label for="nfse_valor_recebido_intermediario">Valor recebido pelo intermediário</label>
+                            <label for="nfse_valor_recebido_intermediario">Valor recebido pelo intermediário
+                                <?php echo campoInfo('Preencha apenas se esta nota tiver intermediário (seção acima): informe a parte do valor total que ficou com o intermediário/plataforma, e não com você.'); ?>
+                            </label>
                             <input id="nfse_valor_recebido_intermediario" name="nfse_valor_recebido_intermediario" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_desconto_incondicionado">Desconto incondicionado</label>
+                            <label for="nfse_desconto_incondicionado">Desconto incondicionado
+                                <?php echo campoInfo('Desconto dado ao cliente sem exigir nenhuma condição (ex.: desconto à vista já aplicado no preço). Reduz a base de cálculo do ISSQN. Deixe em branco se não houver desconto.'); ?>
+                            </label>
                             <input id="nfse_desconto_incondicionado" name="nfse_desconto_incondicionado" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_desconto_condicionado">Desconto condicionado</label>
+                            <label for="nfse_desconto_condicionado">Desconto condicionado
+                                <?php echo campoInfo('Desconto que depende de uma condição futura do cliente (ex.: pagar até certa data). Diferente do incondicionado, não reduz a base de cálculo do ISSQN. Deixe em branco se não houver.'); ?>
+                            </label>
                             <input id="nfse_desconto_condicionado" name="nfse_desconto_condicionado" type="text">
                         </div>
                     </div>
@@ -344,23 +420,33 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_exigibilidade_suspensa">A exigibilidade do ISSQN está suspensa?</label>
+                            <label for="nfse_exigibilidade_suspensa">A exigibilidade do ISSQN está suspensa?
+                                <?php echo campoInfo('Marque "Sim" apenas se existir uma decisão judicial ou processo administrativo em andamento que suspende a cobrança do ISSQN sobre este serviço. Na maioria absoluta dos casos, deixe "Não".'); ?>
+                            </label>
                             <select id="nfse_exigibilidade_suspensa" name="nfse_exigibilidade_suspensa">
                                 <option value="nao" selected>Não</option>
                                 <option value="sim">Sim</option>
                             </select>
                         </div>
-                        <div class="field"><label for="nfse_tipo_suspensao_issqn">Tipo de suspensão (se suspensa)</label><input id="nfse_tipo_suspensao_issqn" name="nfse_tipo_suspensao_issqn" type="text" maxlength="2" placeholder="Código oficial"></div>
-                        <div class="field"><label for="nfse_numero_processo_suspensao">Número do processo de suspensão</label><input id="nfse_numero_processo_suspensao" name="nfse_numero_processo_suspensao" type="text" maxlength="60"></div>
+                        <div class="field"><label for="nfse_tipo_suspensao_issqn">Tipo de suspensão (se suspensa)
+                                <?php echo campoInfo('Só preencha se marcou "Sim" acima: código oficial que identifica o motivo da suspensão (ex.: liminar, depósito judicial). Consulte seu contador/advogado para o código correto do seu processo.'); ?>
+                            </label><input id="nfse_tipo_suspensao_issqn" name="nfse_tipo_suspensao_issqn" type="text" maxlength="2" placeholder="Código oficial"></div>
+                        <div class="field"><label for="nfse_numero_processo_suspensao">Número do processo de suspensão
+                                <?php echo campoInfo('Só preencha se marcou "Sim" acima: número do processo judicial ou administrativo que motivou a suspensão da exigibilidade do ISSQN.'); ?>
+                            </label><input id="nfse_numero_processo_suspensao" name="nfse_numero_processo_suspensao" type="text" maxlength="60"></div>
                         <div class="field">
-                            <label for="nfse_issqn_retido">Há retenção do ISSQN pelo Tomador ou Intermediário?</label>
+                            <label for="nfse_issqn_retido">Há retenção do ISSQN pelo Tomador ou Intermediário?
+                                <?php echo campoInfo('Marque "Sim" quando é o próprio cliente (tomador) ou o intermediário quem deve reter o ISSQN e recolher direto à prefeitura, em vez de você recolher. Isso costuma acontecer em contratações por empresas de outros municípios ou órgãos públicos — confira o contrato/edital se não tiver certeza.'); ?>
+                            </label>
                             <select id="nfse_issqn_retido" name="nfse_issqn_retido">
                                 <option value="nao" selected>Não</option>
                                 <option value="sim">Sim</option>
                             </select>
                         </div>
                         <div class="field" id="campoIssqnRetidoPor" style="display:none;">
-                            <label for="nfse_issqn_retido_por">Retido por</label>
+                            <label for="nfse_issqn_retido_por">Retido por
+                                <?php echo campoInfo('Indica quem faz a retenção do ISSQN: o próprio tomador (cliente) ou o intermediário da operação.'); ?>
+                            </label>
                             <select id="nfse_issqn_retido_por" name="nfse_issqn_retido_por">
                                 <option value="tomador">Tomador</option>
                                 <option value="intermediario">Intermediário</option>
@@ -381,15 +467,21 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <input id="nfse_percentual_retencao_issqn" name="nfse_percentual_retencao_issqn" type="text" inputmode="decimal" placeholder="Ex.: 2,50" maxlength="6">
                         </div>
                         <div class="field">
-                            <label for="nfse_beneficio_municipal">Este serviço está amparado por algum benefício municipal?</label>
+                            <label for="nfse_beneficio_municipal">Este serviço está amparado por algum benefício municipal?
+                                <?php echo campoInfo('Marque "Sim" se a sua prefeitura concede algum incentivo fiscal específico para este serviço (isenção, redução de alíquota, regime especial). Se não souber, deixe "Não" — a maioria dos serviços não tem benefício específico.'); ?>
+                            </label>
                             <select id="nfse_beneficio_municipal" name="nfse_beneficio_municipal">
                                 <option value="nao" selected>Não</option>
                                 <option value="sim">Sim</option>
                             </select>
                         </div>
-                        <div class="field"><label for="nfse_codigo_beneficio_municipal">Código do benefício municipal (se amparado)</label><input id="nfse_codigo_beneficio_municipal" name="nfse_codigo_beneficio_municipal" type="text" maxlength="30"></div>
+                        <div class="field"><label for="nfse_codigo_beneficio_municipal">Código do benefício municipal (se amparado)
+                                <?php echo campoInfo('Só preencha se marcou "Sim" acima: código oficial do benefício/incentivo fiscal concedido pela sua prefeitura, conforme a legislação municipal.'); ?>
+                            </label><input id="nfse_codigo_beneficio_municipal" name="nfse_codigo_beneficio_municipal" type="text" maxlength="30"></div>
                         <div class="field">
-                            <label for="nfse_deducao_reducao_base">Dedução/redução da base de cálculo do ISSQN (opcional)</label>
+                            <label for="nfse_deducao_reducao_base">Dedução/redução da base de cálculo do ISSQN (opcional)
+                                <?php echo campoInfo('Valor, em reais, que deve ser abatido da base de cálculo do ISSQN antes de aplicar a alíquota — usado em situações específicas previstas na legislação municipal (ex.: dedução de materiais em serviços de construção civil). Deixe em branco se não se aplica ao seu caso.'); ?>
+                            </label>
                             <input id="nfse_deducao_reducao_base" name="nfse_deducao_reducao_base" type="text">
                         </div>
                     </div>
@@ -401,7 +493,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_situacao_pis_cofins">Situação Tributária do PIS/COFINS</label>
+                            <label for="nfse_situacao_pis_cofins">Situação Tributária do PIS/COFINS
+                                <?php echo campoInfo('Classifica como o PIS e a COFINS incidem sobre este serviço. Empresas do Simples Nacional normalmente usam "Sem incidência" ou orientação específica do contador; empresas de Lucro Presumido/Real costumam usar "Tributável (alíquota básica)". Na dúvida, confirme com seu contador.'); ?>
+                            </label>
                             <select id="nfse_situacao_pis_cofins" name="nfse_situacao_pis_cofins">
                                 <option value="">Selecione...</option>
                                 <option value="01">01 - Tributável (alíquota básica)</option>
@@ -413,7 +507,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field">
-                            <label for="nfse_tipo_retencao_pis_cofins_csll">Tipo de retenção do PIS/COFINS/CSLL</label>
+                            <label for="nfse_tipo_retencao_pis_cofins_csll">Tipo de retenção do PIS/COFINS/CSLL
+                                <?php echo campoInfo('Indica se o próprio tomador do serviço é obrigado a reter PIS/COFINS/CSLL na fonte (comum em contratos com órgãos públicos e grandes empresas, conforme a Lei 10.833/2003). Se você não recebe cobrança de retenção do seu cliente, deixe "Sem retenção".'); ?>
+                            </label>
                             <select id="nfse_tipo_retencao_pis_cofins_csll" name="nfse_tipo_retencao_pis_cofins_csll">
                                 <option value="">Selecione...</option>
                                 <option value="nenhuma">Sem retenção</option>
@@ -422,15 +518,21 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field">
-                            <label for="nfse_irrf">IRRF (opcional)</label>
+                            <label for="nfse_irrf">IRRF (opcional)
+                                <?php echo campoInfo('Valor do Imposto de Renda Retido na Fonte sobre este serviço, quando o tomador é obrigado a reter (comum em serviços profissionais prestados a pessoas jurídicas, conforme a legislação do IR). Deixe em branco se não houver retenção.'); ?>
+                            </label>
                             <input id="nfse_irrf" name="nfse_irrf" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_contribuicoes_sociais_retidas">Contribuições Sociais - Retidas (opcional)</label>
+                            <label for="nfse_contribuicoes_sociais_retidas">Contribuições Sociais - Retidas (opcional)
+                                <?php echo campoInfo('Valor total retido de PIS/COFINS/CSLL na fonte pelo tomador, quando aplicável (ver "Tipo de retenção" acima). Deixe em branco se não houver retenção.'); ?>
+                            </label>
                             <input id="nfse_contribuicoes_sociais_retidas" name="nfse_contribuicoes_sociais_retidas" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_contribuicao_previdenciaria_retida">Contribuição Previdenciária - Retida (opcional)</label>
+                            <label for="nfse_contribuicao_previdenciaria_retida">Contribuição Previdenciária - Retida (opcional)
+                                <?php echo campoInfo('Valor do INSS retido na fonte pelo tomador, obrigatório em determinados serviços de cessão de mão de obra (ex.: limpeza, vigilância, construção civil), conforme a legislação previdenciária. Deixe em branco se não se aplica.'); ?>
+                            </label>
                             <input id="nfse_contribuicao_previdenciaria_retida" name="nfse_contribuicao_previdenciaria_retida" type="text">
                         </div>
                     </div>
@@ -442,7 +544,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                     <div class="form-grid">
                         <div class="field">
-                            <label for="nfse_tributos_modo">Como informar</label>
+                            <label for="nfse_tributos_modo">Como informar
+                                <?php echo campoInfo('Escolha a forma mais fácil para você informar o valor aproximado dos tributos, exigido por lei (Lei da Transparência Fiscal) em todo documento fiscal. Se sua empresa é do Simples Nacional, use a opção "Simples Nacional (alíquota única)" e informe só a alíquota do DAS. Nos demais casos, escolha entre percentuais ou valores monetários já calculados.'); ?>
+                            </label>
                             <select id="nfse_tributos_modo" name="nfse_tributos_modo">
                                 <option value="percentuais" selected>Configurar os valores percentuais</option>
                                 <option value="valores">Preencher os valores monetários</option>
@@ -452,30 +556,42 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                     </div>
                     <div class="form-grid" id="tributosPercentuais">
                         <div class="field">
-                            <label for="nfse_tributos_federal_percentual" id="labelTributosFederalPercentual">Federal (%)</label>
+                            <label for="nfse_tributos_federal_percentual" id="labelTributosFederalPercentual">Federal (%)
+                                <?php echo campoInfo('Percentual aproximado de tributos federais embutido no preço do serviço, para fins do aviso de transparência fiscal (Lei 12.741/2012). Se sua empresa é do Simples Nacional, aqui entra a alíquota total do DAS.'); ?>
+                            </label>
                             <input id="nfse_tributos_federal_percentual" name="nfse_tributos_federal_percentual" type="text">
                             <span class="muted" id="statusTributosSimples" style="font-size: 0.78rem; display: none;">Informe a alíquota total do DAS (conforme o Anexo e a faixa de receita da empresa); será enviada como tributo federal aproximado.</span>
                         </div>
                         <div class="field" id="campoTributosEstadualPercentual">
-                            <label for="nfse_tributos_estadual_percentual">Estadual (%)</label>
+                            <label for="nfse_tributos_estadual_percentual">Estadual (%)
+                                <?php echo campoInfo('Percentual aproximado de tributos estaduais embutido no preço, apenas para o aviso de transparência fiscal — na prestação de serviços costuma ser 0, já que o ICMS normalmente não incide sobre serviços.'); ?>
+                            </label>
                             <input id="nfse_tributos_estadual_percentual" name="nfse_tributos_estadual_percentual" type="text">
                         </div>
                         <div class="field" id="campoTributosMunicipalPercentual">
-                            <label for="nfse_tributos_municipal_percentual">Municipal (%)</label>
+                            <label for="nfse_tributos_municipal_percentual">Municipal (%)
+                                <?php echo campoInfo('Percentual aproximado do ISSQN (e demais tributos municipais) embutido no preço do serviço, para fins do aviso de transparência fiscal.'); ?>
+                            </label>
                             <input id="nfse_tributos_municipal_percentual" name="nfse_tributos_municipal_percentual" type="text">
                         </div>
                     </div>
                     <div class="form-grid" id="tributosValores" style="display:none;">
                         <div class="field">
-                            <label for="nfse_tributos_federal_valor">Federal (R$)</label>
+                            <label for="nfse_tributos_federal_valor">Federal (R$)
+                                <?php echo campoInfo('Valor aproximado, em reais, de tributos federais embutido no preço deste serviço, usado no lugar do percentual quando você já tem o valor calculado.'); ?>
+                            </label>
                             <input id="nfse_tributos_federal_valor" name="nfse_tributos_federal_valor" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_tributos_estadual_valor">Estadual (R$)</label>
+                            <label for="nfse_tributos_estadual_valor">Estadual (R$)
+                                <?php echo campoInfo('Valor aproximado, em reais, de tributos estaduais embutido no preço deste serviço.'); ?>
+                            </label>
                             <input id="nfse_tributos_estadual_valor" name="nfse_tributos_estadual_valor" type="text">
                         </div>
                         <div class="field">
-                            <label for="nfse_tributos_municipal_valor">Municipal (R$)</label>
+                            <label for="nfse_tributos_municipal_valor">Municipal (R$)
+                                <?php echo campoInfo('Valor aproximado, em reais, do ISSQN (e demais tributos municipais) embutido no preço deste serviço.'); ?>
+                            </label>
                             <input id="nfse_tributos_municipal_valor" name="nfse_tributos_municipal_valor" type="text">
                         </div>
                     </div>
@@ -1185,20 +1301,23 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
             atualizarVisibilidadeRetencaoIssqn();
         }
 
-        document.querySelectorAll('.info-btn').forEach(function (botaoInfo) {
-            const caixaInfo = document.getElementById(botaoInfo.dataset.infoTarget);
-            if (!caixaInfo) return;
-            botaoInfo.addEventListener('click', function (evento) {
+        // Delegado no document (em vez de vincular botão a botão) para funcionar também
+        // com ícones "i" adicionados depois, em conteúdo gerado dinamicamente.
+        document.addEventListener('click', function (evento) {
+            const botaoInfo = evento.target.closest('.info-btn');
+            if (botaoInfo) {
                 evento.stopPropagation();
+                const wrap = botaoInfo.closest('.info-tooltip-wrap');
+                const caixaInfo = wrap ? wrap.querySelector('.info-tooltip-box') : null;
+                if (!caixaInfo) return;
                 const jaAberta = caixaInfo.classList.contains('aberto');
                 document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (outra) {
-                    outra.classList.remove('aberto');
+                    outra.classList.remove('aberto', 'alinhar-direita');
                 });
                 document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (outroBotao) {
                     outroBotao.setAttribute('aria-expanded', 'false');
                 });
                 if (!jaAberta) {
-                    caixaInfo.classList.remove('alinhar-direita');
                     caixaInfo.classList.add('aberto');
                     botaoInfo.setAttribute('aria-expanded', 'true');
                     const limite = caixaInfo.getBoundingClientRect();
@@ -1206,9 +1325,8 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         caixaInfo.classList.add('alinhar-direita');
                     }
                 }
-            });
-        });
-        document.addEventListener('click', function (evento) {
+                return;
+            }
             if (evento.target.closest('.info-tooltip-wrap')) return;
             document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (caixa) {
                 caixa.classList.remove('aberto');

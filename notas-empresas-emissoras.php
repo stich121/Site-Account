@@ -776,20 +776,23 @@ function rotuloCrt(?int $crt): string
     </div>
 
     <script>
-        document.querySelectorAll('.info-btn').forEach(function (botaoInfo) {
-            const caixaInfo = document.getElementById(botaoInfo.dataset.infoTarget);
-            if (!caixaInfo) return;
-            botaoInfo.addEventListener('click', function (evento) {
+        // Delegado no document (em vez de vincular botão a botão) para funcionar também
+        // com ícones "i" adicionados depois, em conteúdo gerado dinamicamente.
+        document.addEventListener('click', function (evento) {
+            const botaoInfo = evento.target.closest('.info-btn');
+            if (botaoInfo) {
                 evento.stopPropagation();
+                const wrap = botaoInfo.closest('.info-tooltip-wrap');
+                const caixaInfo = wrap ? wrap.querySelector('.info-tooltip-box') : null;
+                if (!caixaInfo) return;
                 const jaAberta = caixaInfo.classList.contains('aberto');
                 document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (outra) {
-                    outra.classList.remove('aberto');
+                    outra.classList.remove('aberto', 'alinhar-direita');
                 });
                 document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (outroBotao) {
                     outroBotao.setAttribute('aria-expanded', 'false');
                 });
                 if (!jaAberta) {
-                    caixaInfo.classList.remove('alinhar-direita');
                     caixaInfo.classList.add('aberto');
                     botaoInfo.setAttribute('aria-expanded', 'true');
                     const limite = caixaInfo.getBoundingClientRect();
@@ -797,9 +800,8 @@ function rotuloCrt(?int $crt): string
                         caixaInfo.classList.add('alinhar-direita');
                     }
                 }
-            });
-        });
-        document.addEventListener('click', function (evento) {
+                return;
+            }
             if (evento.target.closest('.info-tooltip-wrap')) return;
             document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (caixa) {
                 caixa.classList.remove('aberto');

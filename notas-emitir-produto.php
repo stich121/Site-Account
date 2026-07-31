@@ -105,7 +105,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <p class="muted" style="margin-top:0.35rem;font-size:0.78rem;"><?php echo $notaEmEdicao ? 'A empresa emissora não pode ser alterada nesta correção.' : 'Para trocar, use "Emitindo por" no topo da página.'; ?> <a href="notas-empresas-emissoras" style="text-decoration:underline;">Gerenciar empresas emissoras</a>.</p>
                         </div>
                         <div class="field" style="grid-column: 1 / -1;">
-                            <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF</label>
+                            <label for="busca_cliente_documento">Buscar cliente por CNPJ/CPF
+                                <?php echo campoInfo('Atalho para localizar rapidamente um cliente já cadastrado. Digite o CNPJ ou CPF (só números ou formatado) e clique em "Buscar" — se encontrado, ele é selecionado automaticamente no campo "Cliente destinatário" abaixo. Se não existir, cadastre um novo cliente na aba Clientes.'); ?>
+                            </label>
                             <div class="row-actions">
                                 <input id="busca_cliente_documento" type="text" style="flex: 1;" placeholder="Digite o CNPJ ou CPF do cliente já cadastrado">
                                 <button class="btn btn-outline btn-small" type="button" id="btnBuscarClienteDocumento"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
@@ -113,7 +115,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             <span class="muted" id="statusBuscaClienteDocumento" style="font-size: 0.78rem;"></span>
                         </div>
                         <div class="field">
-                            <label for="cliente_id">Cliente destinatário <span class="marca-obrigatoria">*</span></label>
+                            <label for="cliente_id">Cliente destinatário <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Empresa ou pessoa para quem a mercadoria está sendo vendida — quem vai receber a nota fiscal. Escolha um cliente já cadastrado; se ainda não existir, cadastre-o antes em "Clientes".'); ?>
+                            </label>
                             <select id="cliente_id" name="cliente_id" required>
                                 <option value="">Selecione</option>
                                 <?php foreach ($clientes as $cliente): ?>
@@ -122,19 +126,27 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                             </select>
                         </div>
                         <div class="field">
-                            <label for="natureza_operacao">Natureza da operação <span class="marca-obrigatoria">*</span></label>
+                            <label for="natureza_operacao">Natureza da operação <span class="marca-obrigatoria">*</span>
+                                <?php echo campoInfo('Descrição curta do tipo de operação praticada, exigida em toda nota fiscal. Para venda de produtos, use algo direto como "Venda de mercadoria" ou mais específico (ex.: "Venda de mercadoria adquirida de terceiros").'); ?>
+                            </label>
                             <input id="natureza_operacao" name="natureza_operacao" type="text" placeholder="Ex.: Venda de mercadoria" required>
                         </div>
                         <div class="field">
-                            <label for="forma_pagamento">Forma de pagamento (texto livre, opcional)</label>
+                            <label for="forma_pagamento">Forma de pagamento (texto livre, opcional)
+                                <?php echo campoInfo('Campo livre e opcional, só para controle interno/exibição na nota (não é validado pela SEFAZ). Diferente do "código de pagamento" na seção Pagamento abaixo, que é o campo formal exigido na NF-e.'); ?>
+                            </label>
                             <input id="forma_pagamento" name="forma_pagamento" type="text" placeholder="Pix, boleto, cartão...">
                         </div>
                         <div class="field">
-                            <label for="data_emissao">Data de emissão</label>
+                            <label for="data_emissao">Data de emissão
+                                <?php echo campoInfo('Data em que a nota está sendo emitida. Já vem preenchida com a data de hoje; normalmente não precisa alterar.'); ?>
+                            </label>
                             <input id="data_emissao" name="data_emissao" type="date" value="<?php echo h(date('Y-m-d')); ?>">
                         </div>
                         <div class="field">
-                            <label for="data_saida_entrada">Data de saída/entrada</label>
+                            <label for="data_saida_entrada">Data de saída/entrada
+                                <?php echo campoInfo('Data em que a mercadoria efetivamente sai do seu estabelecimento (ou entra, em caso de devolução), quando diferente da data de emissão. Opcional; se não preencher, considera-se a mesma data de emissão.'); ?>
+                            </label>
                             <input id="data_saida_entrada" name="data_saida_entrada" type="date">
                         </div>
                     </div>
@@ -144,7 +156,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                             <div class="form-grid">
                                 <div class="field">
-                                    <label for="nfe_finalidade_emissao">Finalidade de emissão</label>
+                                    <label for="nfe_finalidade_emissao">Finalidade de emissão
+                                        <?php echo campoInfo('Use "Normal" para uma venda comum. "Complementar" corrige/completa uma nota anterior (ex.: faltou cobrar um valor). "Ajuste" serve para acertos formais exigidos pelo Fisco. "Devolução" é usada quando a mercadoria está voltando ao fornecedor. Nas opções diferentes de "Normal", informe a nota original no campo "NF-e referenciada" ao lado.'); ?>
+                                    </label>
                                     <select id="nfe_finalidade_emissao" name="nfe_finalidade_emissao">
                                         <option value="normal">Normal</option>
                                         <option value="complementar">Complementar</option>
@@ -153,7 +167,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     </select>
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_indicador_presenca">Indicador de presença do comprador</label>
+                                    <label for="nfe_indicador_presenca">Indicador de presença do comprador
+                                        <?php echo campoInfo('Indica como o comprador efetuou a compra. Use "Presencial" se o cliente comprou pessoalmente na loja/estabelecimento; "Não presencial, pela internet" para vendas online (padrão para e-commerce); as demais opções cobrem telefone, entrega em domicílio (NFC-e) e outros casos específicos.'); ?>
+                                    </label>
                                     <select id="nfe_indicador_presenca" name="nfe_indicador_presenca">
                                         <option value="0">Não se aplica</option>
                                         <option value="1">Presencial</option>
@@ -165,7 +181,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     </select>
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_referenciada">NF-e referenciada (chave de 44 dígitos)</label>
+                                    <label for="nfe_referenciada">NF-e referenciada (chave de 44 dígitos)
+                                        <?php echo campoInfo('Chave de acesso (44 números) da nota fiscal original relacionada a esta emissão. Obrigatório quando a finalidade acima é "Complementar", "Ajuste" ou "Devolução" — nesses casos, informe a chave da nota que está sendo complementada/ajustada/devolvida.'); ?>
+                                    </label>
                                     <input id="nfe_referenciada" name="nfe_referenciada" type="text" maxlength="44" placeholder="Obrigatório para complementar/devolução">
                                 </div>
                             </div>
@@ -177,7 +195,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                             <div class="form-grid">
                                 <div class="field">
-                                    <label for="nfe_modalidade_frete">Modalidade do frete</label>
+                                    <label for="nfe_modalidade_frete">Modalidade do frete
+                                        <?php echo campoInfo('Define quem paga e é responsável pelo frete. "Sem frete" quando não há transporte cobrado à parte. CIF = por conta de quem emite a nota (você); FOB = por conta do destinatário (cliente). Se marcar qualquer opção diferente de "Sem frete", preencha os dados da transportadora abaixo.'); ?>
+                                    </label>
                                     <select id="nfe_modalidade_frete" name="nfe_modalidade_frete">
                                         <option value="9" selected>Sem frete</option>
                                         <option value="0">Por conta do emitente (CIF)</option>
@@ -188,63 +208,93 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     </select>
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_transportador_nome">Transportadora (nome)</label>
+                                    <label for="nfe_transportador_nome">Transportadora (nome)
+                                        <?php echo campoInfo('Nome ou razão social da empresa/pessoa responsável pelo transporte da mercadoria. Preencha apenas se houver frete.'); ?>
+                                    </label>
                                     <input id="nfe_transportador_nome" name="nfe_transportador_nome" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_transportador_cnpj_cpf">Transportadora (CNPJ/CPF)</label>
+                                    <label for="nfe_transportador_cnpj_cpf">Transportadora (CNPJ/CPF)
+                                        <?php echo campoInfo('Documento de identificação da transportadora.'); ?>
+                                    </label>
                                     <input id="nfe_transportador_cnpj_cpf" name="nfe_transportador_cnpj_cpf" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_transportador_ie">Transportadora (IE)</label>
+                                    <label for="nfe_transportador_ie">Transportadora (IE)
+                                        <?php echo campoInfo('Inscrição Estadual da transportadora, se ela for contribuinte de ICMS. Opcional.'); ?>
+                                    </label>
                                     <input id="nfe_transportador_ie" name="nfe_transportador_ie" type="text">
                                 </div>
                                 <div class="field" style="grid-column: 1 / -1;">
-                                    <label for="nfe_transportador_endereco">Transportadora (endereço)</label>
+                                    <label for="nfe_transportador_endereco">Transportadora (endereço)
+                                        <?php echo campoInfo('Endereço da transportadora. Opcional.'); ?>
+                                    </label>
                                     <input id="nfe_transportador_endereco" name="nfe_transportador_endereco" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_transportador_municipio">Transportadora (município)</label>
+                                    <label for="nfe_transportador_municipio">Transportadora (município)
+                                        <?php echo campoInfo('Município onde a transportadora está estabelecida. Opcional.'); ?>
+                                    </label>
                                     <input id="nfe_transportador_municipio" name="nfe_transportador_municipio" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_transportador_uf">Transportadora (UF)</label>
+                                    <label for="nfe_transportador_uf">Transportadora (UF)
+                                        <?php echo campoInfo('Sigla do estado (2 letras) onde a transportadora está estabelecida.'); ?>
+                                    </label>
                                     <input id="nfe_transportador_uf" name="nfe_transportador_uf" type="text" maxlength="2" style="text-transform:uppercase;">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_veiculo_placa">Veículo (placa)</label>
+                                    <label for="nfe_veiculo_placa">Veículo (placa)
+                                        <?php echo campoInfo('Placa do veículo que vai transportar a mercadoria. Preencha apenas se houver frete e você souber o veículo no momento da emissão.'); ?>
+                                    </label>
                                     <input id="nfe_veiculo_placa" name="nfe_veiculo_placa" type="text" maxlength="10">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_veiculo_uf">Veículo (UF)</label>
+                                    <label for="nfe_veiculo_uf">Veículo (UF)
+                                        <?php echo campoInfo('Estado (UF) de emplacamento do veículo transportador.'); ?>
+                                    </label>
                                     <input id="nfe_veiculo_uf" name="nfe_veiculo_uf" type="text" maxlength="2" style="text-transform:uppercase;">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_veiculo_rntc">Veículo (RNTC)</label>
+                                    <label for="nfe_veiculo_rntc">Veículo (RNTC)
+                                        <?php echo campoInfo('Registro Nacional de Transportador Rodoviário de Cargas do veículo/transportadora, quando aplicável. Opcional.'); ?>
+                                    </label>
                                     <input id="nfe_veiculo_rntc" name="nfe_veiculo_rntc" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_volumes_quantidade">Volumes (quantidade)</label>
+                                    <label for="nfe_volumes_quantidade">Volumes (quantidade)
+                                        <?php echo campoInfo('Quantidade de volumes (caixas, pacotes, paletes) em que a mercadoria foi embalada para transporte.'); ?>
+                                    </label>
                                     <input id="nfe_volumes_quantidade" name="nfe_volumes_quantidade" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_volumes_especie">Volumes (espécie)</label>
+                                    <label for="nfe_volumes_especie">Volumes (espécie)
+                                        <?php echo campoInfo('Tipo de embalagem usada no transporte (ex.: "Caixa", "Fardo", "Palete").'); ?>
+                                    </label>
                                     <input id="nfe_volumes_especie" name="nfe_volumes_especie" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_volumes_marca">Volumes (marca)</label>
+                                    <label for="nfe_volumes_marca">Volumes (marca)
+                                        <?php echo campoInfo('Marca de identificação impressa nos volumes transportados, se houver. Opcional.'); ?>
+                                    </label>
                                     <input id="nfe_volumes_marca" name="nfe_volumes_marca" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_volumes_numeracao">Volumes (numeração)</label>
+                                    <label for="nfe_volumes_numeracao">Volumes (numeração)
+                                        <?php echo campoInfo('Numeração de identificação dos volumes, se houver (ex.: "1/3", "2/3"). Opcional.'); ?>
+                                    </label>
                                     <input id="nfe_volumes_numeracao" name="nfe_volumes_numeracao" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_volumes_peso_liquido">Peso líquido (kg)</label>
+                                    <label for="nfe_volumes_peso_liquido">Peso líquido (kg)
+                                        <?php echo campoInfo('Peso da mercadoria sem contar a embalagem, em quilogramas.'); ?>
+                                    </label>
                                     <input id="nfe_volumes_peso_liquido" name="nfe_volumes_peso_liquido" type="text">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_volumes_peso_bruto">Peso bruto (kg)</label>
+                                    <label for="nfe_volumes_peso_bruto">Peso bruto (kg)
+                                        <?php echo campoInfo('Peso total transportado, incluindo a embalagem, em quilogramas.'); ?>
+                                    </label>
                                     <input id="nfe_volumes_peso_bruto" name="nfe_volumes_peso_bruto" type="text">
                                 </div>
                             </div>
@@ -256,7 +306,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <div class="form-section-corpo">
                             <div class="form-grid">
                                 <div class="field">
-                                    <label for="nfe_forma_pagamento_codigo">Forma de pagamento (código NF-e)</label>
+                                    <label for="nfe_forma_pagamento_codigo">Forma de pagamento (código NF-e)
+                                        <?php echo campoInfo('Código oficial da forma de pagamento exigido pela SEFAZ (diferente do campo de texto livre no topo da página). Escolha a opção que corresponde a como o cliente pagou ou vai pagar; use "Sem pagamento" quando não há valor a receber nesta operação (ex.: bonificação, amostra grátis).'); ?>
+                                    </label>
                                     <select id="nfe_forma_pagamento_codigo" name="nfe_forma_pagamento_codigo">
                                         <option value="90" selected>Sem pagamento</option>
                                         <option value="01">Dinheiro</option>
@@ -276,7 +328,9 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     </select>
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_indicador_pagamento">Indicador de pagamento</label>
+                                    <label for="nfe_indicador_pagamento">Indicador de pagamento
+                                        <?php echo campoInfo('Indica se o pagamento é feito de uma vez ("À vista"), parcelado/faturado ("A prazo") ou outra condição.'); ?>
+                                    </label>
                                     <select id="nfe_indicador_pagamento" name="nfe_indicador_pagamento">
                                         <option value="0" selected>À vista</option>
                                         <option value="1">A prazo</option>
@@ -284,11 +338,15 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                                     </select>
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_valor_pago">Valor pago (opcional, padrão = total da nota)</label>
+                                    <label for="nfe_valor_pago">Valor pago (opcional, padrão = total da nota)
+                                        <?php echo campoInfo('Valor efetivamente recebido do cliente. Deixe em branco para usar automaticamente o total da nota (caso mais comum, quando o valor pago é igual ao valor da venda).'); ?>
+                                    </label>
                                     <input id="nfe_valor_pago" name="nfe_valor_pago" type="text" placeholder="0,00">
                                 </div>
                                 <div class="field">
-                                    <label for="nfe_valor_troco">Troco</label>
+                                    <label for="nfe_valor_troco">Troco
+                                        <?php echo campoInfo('Valor do troco devolvido ao cliente, quando o pagamento em dinheiro for maior que o total da nota. Deixe "0,00" se não houver troco.'); ?>
+                                    </label>
                                     <input id="nfe_valor_troco" name="nfe_valor_troco" type="text" value="0,00">
                                 </div>
                             </div>
@@ -410,11 +468,15 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         <summary><span class="form-section-titulo"><i class="fa-solid fa-note-sticky"></i> Informações complementares</span><i class="fa-solid fa-chevron-down"></i></summary>
                         <div class="form-section-corpo">
                             <div class="field">
-                                <label for="nfe_informacoes_complementares">Informações complementares de interesse do contribuinte</label>
+                                <label for="nfe_informacoes_complementares">Informações complementares de interesse do contribuinte
+                                    <?php echo campoInfo('Texto livre e opcional que aparece impresso na nota, com qualquer informação adicional útil ao cliente (ex.: condições comerciais, dados bancários, garantia dos produtos, número de contrato).'); ?>
+                                </label>
                                 <textarea id="nfe_informacoes_complementares" name="nfe_informacoes_complementares"></textarea>
                             </div>
                             <div class="field">
-                                <label for="informacoes_frete">Observações de frete/transporte (texto livre, opcional)</label>
+                                <label for="informacoes_frete">Observações de frete/transporte (texto livre, opcional)
+                                    <?php echo campoInfo('Espaço livre para detalhes extras sobre o transporte que não couberam nos campos específicos da seção Transporte acima (ex.: instruções de entrega, horário preferencial).'); ?>
+                                </label>
                                 <textarea id="informacoes_frete" name="informacoes_frete" placeholder="Observações adicionais sobre o transporte..."></textarea>
                             </div>
                         </div>
@@ -432,6 +494,50 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
     <script>
         const dadosRestaurar = <?php echo $restaurarJson; ?>;
         const dadosEdicaoNota = <?php echo $edicaoJson; ?>;
+
+        // Monta o ícone "i" informativo para uso dentro dos templates de item gerados por
+        // JS (mesmo padrão visual do campoInfo() em PHP, usado nos campos fixos da página).
+        function infoIcon(textoHtml) {
+            return '<span class="info-tooltip-wrap">' +
+                '<button type="button" class="info-btn" aria-expanded="false" aria-label="Mais informações sobre este campo"><i class="fa-solid fa-info"></i></button>' +
+                '<span class="info-tooltip-box" role="tooltip">' + textoHtml + '</span>' +
+                '</span>';
+        }
+
+        // Delegado no document (em vez de vincular botão a botão) para funcionar também
+        // com ícones "i" adicionados depois, quando um novo item é incluído na nota.
+        document.addEventListener('click', function (evento) {
+            const botaoInfo = evento.target.closest('.info-btn');
+            if (botaoInfo) {
+                evento.stopPropagation();
+                const wrap = botaoInfo.closest('.info-tooltip-wrap');
+                const caixaInfo = wrap ? wrap.querySelector('.info-tooltip-box') : null;
+                if (!caixaInfo) return;
+                const jaAberta = caixaInfo.classList.contains('aberto');
+                document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (outra) {
+                    outra.classList.remove('aberto', 'alinhar-direita');
+                });
+                document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (outroBotao) {
+                    outroBotao.setAttribute('aria-expanded', 'false');
+                });
+                if (!jaAberta) {
+                    caixaInfo.classList.add('aberto');
+                    botaoInfo.setAttribute('aria-expanded', 'true');
+                    const limite = caixaInfo.getBoundingClientRect();
+                    if (limite.right > window.innerWidth - 12) {
+                        caixaInfo.classList.add('alinhar-direita');
+                    }
+                }
+                return;
+            }
+            if (evento.target.closest('.info-tooltip-wrap')) return;
+            document.querySelectorAll('.info-tooltip-box.aberto').forEach(function (caixa) {
+                caixa.classList.remove('aberto');
+            });
+            document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (botao) {
+                botao.setAttribute('aria-expanded', 'false');
+            });
+        });
 
         function restaurarCamposSimplesDoErro() {
             if (!dadosRestaurar) return;
@@ -846,46 +952,46 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '</div>' +
                 '<div class="form-grid">' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>Catálogo (opcional)</label>' +
+                        '<label>Catálogo (opcional)' + infoIcon('Se você já vendeu este produto antes, escolha-o aqui para preencher automaticamente descrição, NCM, CFOP, unidade, valor e demais dados fiscais salvos. Deixe em "Digitar manualmente" para um produto novo.') + '</label>' +
                         '<select class="item-catalogo">' + montarOpcoesCatalogo(empresaId) + '</select>' +
                     '</div>' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>Descrição <span class="marca-obrigatoria">*</span></label>' +
+                        '<label>Descrição <span class="marca-obrigatoria">*</span>' + infoIcon('Nome/descrição do produto como vai aparecer na nota fiscal para o cliente. Seja específico o suficiente para identificar o item (ex.: "Camiseta algodão P branca", não só "Camiseta").') + '</label>' +
                         '<input type="text" name="item_descricao[]" class="item-descricao" list="datalistItensDescricao" autocomplete="off" required>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>NCM</label>' +
+                        '<label>NCM' + infoIcon('Código da Nomenclatura Comum do Mercosul que classifica fiscalmente o produto (8 dígitos) — define a tributação (ICMS, IPI, PIS/COFINS) aplicável. Digite o código ou o nome do produto para buscar na lista oficial.') + '</label>' +
                         '<input type="text" name="item_ncm[]" class="item-ncm" maxlength="10" placeholder="Digite o código ou o nome do produto" inputmode="numeric" list="datalistNcm" autocomplete="off">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>CFOP</label>' +
+                        '<label>CFOP' + infoIcon('Código Fiscal de Operações e Prestações: identifica a natureza da operação (venda dentro do estado, para outro estado, devolução, etc.). Para venda comum dentro do seu estado, o mais usual é 5102; para outro estado, 6102 — confirme com seu contador se tiver dúvida.') + '</label>' +
                         '<input type="text" name="item_cfop[]" class="item-cfop" list="datalistCfop" autocomplete="off" placeholder="Ex.: 5102">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>cEAN</label>' +
+                        '<label>cEAN' + infoIcon('Código de barras (GTIN/EAN) do produto, se ele tiver um. Opcional — deixe em branco se o produto não tem código de barras.') + '</label>' +
                         '<input type="text" name="item_cean[]" class="item-cean" placeholder="Opcional">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Unidade</label>' +
+                        '<label>Unidade' + infoIcon('Unidade de medida do produto (ex.: UN para unidade, KG para quilo, CX para caixa, L para litro).') + '</label>' +
                         '<input type="text" name="item_unidade[]" class="item-unidade" value="UN">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Quantidade</label>' +
+                        '<label>Quantidade' + infoIcon('Quantas unidades deste produto estão sendo vendidas nesta nota.') + '</label>' +
                         '<input type="text" name="item_quantidade[]" class="item-quantidade" value="1">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Valor unitário</label>' +
+                        '<label>Valor unitário' + infoIcon('Preço de venda de uma unidade do produto, em reais. O valor total do item (quantidade × valor unitário) é calculado automaticamente.') + '</label>' +
                         '<input type="text" name="item_valor_unitario[]" class="item-valor" value="0,00">' +
                     '</div>' +
                 '</div>' +
                 '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-scale-balanced"></i> ICMS</h3>' +
                 '<div class="form-grid">' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>Situação tributária</label>' +
+                        '<label>Situação tributária' + infoIcon('Código de Situação Tributária (CST) ou CSOSN do ICMS para este produto, conforme o regime tributário da sua empresa (o formulário já mostra a lista certa — CST ou CSOSN — de acordo com o CRT cadastrado). Já vem com um valor padrão comum preenchido; ajuste se este produto tiver tratamento diferente (isenção, substituição tributária, etc.).') + '</label>' +
                         '<select name="item_cst[]" class="item-cst">' + opcoesCstIcmsHtml + '</select>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Origem da mercadoria</label>' +
+                        '<label>Origem da mercadoria' + infoIcon('Indica se o produto é nacional ou importado (e como foi importado). Para produtos fabricados no Brasil com menos de 40% de insumo importado, use "0 Nacional".') + '</label>' +
                         '<select name="item_icms_origem[]" class="item-icms-origem">' +
                             '<option value="0" selected>0 Nacional</option>' +
                             '<option value="1">1 Estrangeira - importação direta</option>' +
@@ -899,7 +1005,7 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                         '</select>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota ICMS (%)</label>' +
+                        '<label>Alíquota ICMS (%)' + infoIcon('Percentual de ICMS aplicado sobre o valor deste item, conforme a legislação do seu estado para este tipo de produto. O valor de imposto calculado aparece logo abaixo do campo.') + '</label>' +
                         '<input type="text" name="item_icms_aliquota[]" class="item-icms-aliquota" value="0">' +
                         '<span class="valor-calculado item-icms-valor-calc">R$ 0,00</span>' +
                     '</div>' +
@@ -907,11 +1013,11 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-industry"></i> IPI</h3>' +
                 '<div class="form-grid">' +
                     '<div class="field">' +
-                        '<label>IPI - CST</label>' +
+                        '<label>IPI - CST' + infoIcon('Situação tributária do IPI para este produto. Só se aplica a produtos industrializados; a maioria dos comerciantes que apenas revende (não industrializa) pode deixar em branco.') + '</label>' +
                         '<input type="text" name="item_ipi_cst[]" class="item-ipi-cst" placeholder="Opcional">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota IPI (%)</label>' +
+                        '<label>Alíquota IPI (%)' + infoIcon('Percentual de IPI aplicado sobre este item, quando aplicável (produto industrializado sujeito ao imposto). Deixe 0 se não houver incidência de IPI.') + '</label>' +
                         '<input type="text" name="item_ipi_aliquota[]" class="item-ipi-aliquota" value="0">' +
                         '<span class="valor-calculado item-ipi-valor-calc">R$ 0,00</span>' +
                     '</div>' +
@@ -919,20 +1025,20 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '<h3 style="margin-top: 1rem;"><i class="fa-solid fa-sack-dollar"></i> PIS e COFINS</h3>' +
                 '<div class="form-grid">' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>Situação tributária do PIS</label>' +
+                        '<label>Situação tributária do PIS' + infoIcon('Classifica como o PIS incide sobre este item. Empresas do Simples Nacional costumam usar código de "Outras operações" (99), já pré-selecionado; empresas de Lucro Presumido/Real normalmente usam "Tributável (alíquota normal)" (01). Confirme com seu contador se tiver dúvida.') + '</label>' +
                         '<select name="item_pis_cst[]" class="item-pis-cst">' + opcoesCstPisCofinsHtml + '</select>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota PIS (%)</label>' +
+                        '<label>Alíquota PIS (%)' + infoIcon('Percentual de PIS aplicado sobre este item, quando aplicável.') + '</label>' +
                         '<input type="text" name="item_pis_aliquota[]" class="item-pis-aliquota" value="0">' +
                         '<span class="valor-calculado item-pis-valor-calc">R$ 0,00</span>' +
                     '</div>' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>Situação tributária do COFINS</label>' +
+                        '<label>Situação tributária do COFINS' + infoIcon('Mesma lógica do PIS acima, aplicada à COFINS. Costuma acompanhar a mesma situação tributária escolhida para o PIS.') + '</label>' +
                         '<select name="item_cofins_cst[]" class="item-cofins-cst">' + opcoesCstPisCofinsHtml + '</select>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota COFINS (%)</label>' +
+                        '<label>Alíquota COFINS (%)' + infoIcon('Percentual de COFINS aplicado sobre este item, quando aplicável.') + '</label>' +
                         '<input type="text" name="item_cofins_aliquota[]" class="item-cofins-aliquota" value="0">' +
                         '<span class="valor-calculado item-cofins-valor-calc">R$ 0,00</span>' +
                     '</div>' +
@@ -941,32 +1047,32 @@ require_once __DIR__ . '/includes/notas-emitir-motor.php';
                 '<p class="muted" style="font-size:0.78rem;margin-bottom:0.75rem;">Deixe "Situação tributária" em branco se este item ainda não deve informar IBS/CBS. Em 2026 a SEFAZ exige as alíquotas-teste fixas (0,1% IBS Estadual, 0% IBS Municipal, 0,9% CBS) — por isso ficam bloqueadas para edição; o servidor também força esses valores ao salvar, mesmo que o campo seja alterado manualmente na requisição.</p>' +
                 '<div class="form-grid">' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>CST do IBS/CBS</label>' +
+                        '<label>CST do IBS/CBS' + infoIcon('Código da Situação Tributária do IBS/CBS para este item (tributação normal, isenção, imunidade, etc.), conforme a nova Reforma Tributária. Deixe em "Não informar" se este item ainda não deve declarar IBS/CBS. Ao escolher, as opções de cClassTrib abaixo são filtradas de acordo.') + '</label>' +
                         '<select class="item-ibscbs-cst">' + opcoesIbscbsCstHtml + '</select>' +
                     '</div>' +
                     '<div class="field" style="grid-column: 1 / -1;">' +
-                        '<label>cClassTrib (Código de Classificação Tributária)</label>' +
+                        '<label>cClassTrib (Código de Classificação Tributária)' + infoIcon('Detalha a situação tributária específica do item perante o IBS/CBS. As opções aqui dependem do CST escolhido acima — selecione o CST primeiro.') + '</label>' +
                         '<select name="item_ibscbs_cclasstrib[]" class="item-ibscbs-cclasstrib">' +
                             '<option value="">Selecione o CST primeiro</option>' +
                         '</select>' +
                         '<input type="hidden" name="item_ibscbs_cst[]" class="item-ibscbs-cst-hidden">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Base de cálculo</label>' +
+                        '<label>Base de cálculo' + infoIcon('Valor sobre o qual o IBS/CBS deste item é calculado. Deixe em branco para usar automaticamente o valor total do item (quantidade × valor unitário) — só preencha se a base de cálculo for diferente por alguma regra específica.') + '</label>' +
                         '<input type="text" name="item_ibscbs_base_calculo[]" class="item-ibscbs-base" placeholder="Padrão: valor do item">' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota IBS Estadual (%)</label>' +
+                        '<label>Alíquota IBS Estadual (%)' + infoIcon('Alíquota-teste fixa definida pela SEFAZ para 2026 (Lei Complementar 214/2025, art. 346): 0,1%. Não é editável — o servidor sempre aplica esse valor, independente do que for enviado.') + '</label>' +
                         '<input type="text" name="item_ibs_uf_aliquota[]" class="item-ibs-uf-aliquota" value="0.1" readonly>' +
                         '<span class="valor-calculado item-ibs-uf-valor-calc">R$ 0,00</span>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota IBS Municipal (%)</label>' +
+                        '<label>Alíquota IBS Municipal (%)' + infoIcon('Alíquota-teste fixa definida pela SEFAZ para 2026: 0%. Não é editável — o servidor sempre aplica esse valor.') + '</label>' +
                         '<input type="text" name="item_ibs_mun_aliquota[]" class="item-ibs-mun-aliquota" value="0" readonly>' +
                         '<span class="valor-calculado item-ibs-mun-valor-calc">R$ 0,00</span>' +
                     '</div>' +
                     '<div class="field">' +
-                        '<label>Alíquota CBS (%)</label>' +
+                        '<label>Alíquota CBS (%)' + infoIcon('Alíquota-teste fixa definida pela SEFAZ para 2026: 0,9%. Não é editável — o servidor sempre aplica esse valor.') + '</label>' +
                         '<input type="text" name="item_cbs_aliquota[]" class="item-cbs-aliquota" value="0.9" readonly>' +
                         '<span class="valor-calculado item-cbs-valor-calc">R$ 0,00</span>' +
                     '</div>' +
