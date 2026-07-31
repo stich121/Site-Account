@@ -627,7 +627,9 @@ function linkFiltroNotas(array $sobrescrever, string $filtroStatus, int $filtroE
 
 function buscarNotaFiscalCompleta(PDO $db, int $notaId): ?array
 {
-    $stmt = $db->prepare('SELECT n.*, e.razao_social AS empresa_razao_social, e.cnpj AS empresa_cnpj, e.inscricao_estadual AS empresa_ie, e.municipio AS empresa_municipio, e.uf AS empresa_uf, e.crt AS empresa_crt, e.ambiente_emissao AS empresa_ambiente_emissao, e.certificado_arquivo, e.certificado_senha_cifrada, c.nome_razao_social AS cliente_nome, c.cnpj_cpf AS cliente_documento, c.municipio AS cliente_municipio, c.uf AS cliente_uf FROM notas_fiscais n INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id INNER JOIN notas_clientes c ON c.id = n.cliente_id WHERE n.id = :id LIMIT 1');
+    // tipo_nota != 'nfce': a NFC-e (venda no balcão) tem página própria (notas-nfce-vendas.php)
+    // e nunca deve aparecer nem ser operável por aqui.
+    $stmt = $db->prepare('SELECT n.*, e.razao_social AS empresa_razao_social, e.cnpj AS empresa_cnpj, e.inscricao_estadual AS empresa_ie, e.municipio AS empresa_municipio, e.uf AS empresa_uf, e.crt AS empresa_crt, e.ambiente_emissao AS empresa_ambiente_emissao, e.certificado_arquivo, e.certificado_senha_cifrada, c.nome_razao_social AS cliente_nome, c.cnpj_cpf AS cliente_documento, c.municipio AS cliente_municipio, c.uf AS cliente_uf FROM notas_fiscais n INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id INNER JOIN notas_clientes c ON c.id = n.cliente_id WHERE n.id = :id AND n.tipo_nota != \'nfce\' LIMIT 1');
     $stmt->execute(['id' => $notaId]);
     return $stmt->fetch() ?: null;
 }
@@ -914,7 +916,7 @@ try {
             exit;
         }
 
-        $whereZip = ["n.status = 'autorizada'", 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim', 'n.empresa_emissora_id = :empresa_emissora_id'];
+        $whereZip = ["n.status = 'autorizada'", "n.tipo_nota != 'nfce'", 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim', 'n.empresa_emissora_id = :empresa_emissora_id'];
         $bindZip = ['mes_inicio' => $dataInicioZip, 'mes_fim' => $dataFimZip, 'empresa_emissora_id' => $empresaEmissoraAtivaId];
         if (!$podeAdministrar) {
             $whereZip[] = 'n.funcionario_id = :funcionario_id';
@@ -1117,7 +1119,7 @@ try {
             [$filtroDataInicio, $filtroDataFim] = [$filtroDataFim, $filtroDataInicio];
         }
     }
-    $where = [];
+    $where = ["n.tipo_nota != 'nfce'"];
     $bind = [];
     if (!$podeAdministrar) {
         $where[] = 'n.funcionario_id = :funcionario_id';

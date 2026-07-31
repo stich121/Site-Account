@@ -21,6 +21,7 @@
     </button>
     <div class="menu-dropdown" id="menuDropdown">
         <a class="btn btn-outline" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas</a>
+        <a class="btn btn-outline" href="notas-nfce-vendas"><i class="fa-solid fa-cash-register"></i> NFC-e (venda no balcão)</a>
         <a class="btn btn-outline" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
         <a class="btn btn-outline" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
         <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Enviar fila NFS-e</a>
