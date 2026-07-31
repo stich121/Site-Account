@@ -666,11 +666,29 @@ try {
         exit;
     }
 
+    // Cada empresa emissora só pode ver as próprias notas: a listagem (e o ZIP do período,
+    // mais abaixo) ficam sempre travados na empresa ativa da sessão ("Emitindo por", no topo),
+    // nunca num id arbitrário vindo da URL. Mesma resolução de includes/notas-nav.php.
+    $idsEmpresasAtivas = array_map(
+        'intval',
+        array_column($dbNotas->query('SELECT id FROM empresas_emissoras WHERE ativo = 1')->fetchAll(), 'id')
+    );
+    if (
+        empty($_SESSION['nfse_empresa_emissora_ativa_id'])
+        || !in_array((int) $_SESSION['nfse_empresa_emissora_ativa_id'], $idsEmpresasAtivas, true)
+    ) {
+        $_SESSION['nfse_empresa_emissora_ativa_id'] = $idsEmpresasAtivas[0] ?? 0;
+    }
+    $empresaEmissoraAtivaId = (int) $_SESSION['nfse_empresa_emissora_ativa_id'];
+    $stmtEmpresaAtiva = $dbNotas->prepare('SELECT razao_social FROM empresas_emissoras WHERE id = :id LIMIT 1');
+    $stmtEmpresaAtiva->execute(['id' => $empresaEmissoraAtivaId]);
+    $empresaEmissoraAtivaNome = (string) ($stmtEmpresaAtiva->fetchColumn() ?: '');
+
     // Documentos fiscais: somente notas autorizadas e dentro do escopo do usuário.
     if (isset($_GET['xml']) || isset($_GET['danfse']) || isset($_GET['danfe'])) {
         $notaId = (int) ($_GET['xml'] ?? $_GET['danfse'] ?? $_GET['danfe']);
         $notaDocumento = buscarNotaFiscalCompleta($dbNotas, $notaId);
-        if (!$notaDocumento || (!$podeAdministrar && (int) $notaDocumento['funcionario_id'] !== $funcionarioId)) {
+        if (!$notaDocumento || (int) $notaDocumento['empresa_emissora_id'] !== $empresaEmissoraAtivaId || (!$podeAdministrar && (int) $notaDocumento['funcionario_id'] !== $funcionarioId)) {
             http_response_code(404);
             echo 'Nota não encontrada.';
             exit;
@@ -760,7 +778,7 @@ try {
         $stmt->execute(['id' => $notaId]);
         $nota = $stmt->fetch();
 
-        if (!$nota || (!$podeAdministrar && (int) $nota['funcionario_id'] !== $funcionarioId)) {
+        if (!$nota || (int) $nota['empresa_emissora_id'] !== $empresaEmissoraAtivaId || (!$podeAdministrar && (int) $nota['funcionario_id'] !== $funcionarioId)) {
             http_response_code(404);
             echo 'Nota não encontrada.';
             exit;
@@ -896,17 +914,11 @@ try {
             exit;
         }
 
-        $empresaZipId = (int) ($_GET['empresa_emissora_id'] ?? 0);
-
-        $whereZip = ["n.status = 'autorizada'", 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim'];
-        $bindZip = ['mes_inicio' => $dataInicioZip, 'mes_fim' => $dataFimZip];
+        $whereZip = ["n.status = 'autorizada'", 'n.data_emissao BETWEEN :mes_inicio AND :mes_fim', 'n.empresa_emissora_id = :empresa_emissora_id'];
+        $bindZip = ['mes_inicio' => $dataInicioZip, 'mes_fim' => $dataFimZip, 'empresa_emissora_id' => $empresaEmissoraAtivaId];
         if (!$podeAdministrar) {
             $whereZip[] = 'n.funcionario_id = :funcionario_id';
             $bindZip['funcionario_id'] = $funcionarioId;
-        }
-        if ($empresaZipId > 0) {
-            $whereZip[] = 'n.empresa_emissora_id = :empresa_emissora_id';
-            $bindZip['empresa_emissora_id'] = $empresaZipId;
         }
 
         $stmtZip = $dbNotas->prepare(
@@ -999,7 +1011,7 @@ try {
         } else {
             try {
                 $notaAtual = buscarNotaFiscalCompleta($dbNotas, $notaId);
-                if (!$notaAtual || (!$podeAdministrar && (int) $notaAtual['funcionario_id'] !== $funcionarioId)) {
+                if (!$notaAtual || (int) $notaAtual['empresa_emissora_id'] !== $empresaEmissoraAtivaId || (!$podeAdministrar && (int) $notaAtual['funcionario_id'] !== $funcionarioId)) {
                     $erro = 'Nota não encontrada.';
                 } elseif ($acao === 'marcar_pendente' && $notaAtual['status'] === 'rascunho') {
                     $dbNotas->prepare('UPDATE notas_fiscais SET status = \'pendente_envio\', motivo_rejeicao = NULL WHERE id = :id AND status = \'rascunho\'')->execute(['id' => $notaId]);
@@ -1085,7 +1097,7 @@ try {
         }
     }
     $filtroStatus = trim($_GET['status'] ?? '');
-    $filtroEmpresaId = (int) ($_GET['empresa_emissora_id'] ?? 0);
+    $filtroEmpresaId = $empresaEmissoraAtivaId;
     $dataValidaFiltro = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1 && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
     // Sem "data_inicio"/"data_fim" na URL: mes atual por padrao. Com os dois vazios
     // (link "Ver todos os períodos"): sem filtro de data.
@@ -1115,10 +1127,11 @@ try {
         $where[] = 'n.status = :status';
         $bind['status'] = $filtroStatus;
     }
-    if ($filtroEmpresaId > 0) {
-        $where[] = 'n.empresa_emissora_id = :empresa_emissora_id';
-        $bind['empresa_emissora_id'] = $filtroEmpresaId;
-    }
+    // Sempre trava na empresa ativa da sessão (nunca vem de $_GET): cada empresa só vê as
+    // próprias notas. $filtroEmpresaId fica 0 só se não houver nenhuma empresa emissora ativa
+    // cadastrada, e aí a comparação abaixo intencionalmente não bate com nenhuma nota.
+    $where[] = 'n.empresa_emissora_id = :empresa_emissora_id';
+    $bind['empresa_emissora_id'] = $filtroEmpresaId;
     if ($filtroDataInicio !== '' && $filtroDataFim !== '') {
         $where[] = 'n.data_emissao BETWEEN :data_inicio AND :data_fim';
         $bind['data_inicio'] = $filtroDataInicio;
@@ -1131,9 +1144,6 @@ try {
         $bind['data_fim'] = $filtroDataFim;
     }
     $sqlWhere = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
-
-    $stmt = $dbNotas->query('SELECT id, razao_social FROM empresas_emissoras WHERE ativo = 1 ORDER BY razao_social ASC');
-    $empresasEmissorasFiltro = $stmt->fetchAll();
 
     $notasPorPagina = 50;
     $stmtTotal = $dbNotas->prepare('SELECT COUNT(*) FROM notas_fiscais n ' . $sqlWhere);
@@ -1239,17 +1249,11 @@ $usuario = h(nomeExibicao($usuarioRaw));
 
         <section class="panel">
             <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-                <h2 style="margin-bottom:0;"><i class="fa-solid fa-list-check"></i> <?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?></h2>
+                <h2 style="margin-bottom:0;"><i class="fa-solid fa-list-check"></i> <?php echo $podeAdministrar ? 'Todas as notas' : 'Minhas notas'; ?> <span class="muted" style="font-weight:400; text-transform:none;">— <?php echo h($empresaEmissoraAtivaNome !== '' ? $empresaEmissoraAtivaNome : 'nenhuma empresa selecionada'); ?></span></h2>
                 <form method="get" class="row-actions">
                     <input class="select-filtro" type="date" name="data_inicio" value="<?php echo h($filtroDataInicio); ?>" onchange="this.form.submit()" aria-label="Data inicial">
                     <span class="muted">até</span>
                     <input class="select-filtro" type="date" name="data_fim" value="<?php echo h($filtroDataFim); ?>" onchange="this.form.submit()" aria-label="Data final">
-                    <select class="select-filtro" name="empresa_emissora_id" onchange="this.form.submit()">
-                        <option value="">Todas as empresas</option>
-                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
-                            <option value="<?php echo (int) $empresaOpcao['id']; ?>" <?php echo $filtroEmpresaId === (int) $empresaOpcao['id'] ? 'selected' : ''; ?>><?php echo h($empresaOpcao['razao_social']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
                     <select class="select-filtro" name="status" onchange="this.form.submit()">
                         <option value="">Todos os status</option>
                         <?php foreach (['rascunho', 'pendente_envio', 'autorizada', 'rejeitada', 'cancelada'] as $statusOpcao): ?>
