@@ -155,6 +155,26 @@ try {
         exit;
     }
 
+    if (($_GET['acao'] ?? '') === 'buscar_documento' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+        header('Content-Type: application/json; charset=utf-8');
+        $documentoBusca = preg_replace('/\D+/', '', $_GET['documento'] ?? '');
+        if (!in_array(strlen($documentoBusca), [11, 14], true)) {
+            echo json_encode(['encontrado' => false]);
+            exit;
+        }
+        $stmtBusca = $dbNotas->prepare(
+            "SELECT * FROM notas_clientes
+             WHERE REPLACE(REPLACE(REPLACE(cnpj_cpf, '.', ''), '/', ''), '-', '') = :doc
+             LIMIT 1"
+        );
+        $stmtBusca->execute(['doc' => $documentoBusca]);
+        $clienteEncontradoBusca = $stmtBusca->fetch();
+        echo json_encode($clienteEncontradoBusca
+            ? ['encontrado' => true, 'cliente' => $clienteEncontradoBusca]
+            : ['encontrado' => false]);
+        exit;
+    }
+
     if (empty($_SESSION['csrf_notas_clientes'])) {
         $_SESSION['csrf_notas_clientes'] = bin2hex(random_bytes(32));
     }
@@ -198,6 +218,17 @@ try {
             $tamanhoEsperado = $tipoPessoa === 'PF' ? 11 : 14;
             $clienteExterior = $codigoPaisCliente !== '' && $codigoPaisCliente !== '1058';
 
+            $clienteIdExistente = null;
+            if (!$editando && $documentoClienteCadastro !== '') {
+                $stmtDup = $dbNotas->prepare(
+                    "SELECT id FROM notas_clientes
+                     WHERE REPLACE(REPLACE(REPLACE(cnpj_cpf, '.', ''), '/', ''), '-', '') = :doc
+                     LIMIT 1"
+                );
+                $stmtDup->execute(['doc' => $documentoClienteCadastro]);
+                $clienteIdExistente = $stmtDup->fetchColumn() ?: null;
+            }
+
             if ($editando && $clienteId <= 0) {
                 $erro = 'Cliente inválido para edição.';
             } elseif ($nomeRazaoSocial === '') {
@@ -235,8 +266,8 @@ try {
                     'indicador_consumidor_final' => $consumidorFinal,
                 ];
 
-                if ($editando) {
-                    $parametros['id'] = $clienteId;
+                if ($editando || $clienteIdExistente) {
+                    $parametros['id'] = $editando ? $clienteId : $clienteIdExistente;
                     $stmt = $dbNotas->prepare(
                         'UPDATE notas_clientes SET
                             tipo_pessoa = :tipo_pessoa, nome_razao_social = :nome_razao_social, cnpj_cpf = :cnpj_cpf,
@@ -248,7 +279,9 @@ try {
                          WHERE id = :id'
                     );
                     $stmt->execute($parametros);
-                    $sucesso = 'Cliente atualizado.';
+                    $sucesso = $editando
+                        ? 'Cliente atualizado.'
+                        : 'Este CNPJ/CPF já estava cadastrado (em outra empresa). Os dados do cliente existente foram atualizados em vez de criar um cadastro duplicado.';
                     $clienteEmEdicao = null;
                 } else {
                     $parametros['criado_por'] = $funcionarioId;
@@ -619,6 +652,66 @@ $usuario = h(nomeExibicao($usuarioRaw));
                         btnBuscarCnpjCliente.disabled = false;
                     });
             });
+        }
+
+        const campoClienteId = document.querySelector('input[name="cliente_id"]');
+        const campoAcao = document.querySelector('input[name="acao"]');
+        const tituloFormularioCliente = document.querySelector('.panel h2');
+        const botaoSalvarCliente = document.querySelector('button[type="submit"]');
+
+        function preencherFormularioComClienteExistente(cliente) {
+            const definir = (id, valor) => {
+                const el = document.getElementById(id);
+                if (el) el.value = valor || '';
+            };
+            if (campoTipoPessoa) campoTipoPessoa.value = cliente.tipo_pessoa || 'PJ';
+            definir('nome_razao_social', cliente.nome_razao_social);
+            definir('cliente_inscricao_estadual', cliente.inscricao_estadual);
+            definir('cliente_email', cliente.email);
+            definir('cliente_logradouro', cliente.logradouro);
+            definir('cliente_numero', cliente.numero);
+            definir('cliente_complemento', cliente.complemento);
+            definir('cliente_bairro', cliente.bairro);
+            definir('cliente_cep', formatarCepCliente(cliente.cep || ''));
+            definir('cliente_municipio', cliente.municipio);
+            definir('cliente_codigo_ibge_municipio', cliente.codigo_ibge_municipio);
+            definir('cliente_codigo_pais', cliente.codigo_pais || '1058');
+            definir('cliente_nif', cliente.nif);
+            definir('cliente_motivo_nao_nif', cliente.motivo_nao_nif);
+            definir('cliente_uf', cliente.uf);
+            const checkConsumidorFinal = document.querySelector('input[name="indicador_consumidor_final"]');
+            if (checkConsumidorFinal) checkConsumidorFinal.checked = Number(cliente.indicador_consumidor_final) === 1;
+            if (campoCnpjCpf) campoCnpjCpf.value = formatarCnpjOuCpf(cliente.cnpj_cpf || '', cliente.tipo_pessoa || 'PJ');
+
+            if (campoClienteId) campoClienteId.value = cliente.id;
+            if (campoAcao) campoAcao.value = 'editar_cliente';
+            if (tituloFormularioCliente) tituloFormularioCliente.textContent = 'Editando: ' + (cliente.nome_razao_social || '');
+            if (botaoSalvarCliente) botaoSalvarCliente.innerHTML = '<i class="fa-solid fa-user-plus"></i> Salvar alterações';
+        }
+
+        function buscarClientePorDocumentoExistente() {
+            if (!campoCnpjCpf || !campoClienteId) return;
+            if (Number(campoClienteId.value) > 0) return; // já em edição, não sobrescrever
+            const digitos = (campoCnpjCpf.value || '').replace(/\D/g, '');
+            if (![11, 14].includes(digitos.length)) return;
+
+            const statusEl = document.getElementById('statusBuscaCnpjCliente');
+            fetch('notas-clientes?acao=buscar_documento&documento=' + digitos)
+                .then(function (resposta) { return resposta.json(); })
+                .then(function (resultado) {
+                    if (resultado && resultado.encontrado) {
+                        preencherFormularioComClienteExistente(resultado.cliente);
+                        if (statusEl) {
+                            statusEl.style.color = 'var(--primary)';
+                            statusEl.textContent = 'Cliente já cadastrado (possivelmente em outra empresa). Dados carregados automaticamente.';
+                        }
+                    }
+                })
+                .catch(function () { /* falha silenciosa: não bloqueia o cadastro manual */ });
+        }
+
+        if (campoCnpjCpf) {
+            campoCnpjCpf.addEventListener('blur', buscarClientePorDocumentoExistente);
         }
 
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {
