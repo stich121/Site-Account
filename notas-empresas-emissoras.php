@@ -945,6 +945,16 @@ function rotuloCrt(?int $crt): string
                 return;
             }
 
+            // A consulta automática disponível aqui é específica de Belo Horizonte. Para empresas
+            // de outros municípios, mantém integralmente o valor informado pelo usuário e deixa o
+            // campo livre para preenchimento manual.
+            if (String(codigoIbge) !== '3106200') {
+                statusIM.style.color = 'var(--text-muted)';
+                statusIM.textContent = 'Empresa de fora de Belo Horizonte: informe a Inscrição Municipal manualmente.';
+                return;
+            }
+
+
             statusIM.style.color = 'var(--text-muted)';
             statusIM.textContent = 'Consultando IM no cadastro nacional (CNC)...';
 
@@ -959,9 +969,14 @@ function rotuloCrt(?int $crt): string
                         return;
                     }
                     if (resultado.dados.im) {
-                        campoIM.value = resultado.dados.im;
-                        statusIM.style.color = 'var(--primary)';
-                        statusIM.textContent = 'IM preenchida automaticamente pelo cadastro nacional.';
+                        if (campoIM.value.trim() === '') {
+                            campoIM.value = resultado.dados.im;
+                            statusIM.style.color = 'var(--primary)';
+                            statusIM.textContent = 'IM preenchida automaticamente pelo cadastro nacional.';
+                        } else {
+                            statusIM.style.color = 'var(--text-muted)';
+                            statusIM.textContent = 'A IM informada manualmente foi mantida.';
+                        }
                     } else {
                         statusIM.style.color = 'var(--text-muted)';
                         statusIM.textContent = resultado.dados.mensagem || 'Nenhuma IM encontrada nesse município para esse CNPJ - confira e preencha na mão.';
