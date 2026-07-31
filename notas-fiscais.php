@@ -1393,6 +1393,14 @@ $usuario = h(nomeExibicao($usuarioRaw));
     </div>
 
     <script>
+        function fecharMenusAcoes(menus) {
+            menus.forEach((m) => {
+                m.classList.remove('aberto');
+                const botao = m.closest('.acoes-menu').querySelector('[data-acoes-toggle]');
+                if (botao) botao.setAttribute('aria-expanded', 'false');
+            });
+        }
+
         document.addEventListener('click', function (evento) {
             const botaoAlvo = evento.target.closest('[data-acoes-toggle]');
             const menusAbertos = document.querySelectorAll('.acoes-menu-dropdown.aberto');
@@ -1400,22 +1408,37 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 evento.stopPropagation();
                 const menu = botaoAlvo.closest('.acoes-menu').querySelector('.acoes-menu-dropdown');
                 const jaAberto = menu.classList.contains('aberto');
-                menusAbertos.forEach((m) => m.classList.remove('aberto'));
+                fecharMenusAcoes(menusAbertos);
                 if (!jaAberto) {
                     menu.classList.add('aberto');
                     botaoAlvo.setAttribute('aria-expanded', 'true');
+                    // position: fixed calculado aqui (não em CSS) porque o menu vive dentro de
+                    // .table-wrap (overflow-x: auto), que corta um "position: absolute" perto da
+                    // borda inferior da tabela. Alinha o menu pela borda direita do botão e, se não
+                    // couber embaixo, abre pra cima dele.
+                    const retanguloBotao = botaoAlvo.getBoundingClientRect();
+                    const alturaMenu = menu.offsetHeight;
+                    const larguraMenu = menu.offsetWidth;
+                    const cabeEmbaixo = retanguloBotao.bottom + 6 + alturaMenu <= window.innerHeight - 8;
+                    menu.style.top = (cabeEmbaixo ? retanguloBotao.bottom + 6 : retanguloBotao.top - 6 - alturaMenu) + 'px';
+                    menu.style.left = Math.max(8, retanguloBotao.right - larguraMenu) + 'px';
                 } else {
                     botaoAlvo.setAttribute('aria-expanded', 'false');
                 }
                 return;
             }
             if (!evento.target.closest('.acoes-menu-dropdown')) {
-                menusAbertos.forEach((m) => {
-                    m.classList.remove('aberto');
-                    const botao = m.closest('.acoes-menu').querySelector('[data-acoes-toggle]');
-                    if (botao) botao.setAttribute('aria-expanded', 'false');
-                });
+                fecharMenusAcoes(menusAbertos);
             }
+        });
+
+        document.querySelectorAll('.table-wrap').forEach((wrap) => {
+            wrap.addEventListener('scroll', function () {
+                fecharMenusAcoes(document.querySelectorAll('.acoes-menu-dropdown.aberto'));
+            });
+        });
+        window.addEventListener('scroll', function () {
+            fecharMenusAcoes(document.querySelectorAll('.acoes-menu-dropdown.aberto'));
         });
 
         if (sessionStorage.getItem('accountFuncionarioSessao') !== 'ativa') {

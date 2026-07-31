@@ -848,9 +848,13 @@ table.lista tbody tr:hover,
 .acoes-menu { position: relative; }
 
 .acoes-menu-dropdown {
-    position: absolute;
-    top: calc(100% + 0.4rem);
-    right: 0;
+    /* position/top/left ficam por conta do JS (position: fixed, calculado a partir do botão) —
+       o menu vive dentro de .table-wrap (overflow-x: auto), que corta qualquer coisa posicionada
+       como "absolute" perto da borda inferior da tabela. Os valores abaixo são só o fallback caso
+       o JS não rode. */
+    position: fixed;
+    top: 0;
+    left: 0;
     display: none;
     flex-direction: column;
     gap: 0.35rem;
