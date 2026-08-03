@@ -39,10 +39,12 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 - Certificados digitais A1.
 - Criação, validação, fila, transmissão e acompanhamento de **NF-e** (produto) direto na SEFAZ estadual.
 - Criação, validação, fila, transmissão e acompanhamento de **NFS-e** (serviço) na NFS-e Nacional.
-- Status de rascunho, pendente, autorizada, rejeitada e cancelada (ambos os tipos).
+- Criação, validação, transmissão, reimpressão de DANFCE, consulta e cancelamento de **NFC-e** (venda no balcão), em tela própria e independente do emissor de NF-e/NFS-e.
+- Status de rascunho, pendente, autorizada, rejeitada e cancelada (todos os tipos).
 - Documento de conferência (em layout de DANFE para NF-e), downloads protegidos, histórico e logs.
 - Correção e reprocessamento de nota rejeitada localmente (NF-e e NFS-e).
 - Filtro por empresa emissora nas telas de **notas fiscais** e de **clientes**: mostra só as notas (ou só os clientes que já têm nota) do CNPJ emitente escolhido.
+- **Buscadores fiscais via SEFAZ/ADN** (NF-e, NFC-e e NFS-e): consultam documentos fiscais ligados ao CNPJ de cada empresa usando só o certificado digital A1 já cadastrado, mesmo que a nota não tenha sido emitida por este sistema — pensado para uso da contabilidade. Sincronização automática por cron, sem depender de alguém abrir a tela.
 
 ## NF-e (produto) — funcionalidades concluídas
 
@@ -172,6 +174,22 @@ Fonte: [Anexo VIII — Correlação Item LC 116, NBS, cIndOp e cClassTrib](https
 - A nota corrigida volta a rascunho e pode ser reprocessada.
 - Notas autorizadas e canceladas permanecem somente para leitura.
 
+## Buscadores fiscais (consulta direta na SEFAZ/ADN)
+
+Telas independentes do emissor de notas: em vez de mostrar só o que foi emitido por este sistema, consultam a **Distribuição de DFe** da SEFAZ (NF-e/NFC-e) ou o **ADN/SEFIN Nacional** (NFS-e) usando apenas o certificado digital A1 já cadastrado da empresa. Pensadas para a contabilidade acompanhar as notas de empresas-cliente mesmo quando a emissão acontece em outro sistema (POS de terceiros, outro emissor etc.).
+
+### Buscador de NF-e e Buscador de NFC-e
+
+- `notas-fiscais-nfe-dfe.php` e `notas-fiscais-nfce-dfe.php` usam a **mesma** chamada `sefazDistDFe()` (webservice de Distribuição de DFe) por empresa/CNPJ — a SEFAZ não filtra por modelo nessa distribuição, então em vez de duplicar a consulta (o que dobraria o consumo de NSU e aumentaria o risco de bloqueio "Consumo Indevido"), o modelo do documento (55 = NF-e, 65 = NFC-e) é lido direto da chave de acesso e gravado na tabela correspondente (`notas_fiscais_nfe_dfe` ou `notas_fiscais_nfce_dfe`). As duas telas compartilham o mesmo ponteiro de posição (NSU) por empresa.
+- Documento completo (`procNFe`) chega pronto, com XML autorizado (baixável) e DANFE/DANFCE gerados localmente. Documento recebido de terceiros chega primeiro como resumo (`resNFe`); a sincronização já envia sozinha a **Ciência da Operação** (evento 210210) para liberar o XML completo numa sincronização seguinte — aplicável só a NF-e, já que NFC-e recebida de terceiros é um cenário raro.
+- Eventos de cancelamento (`resEvento`) são aplicados por chave de acesso nas duas tabelas.
+- Busca por nome, CPF/CNPJ, número ou chave de acesso; filtros de data, empresa e tipo (emitida/recebida); exportação em lote em ZIP (XML + DANFE/DANFCE de um período); paginação.
+- Sincronização automática ao abrir qualquer uma das duas páginas (uma empresa por visita, a mais atrasada) e por cron via `processar-nfe-dfe-automatico.php --cli` — o mesmo cron mantém os dois buscadores em dia, não é preciso configurar um separado para NFC-e.
+
+### Buscador de NFS-e
+
+- `notas-fiscais-nfse-adn.php` usa o ADN/SEFIN Nacional (`sincronizarNfseAdn()`) da mesma forma, com sincronização automática e cron próprio (`processar-nfse-adn-automatico.php`).
+
 ## Bancos de dados
 
 O sistema utiliza dois bancos:
@@ -232,6 +250,15 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `nfe-operacoes.php` | Consulta, cancelamento e DANFE da NF-e |
 | `processar-fila-nfe.php` | Processamento da fila da NF-e |
 | `nfe-diagnostico.php` | Diagnóstico do ambiente (extensões PHP e libs) para NF-e |
+| `notas-nfce-vendas.php` | Listagem, reimpressão de DANFCE, consulta e cancelamento de NFC-e (venda no balcão) |
+| `nfce-operacoes.php` | Consulta, cancelamento e geração de DANFCE da NFC-e |
+| `nfce-sefaz-integracao.php` | Assinatura e transmissão da NFC-e à SEFAZ |
+| `notas-fiscais-nfe-dfe.php` | Buscador de NF-e via Distribuição de DFe da SEFAZ (usa só o certificado A1) |
+| `notas-fiscais-nfce-dfe.php` | Buscador de NFC-e via Distribuição de DFe da SEFAZ (mesma sincronização do buscador de NF-e) |
+| `nfe-distribuicao-integracao.php` | Sincronização compartilhada da Distribuição de DFe (alimenta os buscadores de NF-e e NFC-e) |
+| `processar-nfe-dfe-automatico.php` | Cron/admin da sincronização automática dos buscadores de NF-e e NFC-e |
+| `notas-fiscais-nfse-adn.php` | Buscador de NFS-e via ADN/SEFIN Nacional |
+| `processar-nfse-adn-automatico.php` | Cron/admin da sincronização automática do buscador de NFS-e |
 | `notas-fiscais-schema.sql` | Schema fiscal |
 | `seguranca.php` | Sessão, CSRF e segurança |
 | `backup-banco-dados.php` | Backup diário dos dois bancos (dump via PDO) para o Google Drive |
@@ -409,6 +436,8 @@ Não versionar:
 - Filtro por empresa emissora nas telas de notas fiscais e de clientes (o filtro de clientes usa `EXISTS` em `notas_fiscais`, já que o cadastro de cliente é compartilhado entre empresas e não tem coluna própria de empresa emissora).
 - Ajuste manual da numeração de NF-e por empresa (`nfe_numero_base`): permite "avançar" a sequência quando já existe nota emitida fora do sistema, sem nunca reduzir o próximo número. Cadastro da empresa passou a mostrar ao vivo o último número lançado e o próximo, calculado direto de `notas_fiscais` (não é contador solto).
 - Botão de informação ("i") com caixa de diálogo para os textos de ajuda de campo do cadastro da empresa emissora, substituindo texto sempre visível — componente novo e reaproveitável em `assets/css/notas-fiscais.css`.
+- Relatório em Excel com os impostos (ICMS, ICMS-ST, IPI, PIS, COFINS) lidos do XML de cada NF-e sincronizada, exportável por período direto do buscador de NF-e.
+- **Buscador de NFC-e via Distribuição de DFe da SEFAZ**: nova tela (`notas-fiscais-nfce-dfe.php`) que consulta as NFC-e ligadas ao CNPJ de cada empresa usando só o certificado A1 já cadastrado — pensada para a contabilidade acompanhar vendas de empresas-cliente mesmo quando a emissão não passa por este sistema. Reaproveita a mesma chamada `sefazDistDFe()` já usada pelo buscador de NF-e (mesmo NSU por empresa): o modelo do documento (55/65) é identificado pela própria chave de acesso, sem duplicar a consulta à SEFAZ. O cron existente (`processar-nfe-dfe-automatico.php`) passou a manter os dois buscadores em dia automaticamente, sem precisar de uma tarefa separada.
 
 ## Limites e cuidados
 
@@ -429,4 +458,4 @@ Não versionar:
 
 ---
 
-Última consolidação: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos; e, na sequência, filtro por empresa emissora em notas/clientes, ajuste manual da numeração de NF-e com exibição ao vivo do próximo número, e botão de informação para os textos de ajuda do cadastro da empresa).
+Última consolidação: 3 de agosto de 2026 (relatório Excel de impostos no buscador de NF-e; e novo Buscador de NFC-e via Distribuição de DFe da SEFAZ, reaproveitando a sincronização e o cron já existentes do buscador de NF-e). Consolidação anterior: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos; e, na sequência, filtro por empresa emissora em notas/clientes, ajuste manual da numeração de NF-e com exibição ao vivo do próximo número, e botão de informação para os textos de ajuda do cadastro da empresa).
