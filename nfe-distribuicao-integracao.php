@@ -334,12 +334,28 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             $noUltNsu = $resposta->xpath('//*[local-name()="ultNSU"]');
             $docZips = $resposta->xpath('//*[local-name()="docZip"]') ?: [];
 
-            if ($cStat !== '137' && $cStat !== '138' && empty($docZips)) {
-                // Código diferente de "documentos localizados"/"nenhum documento localizado" e sem
-                // lote: trata como aviso, não erro - encerra o laço sem mais tentativas. cStat 656
-                // (Consumo Indevido) é a SEFAZ pedindo pra esperar - normalmente "tente após 1 hora".
-                // Grava esse prazo pra sincronização automática não insistir na mesma trava a cada
-                // poucos minutos.
+            if ($cStat === '137' && empty($docZips)) {
+                // Fila confirmada vazia (nenhum documento novo agora). A própria SEFAZ só libera
+                // nova consulta depois de ~1h quando a fila está vazia - chamar de novo antes disso
+                // é exatamente o que gera o [656] "Consumo Indevido" (mesma mensagem que a SEFAZ
+                // devolveria). Em vez de esperar levar essa rejeição - o que fazia o buscador
+                // "bloquear na cara" do usuário logo na tentativa seguinte, já que o cron roda a
+                // cada 10-15min e o auto-sync das páginas a cada 5min, bem menos que 1h - este
+                // trecho já auto-impõe o mesmo intervalo preventivamente, assim que a fila fica em
+                // dia, sem precisar da rejeição pra descobrir isso.
+                $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_bloqueado_ate = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = :id')
+                    ->execute(['id' => (int) $empresa['id']]);
+
+                if ($totalProcessado === 0) {
+                    return ['sucesso' => true, 'mensagem' => 'Nenhum documento novo no momento - fila em dia. Próxima verificação liberada em até 1 hora, conforme a regra da SEFAZ para fila vazia.', 'total' => 0];
+                }
+                break;
+            }
+
+            if ($cStat !== '138' && empty($docZips)) {
+                // Qualquer outro código sem lote (inclusive um [656] que ainda assim aconteça, por
+                // alguma chamada concorrente fora deste fluxo, ou outro aviso da SEFAZ): mesmo
+                // tratamento de bloqueio preventivo de 1h, mostrando a mensagem real da SEFAZ.
                 $dbNotas->prepare('UPDATE empresas_emissoras SET nfe_dfe_bloqueado_ate = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = :id')
                     ->execute(['id' => (int) $empresa['id']]);
 
