@@ -3694,6 +3694,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                     <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
                     <a class="admin-menu-link" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
                     <a class="admin-menu-link" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
+                    <a class="admin-menu-link" href="notas-fiscais-nfce-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFC-e</a>
                 </div>
             </div>
             <div class="admin-menu-group" id="grpFuncProgramas">
@@ -3751,6 +3752,7 @@ $dataFimFiltro = $_GET['data_fim'] ?? fimMesAtual();
                     <a class="admin-menu-link" href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emitir nota fiscal</a>
                     <a class="admin-menu-link" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
                     <a class="admin-menu-link" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
+                    <a class="admin-menu-link" href="notas-fiscais-nfce-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFC-e</a>
                 </div>
             </div>
             <div class="admin-menu-group" id="grpAdminProgramas">
