@@ -11,6 +11,8 @@ if (!isset($_SESSION['funcionario_id'])) {
 require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfse-nacional-integracao.php';
+require_once __DIR__ . '/includes/xlsx-writer.php';
+require_once __DIR__ . '/includes/impostos-xml.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -161,7 +163,7 @@ try {
     // mínimo) pra não deixar a página lenta nem estourar o rate limit do ADN; ao longo de algumas
     // visitas (ou via cron, ver processar-nfse-adn-automatico.php) todas ficam em dia sozinhas.
     // Empresas com bloqueio de rate-limit em vigor ficam de fora até o prazo passar.
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export'])) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export']) && !isset($_GET['excel_export'])) {
         [$integracaoAutoOk] = integracaoNfseDisponivel();
         if ($integracaoAutoOk) {
             $candidatasAuto = array_values(array_filter(
@@ -338,6 +340,88 @@ try {
         readfile($arquivoZipTempAdn);
         unlink($arquivoZipTempAdn);
         exit;
+    }
+
+    // Relatorio Excel com os impostos de cada NFS-e sincronizada do periodo (leitura melhor-esforco
+    // do XML completo, ja que estas copias sincronizadas nao guardam colunas proprias de imposto).
+    if (isset($_GET['excel_export'])) {
+        $excelDataInicio = trim((string) ($_GET['excel_data_inicio'] ?? ''));
+        $excelDataFim = trim((string) ($_GET['excel_data_fim'] ?? ''));
+        $dataValidaExcelAdn = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1
+            && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+        if (!$dataValidaExcelAdn($excelDataInicio) || !$dataValidaExcelAdn($excelDataFim)) {
+            http_response_code(400);
+            echo 'Informe uma data inicial e final válidas para o relatório Excel.';
+            exit;
+        }
+        if ($excelDataFim < $excelDataInicio) {
+            [$excelDataInicio, $excelDataFim] = [$excelDataFim, $excelDataInicio];
+        }
+
+        $excelEmpresaId = (int) ($_GET['excel_empresa_emissora_id'] ?? 0);
+        $excelTipo = in_array($_GET['excel_tipo'] ?? '', ['emitida', 'recebida'], true) ? $_GET['excel_tipo'] : '';
+
+        $condicoesExcel = ['e.ativo = 1', 'a.data_emissao BETWEEN :data_inicio AND :data_fim'];
+        $bindExcel = ['data_inicio' => $excelDataInicio . ' 00:00:00', 'data_fim' => $excelDataFim . ' 23:59:59'];
+        if ($excelEmpresaId > 0) {
+            $condicoesExcel[] = 'a.empresa_emissora_id = :empresa_emissora_id';
+            $bindExcel['empresa_emissora_id'] = $excelEmpresaId;
+        }
+        if ($excelTipo !== '') {
+            $condicoesExcel[] = 'a.tipo_documento = :tipo_documento';
+            $bindExcel['tipo_documento'] = $excelTipo;
+        }
+
+        $stmtExcelAdn = $dbNotas->prepare(
+            'SELECT a.data_emissao, a.tipo_documento, a.numero_nfse, a.nome_prestador, a.nome_tomador,
+                    a.valor_servico, a.valor_liquido, a.xml_completo
+             FROM notas_fiscais_nfse_adn a
+             INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id
+             WHERE ' . implode(' AND ', $condicoesExcel) . '
+             ORDER BY a.data_emissao ASC'
+        );
+        foreach ($bindExcel as $chaveBindExcel => $valorBindExcel) {
+            $stmtExcelAdn->bindValue($chaveBindExcel, $valorBindExcel);
+        }
+        $stmtExcelAdn->execute();
+        $documentosExcelAdn = $stmtExcelAdn->fetchAll();
+
+        $cabecalhosExcelAdn = [
+            'Data emissão', 'Tipo', 'Nº NFS-e', 'Prestador', 'Tomador',
+            'Valor serviço (R$)', 'Valor líquido (R$)', 'Base ISSQN (R$)', 'ISSQN (R$)',
+            'PIS (R$)', 'COFINS (R$)', 'INSS retido (R$)', 'IRRF retido (R$)', 'CSLL retido (R$)',
+            'Tributos federais (R$)', 'Tributos estaduais (R$)', 'Tributos municipais (R$)',
+        ];
+        $linhasExcelAdn = [];
+        foreach ($documentosExcelAdn as $documentoExcelAdn) {
+            $impostos = extrairImpostosNfseXml($documentoExcelAdn['xml_completo'] ?? null);
+            $linhasExcelAdn[] = [
+                $documentoExcelAdn['data_emissao'] !== null ? date('d/m/Y H:i', strtotime((string) $documentoExcelAdn['data_emissao'])) : '',
+                $documentoExcelAdn['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida',
+                (string) ($documentoExcelAdn['numero_nfse'] ?? ''),
+                (string) ($documentoExcelAdn['nome_prestador'] ?? ''),
+                (string) ($documentoExcelAdn['nome_tomador'] ?? ''),
+                $documentoExcelAdn['valor_servico'] !== null ? (float) $documentoExcelAdn['valor_servico'] : null,
+                $documentoExcelAdn['valor_liquido'] !== null ? (float) $documentoExcelAdn['valor_liquido'] : null,
+                $impostos['vBCISSQN'],
+                $impostos['vISSQN'],
+                $impostos['vPis'],
+                $impostos['vCofins'],
+                $impostos['vRetCP'],
+                $impostos['vRetIRRF'],
+                $impostos['vRetCSLL'],
+                $impostos['vTotTribFed'],
+                $impostos['vTotTribEst'],
+                $impostos['vTotTribMun'],
+            ];
+        }
+
+        gerarXlsxDownload(
+            'impostos-nfse-portal-nacional-' . $excelDataInicio . '_a_' . $excelDataFim . '.xlsx',
+            'Impostos NFSe',
+            $cabecalhosExcelAdn,
+            $linhasExcelAdn
+        );
     }
 
     $empresaSincronizarId = 0;
@@ -643,6 +727,42 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> XML + PDF</button>
                     <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="xml"><i class="fa-solid fa-file-zipper"></i> Só XML</button>
                     <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> Só PDF</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2><i class="fa-solid fa-file-excel"></i> Relatório de impostos (Excel)</h2>
+            <p class="muted secao-descricao">Gera uma planilha com os impostos (ISSQN, PIS, COFINS, INSS, IRRF, CSLL) de cada NFS-e sincronizada de uma data exata até outra, lidos do XML completo do documento.</p>
+            <form method="get" action="notas-fiscais-nfse-adn" class="filtro-form">
+                <input type="hidden" name="excel_export" value="1">
+                <div class="field field-sm">
+                    <label for="excelDataInicio">Data inicial</label>
+                    <input id="excelDataInicio" type="date" name="excel_data_inicio" required>
+                </div>
+                <div class="field field-sm">
+                    <label for="excelDataFim">Data final</label>
+                    <input id="excelDataFim" type="date" name="excel_data_fim" required>
+                </div>
+                <div class="field">
+                    <label for="excelEmpresaId">Empresa</label>
+                    <select id="excelEmpresaId" name="excel_empresa_emissora_id">
+                        <option value="">Todas</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="excelTipo">Tipo</label>
+                    <select id="excelTipo" name="excel_tipo">
+                        <option value="">Emitidas e recebidas</option>
+                        <option value="emitida">Somente emitidas</option>
+                        <option value="recebida">Somente recebidas</option>
+                    </select>
+                </div>
+                <div class="row-actions" style="flex:none;">
+                    <button class="btn btn-small" type="submit"><i class="fa-solid fa-file-excel"></i> Baixar Excel</button>
                 </div>
             </form>
         </section>

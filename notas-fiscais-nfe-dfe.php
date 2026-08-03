@@ -12,6 +12,8 @@ require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfe-distribuicao-integracao.php';
 require_once __DIR__ . '/nfe-operacoes.php';
+require_once __DIR__ . '/includes/xlsx-writer.php';
+require_once __DIR__ . '/includes/impostos-xml.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -165,7 +167,7 @@ try {
     // a que estiver há mais tempo sem sincronizar, respeitando um intervalo mínimo. Empresas que
     // levaram um bloqueio de rate-limit da SEFAZ (ex.: "tente após 1 hora") ficam de fora até o
     // prazo do bloqueio passar - nada de insistir na mesma trava a cada poucos minutos.
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_nfe_dfe']) && !isset($_GET['pdf_nfe_dfe']) && !isset($_GET['zip_export'])) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_nfe_dfe']) && !isset($_GET['pdf_nfe_dfe']) && !isset($_GET['zip_export']) && !isset($_GET['excel_export'])) {
         [$integracaoAutoOk] = integracaoNfeDisponivel();
         if ($integracaoAutoOk) {
             $candidatasAuto = array_values(array_filter(
@@ -331,6 +333,88 @@ try {
         exit;
     }
 
+    // Relatorio Excel com os impostos de cada NF-e sincronizada do periodo (leitura melhor-esforco
+    // do XML completo, ja que estas copias sincronizadas nao guardam colunas proprias de imposto).
+    if (isset($_GET['excel_export'])) {
+        $excelDataInicio = trim((string) ($_GET['excel_data_inicio'] ?? ''));
+        $excelDataFim = trim((string) ($_GET['excel_data_fim'] ?? ''));
+        $dataValidaExcelNfe = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1
+            && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+        if (!$dataValidaExcelNfe($excelDataInicio) || !$dataValidaExcelNfe($excelDataFim)) {
+            http_response_code(400);
+            echo 'Informe uma data inicial e final válidas para o relatório Excel.';
+            exit;
+        }
+        if ($excelDataFim < $excelDataInicio) {
+            [$excelDataInicio, $excelDataFim] = [$excelDataFim, $excelDataInicio];
+        }
+
+        $excelEmpresaId = (int) ($_GET['excel_empresa_emissora_id'] ?? 0);
+        $excelTipo = in_array($_GET['excel_tipo'] ?? '', ['emitida', 'recebida'], true) ? $_GET['excel_tipo'] : '';
+
+        $condicoesExcel = ['e.ativo = 1', 'a.data_emissao BETWEEN :data_inicio AND :data_fim'];
+        $bindExcel = ['data_inicio' => $excelDataInicio . ' 00:00:00', 'data_fim' => $excelDataFim . ' 23:59:59'];
+        if ($excelEmpresaId > 0) {
+            $condicoesExcel[] = 'a.empresa_emissora_id = :empresa_emissora_id';
+            $bindExcel['empresa_emissora_id'] = $excelEmpresaId;
+        }
+        if ($excelTipo !== '') {
+            $condicoesExcel[] = 'a.tipo_documento = :tipo_documento';
+            $bindExcel['tipo_documento'] = $excelTipo;
+        }
+
+        $stmtExcelNfe = $dbNotas->prepare(
+            'SELECT a.data_emissao, a.tipo_documento, a.numero_nfe, a.serie, a.nome_emitente, a.nome_destinatario,
+                    a.valor_nfe, a.xml_completo
+             FROM notas_fiscais_nfe_dfe a
+             INNER JOIN empresas_emissoras e ON e.id = a.empresa_emissora_id
+             WHERE ' . implode(' AND ', $condicoesExcel) . '
+             ORDER BY a.data_emissao ASC'
+        );
+        foreach ($bindExcel as $chaveBindExcel => $valorBindExcel) {
+            $stmtExcelNfe->bindValue($chaveBindExcel, $valorBindExcel);
+        }
+        $stmtExcelNfe->execute();
+        $documentosExcelNfe = $stmtExcelNfe->fetchAll();
+
+        $cabecalhosExcelNfe = [
+            'Data emissão', 'Tipo', 'Nº NF-e', 'Série', 'Emitente', 'Destinatário',
+            'Valor da NF-e (R$)', 'Base ICMS (R$)', 'ICMS (R$)', 'ICMS-ST (R$)', 'IPI (R$)',
+            'PIS (R$)', 'COFINS (R$)', 'Frete (R$)', 'Desconto (R$)', 'Outras despesas (R$)',
+            'Tributos aprox. (Lei da Transparência) (R$)',
+        ];
+        $linhasExcelNfe = [];
+        foreach ($documentosExcelNfe as $documentoExcelNfe) {
+            $impostos = extrairImpostosNfeXml($documentoExcelNfe['xml_completo'] ?? null);
+            $linhasExcelNfe[] = [
+                $documentoExcelNfe['data_emissao'] !== null ? date('d/m/Y H:i', strtotime((string) $documentoExcelNfe['data_emissao'])) : '',
+                $documentoExcelNfe['tipo_documento'] === 'emitida' ? 'Emitida' : 'Recebida',
+                (string) ($documentoExcelNfe['numero_nfe'] ?? ''),
+                (string) ($documentoExcelNfe['serie'] ?? ''),
+                (string) ($documentoExcelNfe['nome_emitente'] ?? ''),
+                (string) ($documentoExcelNfe['nome_destinatario'] ?? ''),
+                $documentoExcelNfe['valor_nfe'] !== null ? (float) $documentoExcelNfe['valor_nfe'] : null,
+                $impostos['vBC'],
+                $impostos['vICMS'],
+                $impostos['vICMSST'],
+                $impostos['vIPI'],
+                $impostos['vPIS'],
+                $impostos['vCOFINS'],
+                $impostos['vFrete'],
+                $impostos['vDesc'],
+                $impostos['vOutro'],
+                $impostos['vTotTrib'],
+            ];
+        }
+
+        gerarXlsxDownload(
+            'impostos-nfe-sefaz-' . $excelDataInicio . '_a_' . $excelDataFim . '.xlsx',
+            'Impostos NFe',
+            $cabecalhosExcelNfe,
+            $linhasExcelNfe
+        );
+    }
+
     $empresaSincronizarId = 0;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf = $_POST['csrf'] ?? '';
@@ -481,7 +565,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
 
         <details class="notice warning">
             <summary style="cursor:pointer;"><strong>Como funciona</strong> (clique para ver)</summary>
-            <p style="margin-top:0.75rem;">A SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis) direto. Para NF-e recebidas de terceiros, a SEFAZ manda primeiro só um <strong>resumo</strong> (chave, emitente, valor, data) — a sincronização já envia sozinha a <strong>Ciência da Operação</strong> (evento oficial que declara que a empresa está ciente da nota) pra cada resumo pendente, e a partir daí o XML completo passa a vir numa sincronização seguinte, liberando XML e DANFE. Até isso acontecer, a nota aparece com "Só resumo" na tabela.</p>
+            <p style="margin-top:0.75rem;">A SEFAZ não permite buscar por data ou nome diretamente — só por lote sequencial (NSU), com limite de requisições por CNPJ. Toda empresa com certificado digital A1 válido já é sincronizada sozinha (uma por visita a esta página, ou continuamente se houver o cron de <a href="processar-nfe-dfe-automatico">sincronização automática</a> configurado). Para NF-e que a própria empresa emitiu, a SEFAZ manda o documento completo (XML + DANFE disponíveis) direto. Para NF-e recebidas de terceiros, a SEFAZ manda primeiro só um <strong>resumo</strong> (chave, emitente, valor, data) — a sincronização já envia sozinha a <strong>Ciência da Operação</strong> (evento oficial que declara que a empresa está ciente da nota) pra cada resumo pendente, e a partir daí o XML completo passa a vir numa sincronização seguinte, liberando XML e DANFE. Até isso acontecer, a nota aparece com "Só resumo" na tabela. Essa mesma sincronização também alimenta o <a href="notas-fiscais-nfce-dfe">Buscador de NFC-e</a> — a SEFAZ devolve os dois tipos de documento juntos, e o sistema separa cada um pela chave de acesso.</p>
         </details>
 
         <section class="panel">
@@ -593,6 +677,42 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <button class="btn btn-small" type="submit" name="zip_formato" value="ambos"><i class="fa-solid fa-file-zipper"></i> XML + DANFE</button>
                     <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="xml"><i class="fa-solid fa-file-zipper"></i> Só XML</button>
                     <button class="btn btn-outline btn-small" type="submit" name="zip_formato" value="pdf"><i class="fa-solid fa-file-zipper"></i> Só DANFE</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2><i class="fa-solid fa-file-excel"></i> Relatório de impostos (Excel)</h2>
+            <p class="muted secao-descricao">Gera uma planilha com os impostos (ICMS, ICMS-ST, IPI, PIS, COFINS) de cada NF-e sincronizada de uma data exata até outra, lidos do XML completo do documento.</p>
+            <form method="get" action="notas-fiscais-nfe-dfe" class="filtro-form">
+                <input type="hidden" name="excel_export" value="1">
+                <div class="field field-sm">
+                    <label for="excelDataInicio">Data inicial</label>
+                    <input id="excelDataInicio" type="date" name="excel_data_inicio" required>
+                </div>
+                <div class="field field-sm">
+                    <label for="excelDataFim">Data final</label>
+                    <input id="excelDataFim" type="date" name="excel_data_fim" required>
+                </div>
+                <div class="field">
+                    <label for="excelEmpresaId">Empresa</label>
+                    <select id="excelEmpresaId" name="excel_empresa_emissora_id">
+                        <option value="">Todas</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="excelTipo">Tipo</label>
+                    <select id="excelTipo" name="excel_tipo">
+                        <option value="">Emitidas e recebidas</option>
+                        <option value="emitida">Somente emitidas</option>
+                        <option value="recebida">Somente recebidas</option>
+                    </select>
+                </div>
+                <div class="row-actions" style="flex:none;">
+                    <button class="btn btn-small" type="submit"><i class="fa-solid fa-file-excel"></i> Baixar Excel</button>
                 </div>
             </form>
         </section>

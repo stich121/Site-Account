@@ -12,6 +12,7 @@ require_once __DIR__ . '/config_db.php';
 require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfse-operacoes.php';
 require_once __DIR__ . '/nfe-operacoes.php';
+require_once __DIR__ . '/includes/xlsx-writer.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -897,6 +898,102 @@ try {
         exit;
     }
 
+    // Relatorio Excel com os impostos de cada nota do periodo filtrado.
+    if (isset($_GET['excel_data_inicio']) || isset($_GET['excel_data_fim'])) {
+        $dataInicioExcel = trim((string) ($_GET['excel_data_inicio'] ?? ''));
+        $dataFimExcel = trim((string) ($_GET['excel_data_fim'] ?? ''));
+        $dataValidaExcel = static fn (string $d): bool => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1 && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+        if (!$dataValidaExcel($dataInicioExcel) || !$dataValidaExcel($dataFimExcel)) {
+            http_response_code(400);
+            echo 'Informe uma data inicial e final válidas para o relatório Excel.';
+            exit;
+        }
+        if ($dataFimExcel < $dataInicioExcel) {
+            [$dataInicioExcel, $dataFimExcel] = [$dataFimExcel, $dataInicioExcel];
+        }
+
+        $whereExcel = ["n.tipo_nota != 'nfce'", 'n.data_emissao BETWEEN :data_inicio AND :data_fim', 'n.empresa_emissora_id = :empresa_emissora_id'];
+        $bindExcel = ['data_inicio' => $dataInicioExcel, 'data_fim' => $dataFimExcel, 'empresa_emissora_id' => $empresaEmissoraAtivaId];
+        if (!$podeAdministrar) {
+            $whereExcel[] = 'n.funcionario_id = :funcionario_id';
+            $bindExcel['funcionario_id'] = $funcionarioId;
+        }
+
+        $stmtExcel = $dbNotas->prepare(
+            'SELECT n.id, n.tipo_nota, n.numero_interno, n.status, n.valor_total, n.data_emissao, n.chave_acesso,
+                    e.razao_social AS empresa_razao_social, c.nome_razao_social AS cliente_nome,
+                    nf.irrf, nf.contribuicoes_sociais_retidas, nf.contribuicao_previdenciaria_retida,
+                    nf.tributos_federal_valor, nf.tributos_estadual_valor, nf.tributos_municipal_valor,
+                    nf.deducao_reducao_base_calculo
+             FROM notas_fiscais n
+             INNER JOIN empresas_emissoras e ON e.id = n.empresa_emissora_id
+             INNER JOIN notas_clientes c ON c.id = n.cliente_id
+             LEFT JOIN notas_fiscais_nfse nf ON nf.nota_id = n.id
+             WHERE ' . implode(' AND ', $whereExcel) . '
+             ORDER BY n.numero_interno ASC'
+        );
+        $stmtExcel->execute($bindExcel);
+        $notasExcel = $stmtExcel->fetchAll();
+
+        $stmtItensExcel = $dbNotas->prepare(
+            "SELECT nota_id,
+                    COALESCE(SUM(icms_valor), 0) AS icms_valor,
+                    COALESCE(SUM(icms_st_valor), 0) AS icms_st_valor,
+                    COALESCE(SUM(ipi_valor), 0) AS ipi_valor,
+                    COALESCE(SUM(pis_valor), 0) AS pis_valor,
+                    COALESCE(SUM(cofins_valor), 0) AS cofins_valor
+             FROM notas_fiscais_itens
+             WHERE nota_id IN (" . (empty($notasExcel) ? '0' : implode(',', array_map(static fn (array $n): int => (int) $n['id'], $notasExcel))) . ")
+             GROUP BY nota_id"
+        );
+        $stmtItensExcel->execute();
+        $impostosItensPorNota = [];
+        foreach ($stmtItensExcel->fetchAll() as $linhaItens) {
+            $impostosItensPorNota[(int) $linhaItens['nota_id']] = $linhaItens;
+        }
+
+        $cabecalhosExcel = [
+            'Nº interno', 'Tipo', 'Status', 'Data emissão', 'Empresa', 'Cliente', 'Chave de acesso',
+            'Valor total (R$)', 'ICMS (R$)', 'ICMS-ST (R$)', 'IPI (R$)', 'PIS (R$)', 'COFINS (R$)',
+            'IRRF (R$)', 'PIS/COFINS retidos (R$)', 'INSS retido (R$)',
+            'Tributos federais (R$)', 'Tributos estaduais (R$)', 'Tributos municipais (R$)',
+        ];
+        $linhasExcel = [];
+        foreach ($notasExcel as $notaExcel) {
+            $notaIdExcel = (int) $notaExcel['id'];
+            $itensExcel = $impostosItensPorNota[$notaIdExcel] ?? null;
+            $ehNfe = $notaExcel['tipo_nota'] === 'nfe';
+            $linhasExcel[] = [
+                (int) $notaExcel['numero_interno'],
+                $ehNfe ? 'NF-e' : 'NFS-e',
+                rotuloStatusNota((string) $notaExcel['status']),
+                date('d/m/Y', strtotime((string) $notaExcel['data_emissao'])),
+                (string) $notaExcel['empresa_razao_social'],
+                (string) $notaExcel['cliente_nome'],
+                (string) ($notaExcel['chave_acesso'] ?? ''),
+                (float) $notaExcel['valor_total'],
+                $ehNfe ? (float) ($itensExcel['icms_valor'] ?? 0) : null,
+                $ehNfe ? (float) ($itensExcel['icms_st_valor'] ?? 0) : null,
+                $ehNfe ? (float) ($itensExcel['ipi_valor'] ?? 0) : null,
+                $ehNfe ? (float) ($itensExcel['pis_valor'] ?? 0) : null,
+                $ehNfe ? (float) ($itensExcel['cofins_valor'] ?? 0) : null,
+                $ehNfe ? null : (float) ($notaExcel['irrf'] ?? 0),
+                $ehNfe ? null : (float) ($notaExcel['contribuicoes_sociais_retidas'] ?? 0),
+                $ehNfe ? null : (float) ($notaExcel['contribuicao_previdenciaria_retida'] ?? 0),
+                $ehNfe ? null : (float) ($notaExcel['tributos_federal_valor'] ?? 0),
+                $ehNfe ? null : (float) ($notaExcel['tributos_estadual_valor'] ?? 0),
+                $ehNfe ? null : (float) ($notaExcel['tributos_municipal_valor'] ?? 0),
+            ];
+        }
+
+        gerarXlsxDownload(
+            'impostos-notas-fiscais-' . $dataInicioExcel . '_a_' . $dataFimExcel . '.xlsx',
+            'Impostos',
+            $cabecalhosExcel,
+            $linhasExcel
+        );
+    }
+
     // ZIP com todos os XMLs e PDFs de um periodo (so notas autorizadas tem documento fiscal de verdade).
     if (isset($_GET['zip_data_inicio']) || isset($_GET['zip_data_fim'])) {
         $dataInicioZip = trim((string) ($_GET['zip_data_inicio'] ?? ''));
@@ -1269,6 +1366,7 @@ $usuario = h(nomeExibicao($usuarioRaw));
                     <span class="muted">Exibindo notas emitidas de <?php echo h(date('d/m/Y', strtotime($filtroDataInicio))); ?> a <?php echo h(date('d/m/Y', strtotime($filtroDataFim))); ?>.</span>
                     <a class="btn btn-outline btn-small" href="<?php echo h(linkFiltroNotas(['data_inicio' => '', 'data_fim' => '', 'pagina' => 1], $filtroStatus, $filtroEmpresaId, $filtroDataInicio, $filtroDataFim)); ?>">Ver todos os períodos</a>
                     <a class="btn btn-outline btn-small" href="notas-fiscais?zip_data_inicio=<?php echo h($filtroDataInicio); ?>&zip_data_fim=<?php echo h($filtroDataFim); ?><?php echo $filtroEmpresaId > 0 ? '&empresa_emissora_id=' . $filtroEmpresaId : ''; ?>"><i class="fa-solid fa-file-zipper"></i> Baixar ZIP do período (XML + PDF)</a>
+                    <a class="btn btn-outline btn-small" href="notas-fiscais?excel_data_inicio=<?php echo h($filtroDataInicio); ?>&excel_data_fim=<?php echo h($filtroDataFim); ?><?php echo $filtroEmpresaId > 0 ? '&empresa_emissora_id=' . $filtroEmpresaId : ''; ?>"><i class="fa-solid fa-file-excel"></i> Relatório de impostos (Excel)</a>
                 <?php elseif ($filtroDataInicio !== ''): ?>
                     <span class="muted">Exibindo notas emitidas a partir de <?php echo h(date('d/m/Y', strtotime($filtroDataInicio))); ?>. Informe também a data final para poder baixar o ZIP.</span>
                 <?php elseif ($filtroDataFim !== ''): ?>
