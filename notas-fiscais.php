@@ -955,7 +955,7 @@ try {
         $cabecalhosExcel = [
             'Nº interno', 'Tipo', 'Status', 'Data emissão', 'Empresa', 'Cliente', 'Chave de acesso',
             'Valor total (R$)', 'ICMS (R$)', 'ICMS-ST (R$)', 'IPI (R$)', 'PIS (R$)', 'COFINS (R$)',
-            'IRRF (R$)', 'PIS/COFINS retidos (R$)', 'INSS retido (R$)',
+            'IRRF (R$)', 'CSLL retida (R$)', 'INSS retido (R$)',
             'Tributos federais (R$)', 'Tributos estaduais (R$)', 'Tributos municipais (R$)',
         ];
         $linhasExcel = [];

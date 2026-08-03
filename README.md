@@ -44,6 +44,7 @@ Projeto web da Account Contabilidade em PHP, MySQL, JavaScript e Python. O repos
 - Documento de conferência (em layout de DANFE para NF-e), downloads protegidos, histórico e logs.
 - Correção e reprocessamento de nota rejeitada localmente (NF-e e NFS-e).
 - Filtro por empresa emissora nas telas de **notas fiscais** e de **clientes**: mostra só as notas (ou só os clientes que já têm nota) do CNPJ emitente escolhido.
+- Relatório de impostos em Excel (`.xlsx`), com botão "Relatório de impostos (Excel)" nas três telas de busca de notas (`notas-fiscais.php`, `notas-fiscais-nfe-dfe.php`, `notas-fiscais-nfse-adn.php`), reaproveitando os mesmos filtros de data/empresa/tipo já usados na exportação em ZIP.
 - **Buscadores fiscais via SEFAZ/ADN** (NF-e, NFC-e e NFS-e): consultam documentos fiscais ligados ao CNPJ de cada empresa usando só o certificado digital A1 já cadastrado, mesmo que a nota não tenha sido emitida por este sistema — pensado para uso da contabilidade. Sincronização automática por cron, sem depender de alguém abrir a tela.
 
 ## NF-e (produto) — funcionalidades concluídas
@@ -259,6 +260,8 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `processar-nfe-dfe-automatico.php` | Cron/admin da sincronização automática dos buscadores de NF-e e NFC-e |
 | `notas-fiscais-nfse-adn.php` | Buscador de NFS-e via ADN/SEFIN Nacional |
 | `processar-nfse-adn-automatico.php` | Cron/admin da sincronização automática do buscador de NFS-e |
+| `includes/xlsx-writer.php` | Gerador de `.xlsx` sem dependências externas (OOXML via `ZipArchive`), usado pelo relatório de impostos |
+| `includes/impostos-xml.php` | Extração dos valores de imposto a partir do `xml_completo` sincronizado (NF-e/NFS-e), para o relatório Excel dos buscadores DFe/ADN |
 | `notas-fiscais-schema.sql` | Schema fiscal |
 | `seguranca.php` | Sessão, CSRF e segurança |
 | `backup-banco-dados.php` | Backup diário dos dois bancos (dump via PDO) para o Google Drive |
@@ -436,7 +439,7 @@ Não versionar:
 - Filtro por empresa emissora nas telas de notas fiscais e de clientes (o filtro de clientes usa `EXISTS` em `notas_fiscais`, já que o cadastro de cliente é compartilhado entre empresas e não tem coluna própria de empresa emissora).
 - Ajuste manual da numeração de NF-e por empresa (`nfe_numero_base`): permite "avançar" a sequência quando já existe nota emitida fora do sistema, sem nunca reduzir o próximo número. Cadastro da empresa passou a mostrar ao vivo o último número lançado e o próximo, calculado direto de `notas_fiscais` (não é contador solto).
 - Botão de informação ("i") com caixa de diálogo para os textos de ajuda de campo do cadastro da empresa emissora, substituindo texto sempre visível — componente novo e reaproveitável em `assets/css/notas-fiscais.css`.
-- Relatório em Excel com os impostos (ICMS, ICMS-ST, IPI, PIS, COFINS) lidos do XML de cada NF-e sincronizada, exportável por período direto do buscador de NF-e.
+- **Relatório de impostos em Excel**, agora nas três telas de busca de notas: no hub `notas-fiscais.php` (notas emitidas pelo próprio sistema) os valores vêm direto das colunas estruturadas do banco (ICMS/ICMS-ST/IPI/PIS/COFINS por item da NF-e, IRRF/PIS-COFINS retidos/INSS/tributos federal-estadual-municipal da NFS-e); nos buscadores sincronizados `notas-fiscais-nfe-dfe.php` e `notas-fiscais-nfse-adn.php` os impostos são extraídos "melhor esforço" do `xml_completo` salvo (`includes/impostos-xml.php`), já que essas tabelas de sincronização não têm coluna própria de imposto. Gera um `.xlsx` real via OOXML escrito à mão com `ZipArchive` (`includes/xlsx-writer.php`), sem novas dependências — mesmo padrão já usado pelo PDF/ZIP do projeto. Reaproveita os mesmos filtros de data/empresa/tipo já existentes na exportação em ZIP.
 - **Buscador de NFC-e via Distribuição de DFe da SEFAZ**: nova tela (`notas-fiscais-nfce-dfe.php`) que consulta as NFC-e ligadas ao CNPJ de cada empresa usando só o certificado A1 já cadastrado — pensada para a contabilidade acompanhar vendas de empresas-cliente mesmo quando a emissão não passa por este sistema. Reaproveita a mesma chamada `sefazDistDFe()` já usada pelo buscador de NF-e (mesmo NSU por empresa): o modelo do documento (55/65) é identificado pela própria chave de acesso, sem duplicar a consulta à SEFAZ. O cron existente (`processar-nfe-dfe-automatico.php`) passou a manter os dois buscadores em dia automaticamente, sem precisar de uma tarefa separada.
 
 ## Limites e cuidados
@@ -458,4 +461,4 @@ Não versionar:
 
 ---
 
-Última consolidação: 3 de agosto de 2026 (relatório Excel de impostos no buscador de NF-e; e novo Buscador de NFC-e via Distribuição de DFe da SEFAZ, reaproveitando a sincronização e o cron já existentes do buscador de NF-e). Consolidação anterior: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos; e, na sequência, filtro por empresa emissora em notas/clientes, ajuste manual da numeração de NF-e com exibição ao vivo do próximo número, e botão de informação para os textos de ajuda do cadastro da empresa).
+Última consolidação: 3 de agosto de 2026 (relatório de impostos em Excel nas três telas de busca de notas — hub de emitidas, buscador de NF-e/DFe e buscador de NFS-e/ADN — gerando `.xlsx` real sem novas dependências; novo Buscador de NFC-e via Distribuição de DFe da SEFAZ, reaproveitando a sincronização e o cron já existentes do buscador de NF-e). Consolidação anterior: 29 de julho de 2026 (emissão real de NF-e do zero: cálculo de impostos por item, XML/assinatura/transmissão à SEFAZ, fila, DANFE, catálogos de CFOP/NCM/IBS-CBS e reorganização do cadastro de produtos; e, na sequência, filtro por empresa emissora em notas/clientes, ajuste manual da numeração de NF-e com exibição ao vivo do próximo número, e botão de informação para os textos de ajuda do cadastro da empresa).

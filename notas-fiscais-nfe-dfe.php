@@ -382,6 +382,7 @@ try {
             'Valor da NF-e (R$)', 'Base ICMS (R$)', 'ICMS (R$)', 'ICMS-ST (R$)', 'IPI (R$)',
             'PIS (R$)', 'COFINS (R$)', 'Frete (R$)', 'Desconto (R$)', 'Outras despesas (R$)',
             'Tributos aprox. (Lei da Transparência) (R$)',
+            'Base IBS/CBS (R$)', 'IBS (R$)', 'CBS (R$)',
         ];
         $linhasExcelNfe = [];
         foreach ($documentosExcelNfe as $documentoExcelNfe) {
@@ -404,6 +405,9 @@ try {
                 $impostos['vDesc'],
                 $impostos['vOutro'],
                 $impostos['vTotTrib'],
+                $impostos['vBCIBSCBS'],
+                $impostos['vIBS'],
+                $impostos['vCBS'],
             ];
         }
 

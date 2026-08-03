@@ -389,8 +389,9 @@ try {
         $cabecalhosExcelAdn = [
             'Data emissão', 'Tipo', 'Nº NFS-e', 'Prestador', 'Tomador',
             'Valor serviço (R$)', 'Valor líquido (R$)', 'Base ISSQN (R$)', 'ISSQN (R$)',
-            'PIS (R$)', 'COFINS (R$)', 'INSS retido (R$)', 'IRRF retido (R$)', 'CSLL retido (R$)',
+            'CST PIS/COFINS', 'INSS retido (R$)', 'IRRF retido (R$)', 'CSLL retido (R$)',
             'Tributos federais (R$)', 'Tributos estaduais (R$)', 'Tributos municipais (R$)',
+            'Tributos aprox. Simples Nacional (%)',
         ];
         $linhasExcelAdn = [];
         foreach ($documentosExcelAdn as $documentoExcelAdn) {
@@ -405,14 +406,14 @@ try {
                 $documentoExcelAdn['valor_liquido'] !== null ? (float) $documentoExcelAdn['valor_liquido'] : null,
                 $impostos['vBCISSQN'],
                 $impostos['vISSQN'],
-                $impostos['vPis'],
-                $impostos['vCofins'],
+                $impostos['cstPisCofins'],
                 $impostos['vRetCP'],
                 $impostos['vRetIRRF'],
                 $impostos['vRetCSLL'],
                 $impostos['vTotTribFed'],
                 $impostos['vTotTribEst'],
                 $impostos['vTotTribMun'],
+                $impostos['pTotTribSN'],
             ];
         }
 
