@@ -263,6 +263,27 @@ function manifestarCienciaNfe(array $empresa, string $chave): array
     }
 }
 
+// Trava exclusiva por empresa (MySQL GET_LOCK, mesmo padrão de obterLockAcaoNota() em
+// notas-fiscais.php): garante no máximo 1 sincronização real em andamento por empresa a
+// qualquer momento. A Distribuição DFe é sequencial por NSU - se duas chamadas para a MESMA
+// empresa saem quase juntas (auto-sync do buscador de NF-e + o de NFC-e abertos ao mesmo tempo,
+// o cron rodando junto de um clique manual, duas abas etc.), as duas partem do mesmo último NSU
+// gravado no banco, e a SEFAZ rejeita a segunda com [656] "Deve ser utilizado o ultNSU nas
+// solicitações subsequentes" - exatamente esse sintoma. Não existe "2 chamadas simultâneas
+// seguras" aqui: o protocolo exige estritamente 1 de cada vez por CNPJ, nunca mais.
+function obterLockDfeEmpresa(PDO $db, int $empresaId): bool
+{
+    $stmt = $db->prepare('SELECT GET_LOCK(:nome, 0)');
+    $stmt->execute(['nome' => 'account_dfe_sync_empresa_' . $empresaId]);
+    return (int) $stmt->fetchColumn() === 1;
+}
+
+function liberarLockDfeEmpresa(PDO $db, int $empresaId): void
+{
+    $stmt = $db->prepare('SELECT RELEASE_LOCK(:nome)');
+    $stmt->execute(['nome' => 'account_dfe_sync_empresa_' . $empresaId]);
+}
+
 function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 {
     [$ok, $erro, $tools] = montarToolsNfe($empresa);
@@ -273,6 +294,11 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
     $cnpjEmpresa = preg_replace('/\D+/', '', (string) ($empresa['cnpj'] ?? ''));
     if ($cnpjEmpresa === '') {
         return ['sucesso' => false, 'mensagem' => 'Empresa sem CNPJ cadastrado; cadastre o CNPJ em Empresas emissoras.', 'total' => 0];
+    }
+
+    $empresaIdLock = (int) $empresa['id'];
+    if (!obterLockDfeEmpresa($dbNotas, $empresaIdLock)) {
+        return ['sucesso' => true, 'mensagem' => 'Já existe uma sincronização em andamento para essa empresa (outra aba, o cron, ou o outro buscador). Aguarde alguns instantes e tente de novo.', 'total' => 0];
     }
 
     $totalProcessado = 0;
@@ -478,6 +504,8 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
         return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado, 'mais_documentos_pendentes' => $maisDocumentosPendentes];
     } catch (Throwable $e) {
         return ['sucesso' => false, 'mensagem' => 'Falha ao consultar a SEFAZ: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
+    } finally {
+        liberarLockDfeEmpresa($dbNotas, $empresaIdLock);
     }
 }
 
