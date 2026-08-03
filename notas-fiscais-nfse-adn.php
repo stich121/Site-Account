@@ -13,6 +13,7 @@ require_once __DIR__ . '/config_db_notas.php';
 require_once __DIR__ . '/nfse-nacional-integracao.php';
 require_once __DIR__ . '/includes/xlsx-writer.php';
 require_once __DIR__ . '/includes/impostos-xml.php';
+require_once __DIR__ . '/includes/des-bh-txt.php';
 
 $funcionarioId = (int) $_SESSION['funcionario_id'];
 $usuarioRaw = $_SESSION['funcionario_usuario'] ?? 'Funcionário';
@@ -163,7 +164,7 @@ try {
     // mínimo) pra não deixar a página lenta nem estourar o rate limit do ADN; ao longo de algumas
     // visitas (ou via cron, ver processar-nfse-adn-automatico.php) todas ficam em dia sozinhas.
     // Empresas com bloqueio de rate-limit em vigor ficam de fora até o prazo passar.
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export']) && !isset($_GET['excel_export'])) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['xml_adn']) && !isset($_GET['pdf_adn']) && !isset($_GET['zip_export']) && !isset($_GET['excel_export']) && !isset($_GET['des_export'])) {
         [$integracaoAutoOk] = integracaoNfseDisponivel();
         if ($integracaoAutoOk) {
             $candidatasAuto = array_values(array_filter(
@@ -423,6 +424,71 @@ try {
             $cabecalhosExcelAdn,
             $linhasExcelAdn
         );
+    }
+
+    // Arquivo TXT para a DES de Belo Horizonte (Declaração Eletrônica de Serviços),
+    // com as notas de entrada (recebidas) e saída (emitidas) do mês selecionado de UMA
+    // empresa - o leiaute só permite uma Inscrição Municipal por arquivo (registro "H").
+    // Ver includes/des-bh-txt.php para o detalhe do leiaute (Manual do Usuário DES v2.05).
+    if (isset($_GET['des_export'])) {
+        $desMes = trim((string) ($_GET['des_mes'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}$/', $desMes) !== 1) {
+            http_response_code(400);
+            echo 'Informe um mês válido para o arquivo da DES.';
+            exit;
+        }
+        $desDataInicio = $desMes . '-01';
+        $desDataFim = date('Y-m-t', strtotime($desDataInicio));
+
+        $desEmpresaId = (int) ($_GET['des_empresa_emissora_id'] ?? 0);
+        if ($desEmpresaId <= 0) {
+            http_response_code(400);
+            echo 'Selecione a empresa para gerar o arquivo da DES (o leiaute exige uma Inscrição Municipal por arquivo).';
+            exit;
+        }
+
+        $stmtDesEmpresa = $dbNotas->prepare('SELECT * FROM empresas_emissoras WHERE id = :id AND ativo = 1 LIMIT 1');
+        $stmtDesEmpresa->execute(['id' => $desEmpresaId]);
+        $desEmpresa = $stmtDesEmpresa->fetch();
+        if (!$desEmpresa) {
+            http_response_code(404);
+            echo 'Empresa não encontrada.';
+            exit;
+        }
+        if (trim((string) ($desEmpresa['inscricao_municipal'] ?? '')) === '') {
+            http_response_code(409);
+            echo 'A empresa selecionada não tem Inscrição Municipal cadastrada (obrigatória no registro "H" da DES). Cadastre em Empresas emissoras antes de gerar o arquivo.';
+            exit;
+        }
+
+        $desNaturezaEmitida = in_array($_GET['des_natureza_emitida'] ?? '', ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'N', 'P', 'Q'], true)
+            ? $_GET['des_natureza_emitida'] : 'A';
+        $desNaturezaRecebida = in_array($_GET['des_natureza_recebida'] ?? '', ['A', 'B', 'C', 'E', 'F', 'H', 'I', 'J', 'K', 'L', 'N', 'O', 'P', 'Q'], true)
+            ? $_GET['des_natureza_recebida'] : 'A';
+
+        $stmtDesNotas = $dbNotas->prepare(
+            'SELECT tipo_documento, numero_nfse, cnpj_prestador, nome_prestador, cnpj_tomador, nome_tomador,
+                    data_emissao, valor_servico, valor_liquido, cancelada, xml_completo
+             FROM notas_fiscais_nfse_adn
+             WHERE empresa_emissora_id = :empresa_emissora_id
+               AND data_emissao BETWEEN :data_inicio AND :data_fim
+             ORDER BY tipo_documento ASC, data_emissao ASC'
+        );
+        $stmtDesNotas->execute([
+            'empresa_emissora_id' => $desEmpresaId,
+            'data_inicio' => $desDataInicio . ' 00:00:00',
+            'data_fim' => $desDataFim . ' 23:59:59',
+        ]);
+        $desNotas = $stmtDesNotas->fetchAll();
+
+        $desRegistros = [gerarRegistroDesH((string) $desEmpresa['inscricao_municipal'])];
+        foreach ($desNotas as $desNota) {
+            $desRegistros[] = $desNota['tipo_documento'] === 'emitida'
+                ? gerarRegistroDesE($desNota, $desEmpresa, $desNaturezaEmitida)
+                : gerarRegistroDesR($desNota, $desEmpresa, $desNaturezaRecebida);
+        }
+
+        gerarDesTxtDownload('des-bh-' . $desMes . '-' . preg_replace('/\D+/', '', (string) $desEmpresa['cnpj']) . '.txt', $desRegistros);
     }
 
     $empresaSincronizarId = 0;
@@ -764,6 +830,56 @@ $usuario = h(nomeExibicao($usuarioRaw));
                 </div>
                 <div class="row-actions" style="flex:none;">
                     <button class="btn btn-small" type="submit"><i class="fa-solid fa-file-excel"></i> Baixar Excel</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2><i class="fa-solid fa-file-lines"></i> Arquivo DES (Belo Horizonte)</h2>
+            <p class="muted secao-descricao">Gera o arquivo <strong>.txt</strong> de importação de notas para a DES (Declaração Eletrônica de Serviços) da Prefeitura de Belo Horizonte - BHISS Digital, com as notas de saída (emitidas) e entrada (recebidas) do mês selecionado de uma única empresa.</p>
+            <details class="notice warning">
+                <summary style="cursor:pointer;"><strong>Antes de importar na DES</strong> (clique para ver)</summary>
+                <p style="margin-top:0.75rem;">O leiaute oficial (Manual do Usuário DES v2.05) pede muito mais dados do que o Portal Nacional distribui sobre a nota (endereço completo do tomador/prestador, natureza da operação, alíquota etc.). Este arquivo preenche o que dá pra extrair do XML de cada nota e deixa em zeros/espaços o que não existir - <strong>confira o arquivo (e a natureza da operação escolhida abaixo) antes de enviar à Prefeitura</strong>, principalmente se alguma nota tiver dedução de material, isenção ou imunidade diferente do padrão "Sem Dedução".</p>
+            </details>
+            <form method="get" action="notas-fiscais-nfse-adn" class="filtro-form">
+                <input type="hidden" name="des_export" value="1">
+                <div class="field field-sm">
+                    <label for="desMes">Mês</label>
+                    <input id="desMes" type="month" name="des_mes" required>
+                </div>
+                <div class="field field-lg">
+                    <label for="desEmpresaId">Empresa (obrigatória)</label>
+                    <select id="desEmpresaId" name="des_empresa_emissora_id" required>
+                        <option value="">Selecione a empresa</option>
+                        <?php foreach ($empresasEmissorasFiltro as $empresaOpcao): ?>
+                            <option value="<?php echo (int) $empresaOpcao['id']; ?>"><?php echo h($empresaOpcao['razao_social']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="desNaturezaEmitida">Natureza (notas emitidas)</label>
+                    <select id="desNaturezaEmitida" name="des_natureza_emitida">
+                        <option value="A">A - Sem Dedução</option>
+                        <option value="B">B - Com Dedução/Materiais</option>
+                        <option value="C">C - Isenta de ISSQN</option>
+                        <option value="F">F - Imune</option>
+                        <option value="J">J - Microempresa</option>
+                        <option value="Q">Q - Não Tributável</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="desNaturezaRecebida">Natureza (notas recebidas)</label>
+                    <select id="desNaturezaRecebida" name="des_natureza_recebida">
+                        <option value="A">A - Sem Dedução</option>
+                        <option value="B">B - Com Dedução</option>
+                        <option value="C">C - Isenta de ISSQN</option>
+                        <option value="F">F - Imune</option>
+                        <option value="J">J - Microempresa</option>
+                        <option value="Q">Q - Não Tributável</option>
+                    </select>
+                </div>
+                <div class="row-actions" style="flex:none;">
+                    <button class="btn btn-small" type="submit"><i class="fa-solid fa-file-lines"></i> Baixar TXT da DES</button>
                 </div>
             </form>
         </section>

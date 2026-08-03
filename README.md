@@ -262,6 +262,7 @@ O SQL inclui atualizações idempotentes. A alteração da tabela `funcionarios`
 | `processar-nfse-adn-automatico.php` | Cron/admin da sincronização automática do buscador de NFS-e |
 | `includes/xlsx-writer.php` | Gerador de `.xlsx` sem dependências externas (OOXML via `ZipArchive`), usado pelo relatório de impostos |
 | `includes/impostos-xml.php` | Extração dos valores de imposto a partir do `xml_completo` sincronizado (NF-e/NFS-e), para o relatório Excel dos buscadores DFe/ADN |
+| `includes/des-bh-txt.php` | Gerador do arquivo `.txt` de importação da DES (Declaração Eletrônica de Serviços) de Belo Horizonte - leiaute oficial v2.05 (registros H/E/R), usado pelo buscador de NFS-e ADN |
 | `notas-fiscais-schema.sql` | Schema fiscal |
 | `seguranca.php` | Sessão, CSRF e segurança |
 | `backup-banco-dados.php` | Backup diário dos dois bancos (dump via PDO) para o Google Drive |
