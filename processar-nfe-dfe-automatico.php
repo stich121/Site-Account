@@ -1,6 +1,10 @@
 <?php
 // Coloca em dia, com TODAS as empresas emissoras que já têm certificado A1 válido, a cópia local
-// do buscador de NF-e (notas_fiscais_nfe_dfe), sem precisar que ninguém abra a página.
+// dos buscadores de NF-e (notas_fiscais_nfe_dfe) E NFC-e (notas_fiscais_nfce_dfe), sem precisar
+// que ninguém abra nenhuma das duas páginas. As duas usam a MESMA chamada sefazDistDFe() por
+// empresa (a SEFAZ devolve os dois modelos de documento juntos - ver nfe-distribuicao-integracao.php),
+// então este único cron já mantém ambos os buscadores em dia; não existe (nem deveria existir) um
+// cron separado só para NFC-e, pois isso dobraria as chamadas à SEFAZ por CNPJ sem necessidade.
 // Pode rodar via navegador (admin, botão manual) ou via CLI/cron:
 //   php processar-nfe-dfe-automatico.php --cli
 //
@@ -110,7 +114,7 @@ $csrf = h($_SESSION['csrf_processar_nfe_dfe'] ?? '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sincronização Automática do Buscador de NF-e | ACCOUNT Contabilidade</title>
+    <title>Sincronização Automática dos Buscadores de NF-e e NFC-e | ACCOUNT Contabilidade</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
@@ -127,8 +131,8 @@ $csrf = h($_SESSION['csrf_processar_nfe_dfe'] ?? '');
         </header>
 
         <section class="panel">
-            <h1>Sincronização Automática do Buscador de NF-e</h1>
-            <p class="muted">O buscador de NF-e já sincroniza sozinho uma empresa por visita à página (a que estiver há mais tempo sem sincronizar). Esta tela é só pra rodar manualmente ou configurar num cron — assim todas as empresas ficam em dia mesmo que ninguém abra o buscador.</p>
+            <h1>Sincronização Automática dos Buscadores de NF-e e NFC-e</h1>
+            <p class="muted">Os buscadores de <a href="notas-fiscais-nfe-dfe">NF-e</a> e <a href="notas-fiscais-nfce-dfe">NFC-e</a> já sincronizam sozinhos uma empresa por visita à respectiva página (a que estiver há mais tempo sem sincronizar). Esta tela roda a mesma sincronização pros dois de uma vez — manualmente ou por cron — assim todas as empresas ficam em dia mesmo que ninguém abra nenhum dos dois buscadores.</p>
         </section>
 
         <?php if ($erro !== ''): ?>
@@ -148,7 +152,7 @@ $csrf = h($_SESSION['csrf_processar_nfe_dfe'] ?? '');
         <div class="notice warning">
             <strong>Para rodar sozinho, sem depender de ninguém abrir esta página:</strong> configure no hPanel da Hostinger (Avançado &gt; Cron Jobs) uma tarefa a cada 10-15 minutos executando:
             <code>php <?php echo h(__DIR__); ?>/processar-nfe-dfe-automatico.php --cli</code>
-Cada execução do cron avança um pouco mais que uma sincronização manual, mas de forma espaçada (com pausas reais entre as chamadas) pra não levar um bloqueio de rate limit da SEFAZ. Um histórico retroativo grande (ex.: 3 meses numa empresa que nunca sincronizou) fica em dia ao longo de várias execuções do cron, sem precisar de nada manual.
+Cada execução do cron avança um pouco mais que uma sincronização manual, mas de forma espaçada (com pausas reais entre as chamadas) pra não levar um bloqueio de rate limit da SEFAZ. Um histórico retroativo grande (ex.: 3 meses numa empresa que nunca sincronizou) fica em dia ao longo de várias execuções do cron, sem precisar de nada manual. Essa mesma execução já busca NF-e e NFC-e juntas — não é preciso configurar um segundo cron para NFC-e.
         </div>
 
         <?php if (!empty($resultados)): ?>

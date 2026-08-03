@@ -156,5 +156,6 @@ $redirecionarEmpresaAtivaNfce = htmlspecialchars(basename($_SERVER['REQUEST_URI'
     <a class="<?php echo $abaClasseNfce('emitir'); ?>" href="notas-nfce-emitir"><i class="fa-solid fa-plus"></i> Emitir NFC-e</a>
     <a class="<?php echo $abaClasseNfce('produtos'); ?>" href="notas-nfce-produtos"><i class="fa-solid fa-boxes-stacked"></i> Produtos NFC-e</a>
     <a class="<?php echo $abaClasseNfce('config'); ?>" href="notas-nfce-config"><i class="fa-solid fa-gear"></i> Configuração NFC-e</a>
+    <a href="notas-fiscais-nfce-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFC-e (SEFAZ)</a>
     <a href="notas-fiscais"><i class="fa-solid fa-file-invoice"></i> Emissor de notas (NF-e/NFS-e)</a>
 </nav>

@@ -24,6 +24,7 @@
         <a class="btn btn-outline" href="notas-nfce-vendas"><i class="fa-solid fa-cash-register"></i> NFC-e (venda no balcão)</a>
         <a class="btn btn-outline" href="notas-fiscais-nfse-adn"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFS-e</a>
         <a class="btn btn-outline" href="notas-fiscais-nfe-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NF-e</a>
+        <a class="btn btn-outline" href="notas-fiscais-nfce-dfe"><i class="fa-solid fa-magnifying-glass"></i> Buscador de NFC-e</a>
         <a class="btn btn-outline" href="processar-fila-nfse"><i class="fa-solid fa-paper-plane"></i> Enviar fila NFS-e</a>
         <a class="btn btn-outline" href="processar-fila-nfe"><i class="fa-solid fa-paper-plane"></i> Enviar fila NF-e</a>
         <a class="btn btn-outline" href="painel"><i class="fa-solid fa-clock"></i> Painel de ponto</a>

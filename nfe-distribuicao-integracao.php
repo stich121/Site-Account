@@ -125,8 +125,19 @@ function extrairCamposNfeDfe(string $xmlConteudo, bool $documentoCompleto, strin
 // Códigos de evento (tabela oficial da NF-e) que significam "esta NF-e foi cancelada".
 const NFE_DFE_CODIGOS_EVENTO_CANCELAMENTO = ['110111'];
 
+// Extrai o modelo do documento (55 = NF-e, 65 = NFC-e) diretamente da chave de acesso - mesma
+// posição usada em extrairSerieNumeroDaChaveNfe(), sem depender do atributo "schema" do docZip
+// (que varia entre UFs) nem de reabrir o XML: a chave já vem disponível em $campos['chave_acesso'].
+function modeloDaChaveDfe(string $chave44): string
+{
+    $chave44 = preg_replace('/\D+/', '', $chave44);
+    return strlen($chave44) === 44 ? substr($chave44, 20, 2) : '';
+}
+
 // Aplica um evento (resEvento) recebido da SEFAZ: só nos interessa marcar cancelamento na nota já
-// sincronizada, identificada pela chave que o próprio evento referencia.
+// sincronizada, identificada pela chave que o próprio evento referencia. O mesmo evento é
+// verificado nas duas tabelas (NF-e e NFC-e compartilham o mesmo fluxo de Distribuição DFe) - a
+// atualização na tabela onde a chave não existir simplesmente não afeta nenhuma linha.
 function aplicarEventoNfeDfe(PDO $dbNotas, string $xmlConteudo): bool
 {
     try {
@@ -145,18 +156,65 @@ function aplicarEventoNfeDfe(PDO $dbNotas, string $xmlConteudo): bool
     $tipoEvento = !empty($noTpEvento) ? (string) $noTpEvento[0] : '';
     if ($chave !== '' && in_array($tipoEvento, NFE_DFE_CODIGOS_EVENTO_CANCELAMENTO, true)) {
         $noDhEvento = $xml->xpath('//*[local-name()="dhEvento"]');
-        $stmt = $dbNotas->prepare(
-            'UPDATE notas_fiscais_nfe_dfe
-             SET cancelada = 1, data_cancelamento = COALESCE(data_cancelamento, :data_evento), atualizado_em = NOW()
-             WHERE chave_acesso = :chave_acesso'
-        );
-        $stmt->execute([
-            'data_evento' => !empty($noDhEvento) ? date('Y-m-d H:i:s', strtotime((string) $noDhEvento[0])) : date('Y-m-d H:i:s'),
-            'chave_acesso' => $chave,
-        ]);
+        $dataEvento = !empty($noDhEvento) ? date('Y-m-d H:i:s', strtotime((string) $noDhEvento[0])) : date('Y-m-d H:i:s');
+
+        foreach (['notas_fiscais_nfe_dfe', 'notas_fiscais_nfce_dfe'] as $tabelaDfe) {
+            if ($tabelaDfe === 'notas_fiscais_nfce_dfe' && !schemaJaPreparada('notas_fiscais_nfce_dfe')) {
+                continue;
+            }
+            $stmt = $dbNotas->prepare(
+                "UPDATE {$tabelaDfe}
+                 SET cancelada = 1, data_cancelamento = COALESCE(data_cancelamento, :data_evento), atualizado_em = NOW()
+                 WHERE chave_acesso = :chave_acesso"
+            );
+            $stmt->execute(['data_evento' => $dataEvento, 'chave_acesso' => $chave]);
+        }
     }
 
     return true;
+}
+
+// Mesmo schema de notas_fiscais_nfe_dfe (ver notas-fiscais-nfe-dfe.php), só que para os
+// documentos modelo 65 (NFC-e) vindos da mesma Distribuição DFe. Preparada aqui (e não só na
+// página buscadora) porque a sincronização roda também via cron/automática antes de o usuário
+// nunca ter aberto notas-fiscais-nfce-dfe.php.
+function prepararTabelaNfceDfeCompartilhada(PDO $db): void
+{
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notas_fiscais_nfce_dfe (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            empresa_emissora_id INT UNSIGNED NOT NULL,
+            chave_acesso VARCHAR(60) NOT NULL,
+            nsu BIGINT UNSIGNED NULL,
+            tipo_documento ENUM('emitida','recebida') NOT NULL,
+            numero_nfe INT UNSIGNED NULL,
+            serie SMALLINT UNSIGNED NULL,
+            situacao ENUM('autorizada','cancelada','denegada') NOT NULL DEFAULT 'autorizada',
+            cancelada TINYINT(1) NOT NULL DEFAULT 0,
+            data_cancelamento DATETIME NULL,
+            cnpj_emitente VARCHAR(20) NULL,
+            nome_emitente VARCHAR(180) NULL,
+            cnpj_destinatario VARCHAR(20) NULL,
+            nome_destinatario VARCHAR(180) NULL,
+            natureza_operacao VARCHAR(120) NULL,
+            descricao_resumida VARCHAR(255) NULL,
+            data_emissao DATETIME NULL,
+            valor_nfe DECIMAL(14,2) NULL,
+            protocolo_autorizacao VARCHAR(30) NULL,
+            tem_documento_completo TINYINT(1) NOT NULL DEFAULT 0,
+            manifestada TINYINT(1) NOT NULL DEFAULT 0,
+            data_manifestacao DATETIME NULL,
+            xml_completo MEDIUMTEXT NULL,
+            criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_nfce_dfe_chave (chave_acesso),
+            KEY idx_nfce_dfe_empresa (empresa_emissora_id, tipo_documento, data_emissao),
+            CONSTRAINT fk_nfce_dfe_empresa
+                FOREIGN KEY (empresa_emissora_id) REFERENCES empresas_emissoras(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
 }
 
 // Manifestação do Destinatário - Ciência da Operação (evento 210210). A SEFAZ só libera o XML
@@ -207,8 +265,12 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
     $totalProcessado = 0;
 
     try {
-        $stmtUpsert = $dbNotas->prepare(
-            'INSERT INTO notas_fiscais_nfe_dfe
+        if (!schemaJaPreparada('notas_fiscais_nfce_dfe')) {
+            prepararTabelaNfceDfeCompartilhada($dbNotas);
+            marcarSchemaPreparada('notas_fiscais_nfce_dfe');
+        }
+
+        $sqlUpsertDfe = static fn (string $tabela): string => "INSERT INTO {$tabela}
                 (empresa_emissora_id, chave_acesso, nsu, tipo_documento, numero_nfe, serie, situacao,
                  cnpj_emitente, nome_emitente, cnpj_destinatario, nome_destinatario, natureza_operacao,
                  descricao_resumida, data_emissao, valor_nfe, protocolo_autorizacao, tem_documento_completo,
@@ -230,8 +292,14 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
                 protocolo_autorizacao = VALUES(protocolo_autorizacao),
                 tem_documento_completo = GREATEST(tem_documento_completo, VALUES(tem_documento_completo)),
                 xml_completo = IF(VALUES(tem_documento_completo) = 1, VALUES(xml_completo), xml_completo),
-                atualizado_em = NOW()'
-        );
+                atualizado_em = NOW()";
+
+        // Mesma chamada sefazDistDFe() serve tanto NF-e (mod 55) quanto NFC-e (mod 65) - a SEFAZ
+        // não filtra por modelo nessa distribuição, então em vez de duplicar a consulta (o que
+        // dobraria o consumo de NSU/rajada por CNPJ), o modelo é lido da própria chave de acesso
+        // (ver modeloDaChaveDfe()) e o documento é gravado na tabela correspondente.
+        $stmtUpsert = $dbNotas->prepare($sqlUpsertDfe('notas_fiscais_nfe_dfe'));
+        $stmtUpsertNfce = $dbNotas->prepare($sqlUpsertDfe('notas_fiscais_nfce_dfe'));
 
         $ultimoNsu = (int) ($empresa['nfe_dfe_ultimo_nsu'] ?? 0);
         // A SEFAZ aplica um controle de consumo bem mais rígido do que o ADN da NFS-e (o "[656]
@@ -317,7 +385,13 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
                 $campos['empresa_emissora_id'] = (int) $empresa['id'];
                 $campos['nsu'] = $nsuDoc !== '' ? (int) $nsuDoc : null;
                 $campos['xml_completo'] = $documentoCompleto ? $xmlDoc : null;
-                $stmtUpsert->execute($campos);
+
+                $modeloDocumento = modeloDaChaveDfe((string) $campos['chave_acesso']);
+                if ($modeloDocumento === '65') {
+                    $stmtUpsertNfce->execute($campos);
+                } else {
+                    $stmtUpsert->execute($campos);
+                }
                 $totalProcessado++;
             }
 
