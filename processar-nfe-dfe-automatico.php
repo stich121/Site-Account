@@ -46,7 +46,7 @@ if ($viaCli) {
 
     foreach ($resultados as $linha) {
         $situacao = $linha['sucesso'] ? 'OK' : 'FALHOU';
-        echo "{$linha['empresa']}: {$situacao} — {$linha['total']} documento(s). {$linha['mensagem']}\n";
+        echo "{$linha['empresa']}: {$situacao} — {$linha['total_nfe']} NF-e, {$linha['total_nfce']} NFC-e. {$linha['mensagem']}\n";
     }
 
     exit(0);
@@ -164,7 +164,8 @@ Cada execução do cron avança um pouco mais que uma sincronização manual, ma
                             <tr>
                                 <th>Empresa</th>
                                 <th>Resultado</th>
-                                <th>Documentos novos</th>
+                                <th>NF-e novas</th>
+                                <th>NFC-e novas</th>
                                 <th>Detalhe</th>
                             </tr>
                         </thead>
@@ -177,7 +178,8 @@ Cada execução do cron avança um pouco mais que uma sincronização manual, ma
                                             <?php echo $linha['sucesso'] ? 'Em dia' : 'Falhou'; ?>
                                         </span>
                                     </td>
-                                    <td><?php echo (int) $linha['total']; ?></td>
+                                    <td><?php echo (int) ($linha['total_nfe'] ?? 0); ?></td>
+                                    <td><?php echo (int) ($linha['total_nfce'] ?? 0); ?></td>
                                     <td><?php echo h($linha['mensagem']); ?></td>
                                 </tr>
                             <?php endforeach; ?>

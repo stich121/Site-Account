@@ -180,8 +180,10 @@ try {
             $cooldownAutoSegundos = 300;
             if ($empresaAuto !== null && (empty($empresaAuto['nfe_dfe_sincronizado_em']) || (time() - strtotime($empresaAuto['nfe_dfe_sincronizado_em'])) > $cooldownAutoSegundos)) {
                 $resultadoAuto = sincronizarNfeDfe($dbNotas, $empresaAuto);
-                if ($resultadoAuto['sucesso'] && $resultadoAuto['total'] > 0) {
-                    $sucesso = "Sincronização automática de {$empresaAuto['razao_social']}: {$resultadoAuto['total']} documento(s) novo(s).";
+                if ($resultadoAuto['sucesso'] && ($resultadoAuto['total_nfe'] ?? 0) > 0) {
+                    // Mostra só a contagem de NF-e: a mesma chamada pode ter trazido NFC-e junto
+                    // (ver comentário em sincronizarNfeDfe()), mas isso já aparece no Buscador de NFC-e.
+                    $sucesso = "Sincronização automática de {$empresaAuto['razao_social']}: {$resultadoAuto['total_nfe']} NF-e nova(s).";
                 }
             }
         }
@@ -438,7 +440,21 @@ try {
             } else {
                 $resultadoSync = sincronizarNfeDfe($dbNotas, $empresaSincronizar);
                 if ($resultadoSync['sucesso']) {
-                    $sucesso = $resultadoSync['mensagem'];
+                    // A conclusão "de verdade" (com contagem) só existe quando o retorno tem
+                    // 'mais_documentos_pendentes' - os demais casos (bloqueio, sincronização já em
+                    // andamento, fila vazia, erro da SEFAZ) já vêm com a mensagem certa pra mostrar
+                    // direto, sem misturar contagem de NF-e com NFC-e.
+                    if (array_key_exists('mais_documentos_pendentes', $resultadoSync)) {
+                        $sucesso = "Sincronização concluída: {$resultadoSync['total_nfe']} NF-e nova(s)/atualizada(s).";
+                        if (!empty($resultadoSync['mais_documentos_pendentes'])) {
+                            $sucesso .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
+                        }
+                        if (($resultadoSync['total_nfce'] ?? 0) > 0) {
+                            $sucesso .= " (A mesma consulta também trouxe {$resultadoSync['total_nfce']} NFC-e, já refletida no Buscador de NFC-e.)";
+                        }
+                    } else {
+                        $sucesso = $resultadoSync['mensagem'];
+                    }
                 } else {
                     $erro = $resultadoSync['mensagem'];
                 }

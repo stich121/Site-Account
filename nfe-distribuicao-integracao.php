@@ -288,20 +288,27 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
 {
     [$ok, $erro, $tools] = montarToolsNfe($empresa);
     if (!$ok) {
-        return ['sucesso' => false, 'mensagem' => $erro, 'total' => 0];
+        return ['sucesso' => false, 'mensagem' => $erro, 'total' => 0, 'total_nfe' => 0, 'total_nfce' => 0];
     }
 
     $cnpjEmpresa = preg_replace('/\D+/', '', (string) ($empresa['cnpj'] ?? ''));
     if ($cnpjEmpresa === '') {
-        return ['sucesso' => false, 'mensagem' => 'Empresa sem CNPJ cadastrado; cadastre o CNPJ em Empresas emissoras.', 'total' => 0];
+        return ['sucesso' => false, 'mensagem' => 'Empresa sem CNPJ cadastrado; cadastre o CNPJ em Empresas emissoras.', 'total' => 0, 'total_nfe' => 0, 'total_nfce' => 0];
     }
 
     $empresaIdLock = (int) $empresa['id'];
     if (!obterLockDfeEmpresa($dbNotas, $empresaIdLock)) {
-        return ['sucesso' => true, 'mensagem' => 'Já existe uma sincronização em andamento para essa empresa (outra aba, o cron, ou o outro buscador). Aguarde alguns instantes e tente de novo.', 'total' => 0];
+        return ['sucesso' => true, 'mensagem' => 'Já existe uma sincronização em andamento para essa empresa (outra aba, o cron, ou o outro buscador). Aguarde alguns instantes e tente de novo.', 'total' => 0, 'total_nfe' => 0, 'total_nfce' => 0];
     }
 
+    // $totalProcessado soma NF-e + NFC-e (usado só pra controle interno de laço/retry). Os dois
+    // contadores por tipo existem porque a mesma chamada sefazDistDFe() sempre traz os dois
+    // juntos (ver comentário em modeloDaChaveDfe()) - não tem como buscar só um dos dois na
+    // SEFAZ, então cada buscador (NF-e/NFC-e) mostra pro usuário só a contagem do seu próprio
+    // tipo, mesmo a chamada real sendo compartilhada.
     $totalProcessado = 0;
+    $totalProcessadoNfe = 0;
+    $totalProcessadoNfce = 0;
 
     try {
         if (!schemaJaPreparada('notas_fiscais_nfce_dfe')) {
@@ -386,7 +393,7 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
                     ->execute(['id' => (int) $empresa['id']]);
 
                 if ($totalProcessado === 0) {
-                    return ['sucesso' => true, 'mensagem' => 'Nenhum documento novo no momento - fila em dia. Próxima verificação liberada em até 1 hora, conforme a regra da SEFAZ para fila vazia.', 'total' => 0];
+                    return ['sucesso' => true, 'mensagem' => 'Nenhum documento novo no momento - fila em dia. Próxima verificação liberada em até 1 hora, conforme a regra da SEFAZ para fila vazia.', 'total' => 0, 'total_nfe' => 0, 'total_nfce' => 0];
                 }
                 break;
             }
@@ -399,7 +406,7 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
                     ->execute(['id' => (int) $empresa['id']]);
 
                 if ($totalProcessado === 0) {
-                    return ['sucesso' => true, 'mensagem' => "Portal da SEFAZ: [{$cStat}] {$xMotivo}", 'total' => 0];
+                    return ['sucesso' => true, 'mensagem' => "Portal da SEFAZ: [{$cStat}] {$xMotivo}", 'total' => 0, 'total_nfe' => 0, 'total_nfce' => 0];
                 }
                 break;
             }
@@ -444,8 +451,10 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
                 $modeloDocumento = modeloDaChaveDfe((string) $campos['chave_acesso']);
                 if ($modeloDocumento === '65') {
                     $stmtUpsertNfce->execute($campos);
+                    $totalProcessadoNfce++;
                 } else {
                     $stmtUpsert->execute($campos);
+                    $totalProcessadoNfe++;
                 }
                 $totalProcessado++;
             }
@@ -493,7 +502,7 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             }
         }
 
-        $mensagem = "Sincronização concluída: {$totalProcessado} documento(s) novo(s)/atualizado(s).";
+        $mensagem = "Sincronização concluída: {$totalProcessadoNfe} NF-e e {$totalProcessadoNfce} NFC-e novo(s)/atualizado(s).";
         if ($totalManifestado > 0) {
             $mensagem .= " Ciência da Operação enviada para {$totalManifestado} nota(s) recebida(s); o XML completo delas deve aparecer numa próxima sincronização.";
         }
@@ -501,9 +510,9 @@ function sincronizarNfeDfe(PDO $dbNotas, array $empresa): array
             $mensagem .= ' Se ainda houver documentos mais antigos pendentes, clique em "Sincronizar agora" de novo para continuar.';
         }
 
-        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado, 'mais_documentos_pendentes' => $maisDocumentosPendentes];
+        return ['sucesso' => true, 'mensagem' => $mensagem, 'total' => $totalProcessado, 'total_nfe' => $totalProcessadoNfe, 'total_nfce' => $totalProcessadoNfce, 'mais_documentos_pendentes' => $maisDocumentosPendentes];
     } catch (Throwable $e) {
-        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar a SEFAZ: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado];
+        return ['sucesso' => false, 'mensagem' => 'Falha ao consultar a SEFAZ: ' . trim(strip_tags($e->getMessage())), 'total' => $totalProcessado, 'total_nfe' => $totalProcessadoNfe, 'total_nfce' => $totalProcessadoNfce];
     } finally {
         liberarLockDfeEmpresa($dbNotas, $empresaIdLock);
     }
@@ -528,11 +537,13 @@ function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpre
         }
 
         if (!empty($empresa['nfe_dfe_bloqueado_ate']) && strtotime($empresa['nfe_dfe_bloqueado_ate']) > time()) {
-            $resultados[] = ['empresa' => $empresa['razao_social'], 'sucesso' => true, 'total' => 0, 'mensagem' => 'Bloqueada pela SEFAZ até ' . date('d/m/Y H:i', strtotime($empresa['nfe_dfe_bloqueado_ate'])) . '.'];
+            $resultados[] = ['empresa' => $empresa['razao_social'], 'sucesso' => true, 'total' => 0, 'total_nfe' => 0, 'total_nfce' => 0, 'mensagem' => 'Bloqueada pela SEFAZ até ' . date('d/m/Y H:i', strtotime($empresa['nfe_dfe_bloqueado_ate'])) . '.'];
             continue;
         }
 
         $totalEmpresa = 0;
+        $totalEmpresaNfe = 0;
+        $totalEmpresaNfce = 0;
         $ultimaMensagem = '';
         $ultimoSucesso = true;
 
@@ -550,6 +561,8 @@ function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpre
             $ultimaMensagem = $resultado['mensagem'];
             $ultimoSucesso = $resultado['sucesso'];
             $totalEmpresa += $resultado['total'];
+            $totalEmpresaNfe += $resultado['total_nfe'] ?? 0;
+            $totalEmpresaNfce += $resultado['total_nfce'] ?? 0;
 
             // Continua tentando mesmo com total=0 na leva, desde que ainda haja sinal de mais
             // documento pela frente - ver comentário em sincronizarNfeDfe(). Só para de fato
@@ -567,6 +580,8 @@ function sincronizarTodasEmpresasNfeDfe(PDO $dbNotas, int $maxTentativasPorEmpre
             'empresa' => $empresa['razao_social'],
             'sucesso' => $ultimoSucesso,
             'total' => $totalEmpresa,
+            'total_nfe' => $totalEmpresaNfe,
+            'total_nfce' => $totalEmpresaNfce,
             'mensagem' => $ultimaMensagem,
         ];
     }
