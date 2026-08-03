@@ -433,6 +433,8 @@ try {
                 $erro = 'Selecione uma empresa emissora válida para sincronizar.';
             } elseif (!empty($empresaSincronizar['nfe_dfe_bloqueado_ate']) && strtotime($empresaSincronizar['nfe_dfe_bloqueado_ate']) > time()) {
                 $erro = "A SEFAZ ainda está bloqueando essa empresa por excesso de requisições (aguarde até " . date('d/m/Y H:i', strtotime($empresaSincronizar['nfe_dfe_bloqueado_ate'])) . "). Tentar de novo antes disso só reinicia o bloqueio.";
+            } elseif (sincronizacaoDfeMuitoRecente($empresaSincronizar)) {
+                $erro = 'Essa empresa acabou de ser sincronizada há menos de 1 minuto (automaticamente, ao abrir esta página ou o Buscador de NFC-e, que compartilha a mesma consulta). Aguarde um pouco e tente de novo — chamar a SEFAZ de novo rápido demais é o que causa o bloqueio de "Consumo Indevido", mesmo numa empresa nunca sincronizada antes.';
             } else {
                 $resultadoSync = sincronizarNfeDfe($dbNotas, $empresaSincronizar);
                 if ($resultadoSync['sucesso']) {

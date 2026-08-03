@@ -125,6 +125,19 @@ function extrairCamposNfeDfe(string $xmlConteudo, bool $documentoCompleto, strin
 // Códigos de evento (tabela oficial da NF-e) que significam "esta NF-e foi cancelada".
 const NFE_DFE_CODIGOS_EVENTO_CANCELAMENTO = ['110111'];
 
+// Evita chamar a SEFAZ de novo pra mesma empresa poucos segundos depois de uma sincronização
+// anterior - seja ela automática (silenciosa, dispara sozinha ao abrir qualquer um dos dois
+// buscadores) ou manual. Sem essa guarda, o auto-sync que já roda ao abrir a página + um clique
+// manual logo em seguida (ou o usuário abrindo o buscador de NF-e e o de NFC-e em sequência, já
+// que os dois compartilham o mesmo NSU/CNPJ) bastam pra dois pedidos reais caírem na SEFAZ com
+// poucos segundos de diferença - o suficiente pra ela devolver [656] Consumo Indevido mesmo numa
+// empresa que nunca tinha sido sincronizada antes.
+function sincronizacaoDfeMuitoRecente(array $empresa, int $segundosMinimos = 60): bool
+{
+    return !empty($empresa['nfe_dfe_sincronizado_em'])
+        && (time() - strtotime((string) $empresa['nfe_dfe_sincronizado_em'])) < $segundosMinimos;
+}
+
 // Extrai o modelo do documento (55 = NF-e, 65 = NFC-e) diretamente da chave de acesso - mesma
 // posição usada em extrairSerieNumeroDaChaveNfe(), sem depender do atributo "schema" do docZip
 // (que varia entre UFs) nem de reabrir o XML: a chave já vem disponível em $campos['chave_acesso'].
