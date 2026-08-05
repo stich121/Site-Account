@@ -196,6 +196,28 @@ try {
                     $sucesso = 'Funcionário excluído definitivamente.';
                 }
             }
+        } elseif (($_POST['acao'] ?? '') === 'resetar_senha') {
+            $id = (int) ($_POST['funcionario_id'] ?? 0);
+            $novaSenha = (string) ($_POST['nova_senha'] ?? '');
+
+            if ($id <= 0 || $id === $funcionarioId) {
+                $erro = 'Não foi possível redefinir a senha deste funcionário.';
+            } elseif (strlen($novaSenha) < 6) {
+                $erro = 'A nova senha deve ter pelo menos 6 caracteres.';
+            } else {
+                $stmt = $db->prepare('SELECT id FROM funcionarios WHERE id = :id LIMIT 1');
+                $stmt->execute(['id' => $id]);
+                if (!$stmt->fetch()) {
+                    $erro = 'Funcionário não encontrado.';
+                } else {
+                    $stmt = $db->prepare('UPDATE funcionarios SET senha = :senha WHERE id = :id');
+                    $stmt->execute([
+                        'senha' => password_hash($novaSenha, PASSWORD_DEFAULT),
+                        'id' => $id,
+                    ]);
+                    $sucesso = 'Senha redefinida com sucesso.';
+                }
+            }
         }
     }
 
@@ -422,6 +444,22 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
             flex-wrap: wrap;
         }
 
+        td .row-actions + .row-actions,
+        td .reset-senha-form + div {
+            margin-top: 0.5rem;
+        }
+
+        .reset-senha-form input[type="password"] {
+            width: 120px;
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: var(--input-bg);
+            color: var(--text-white);
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+        }
+
         .delete-confirm {
             display: inline-flex;
             align-items: center;
@@ -595,6 +633,13 @@ $csrf = h($_SESSION['csrf_gerenciar_funcionarios'] ?? '');
                                 </td>
                                 <td>
                                     <?php if ((int) $funcionario['id'] !== $funcionarioId): ?>
+                                        <form method="post" class="row-actions reset-senha-form">
+                                            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+                                            <input type="hidden" name="funcionario_id" value="<?php echo h((string) $funcionario['id']); ?>">
+                                            <input type="hidden" name="acao" value="resetar_senha">
+                                            <input type="password" name="nova_senha" placeholder="Nova senha" minlength="6" required>
+                                            <button class="btn btn-outline" type="submit" onclick="return confirm('Redefinir a senha deste funcionário?');"><i class="fa-solid fa-key"></i> Redefinir senha</button>
+                                        </form>
                                         <?php if ((int) $funcionario['ativo'] === 1): ?>
                                             <form method="post" class="row-actions">
                                                 <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
